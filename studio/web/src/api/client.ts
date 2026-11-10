@@ -159,6 +159,8 @@ export const renderFileUrl = (pid: string, rid: string) =>
 export const fppProbe = (host: string) => request<FppProbe>("POST", "/fpp/probe", { host });
 export const fppStatus = (host: string) =>
   request<FppStatus>("GET", `/fpp/status?host=${enc(host)}`);
+export const fppSequences = (host: string) =>
+  request<{ sequences: string[] }>("GET", `/fpp/sequences?host=${enc(host)}`);
 export const publish = (
   pid: string,
   body: {

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import socket
 import time
 from pathlib import Path
@@ -182,6 +183,43 @@ def test_publish(client: TestClient, tmp_path: Path, fake_fpp: FakeFpp) -> None:
     assert job["state"] == "succeeded", job
     assert job["result"]["media_name"].endswith("_align.mp4")
     assert job["result"]["playlist_name"] == "FacadeKit - Show (alignment)"
+
+
+def test_sequences(client: TestClient, fake_fpp: FakeFpp) -> None:
+    seq_dir = fake_fpp.state_dir / "sequences"
+    seq_dir.mkdir(parents=True, exist_ok=True)
+    for name in ("b.fseq", "A.fseq", "x.txt"):
+        (seq_dir / name).write_bytes(b"seq")
+    resp = client.get(f"{API}/fpp/sequences", params={"host": fake_fpp.host})
+    assert resp.status_code == 200
+    assert resp.json() == {"sequences": ["A.fseq", "b.fseq"]}
+    dead = client.get(f"{API}/fpp/sequences", params={"host": _closed_host()})
+    assert dead.status_code == 200
+    assert dead.json() == {"sequences": []}
+    bad = client.get(f"{API}/fpp/sequences", params={"host": "u@h"})
+    assert bad.status_code == 422
+
+
+def test_publish_with_sequence(client: TestClient, tmp_path: Path, fake_fpp: FakeFpp) -> None:
+    pid = _make_project(client, tmp_path)
+    show = _render(client, pid)
+    resp = client.post(
+        f"{API}/projects/{pid}/publish",
+        json={
+            "host": fake_fpp.host,
+            "render_id": show["render_id"],
+            "start": False,
+            "sequence_name": "A.fseq",
+        },
+    )
+    assert resp.status_code == 202
+    job = _wait(client, resp.json()["job_id"])
+    assert job["state"] == "succeeded", job
+    playlist = fake_fpp.state_dir / "playlists" / f"{job['result']['playlist_name']}.json"
+    entry = json.loads(playlist.read_text(encoding="utf-8"))["mainPlaylist"][0]
+    assert entry["type"] == "both"
+    assert entry["sequenceName"] == "A.fseq"
+    assert entry["mediaName"] == f"fk_{pid}.mp4"
 
 
 def test_publish_validation(client: TestClient, tmp_path: Path, fake_fpp: FakeFpp) -> None:

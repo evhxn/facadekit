@@ -63,7 +63,11 @@ export default function PublishPage() {
         onSelect={setSelectedId}
         onRendered={(rid) => refresh(rid)}
       />
-      <FppPanel project={project} selectedRenderId={selectedId} />
+      <FppPanel
+        project={project}
+        selectedRenderId={selectedId}
+        onRendered={(rid) => refresh(rid)}
+      />
       <nav className={styles.nav}>
         <Link to={`/p/${project.id}/arrange`}>Back</Link>
       </nav>

@@ -10,7 +10,7 @@ from facadekit.api.deps import AppState, get_state
 from facadekit.api.routes_render import render_file, render_kind
 from facadekit.errors import BAD_REQUEST, REVISION_CONFLICT, FkError
 from facadekit.fpp.client import FppClient
-from facadekit.fpp.publish import probe_fpp, publish_render
+from facadekit.fpp.publish import SEQUENCES_DIR, probe_fpp, publish_render
 
 router = APIRouter()
 
@@ -58,6 +58,22 @@ def fpp_status(host: str) -> dict[str, Any]:
     finally:
         if client is not None:
             client.close()
+
+
+@router.get("/fpp/sequences")
+def fpp_sequences(host: str) -> dict[str, list[str]]:
+    check_host(host)
+    client: FppClient | None = None
+    try:
+        client = FppClient(host, timeout=3)
+        names = client.list_files(SEQUENCES_DIR)
+    except FkError:
+        return {"sequences": []}
+    finally:
+        if client is not None:
+            client.close()
+    fseq = [name for name in names if name.lower().endswith(".fseq")]
+    return {"sequences": sorted(fseq, key=str.lower)}
 
 
 @router.post("/projects/{pid}/publish", status_code=202)

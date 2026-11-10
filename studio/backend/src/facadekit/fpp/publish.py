@@ -16,6 +16,7 @@ from facadekit.errors import FkError
 from facadekit.fpp.client import FppClient
 
 VIDEO_DIR = "videos"  # FPP media directory for video files [assumption; spike S-1]
+SEQUENCES_DIR = "sequences"  # FPP directory for light sequence files (.fseq) [assumption]
 MIN_FPP_MAJOR = 10
 NAME_PREFIX = "fk_"
 FALLBACK_STEM = "show"

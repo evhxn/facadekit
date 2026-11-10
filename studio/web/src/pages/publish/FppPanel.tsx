@@ -1,5 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { ApiError, cancelJob, fppProbe, fppStatus, publish, startRender } from "../../api/client";
+import {
+  ApiError,
+  cancelJob,
+  fppProbe,
+  fppSequences,
+  fppStatus,
+  publish,
+  startRender,
+} from "../../api/client";
 import { waitForJob } from "../../api/events";
 import { userMessage } from "../../api/errors";
 import type { FppProbe, FppStatus, Job, Project } from "../../api/types";
@@ -21,19 +29,46 @@ function failureMessage(job: Job, fallback: string): string {
   return job.error ? userMessage(job.error.code, job.error.message) : fallback;
 }
 
+function seqKey(projectId: string): string {
+  return `fk.seq.${projectId}`;
+}
+
+function readSequence(projectId: string): string {
+  try {
+    return window.localStorage.getItem(seqKey(projectId)) ?? "";
+  } catch {
+    // Storage can be blocked (private windows); the choice is then simply not remembered.
+    return "";
+  }
+}
+
+function writeSequence(projectId: string, value: string): void {
+  try {
+    window.localStorage.setItem(seqKey(projectId), value);
+  } catch {
+    // Storage can be blocked (private windows); the choice is then simply not remembered.
+  }
+}
+
 export default function FppPanel({
   project,
   selectedRenderId,
+  onRendered,
 }: {
   project: Project;
   selectedRenderId: string | null;
+  onRendered?: (renderId: string) => Promise<void>;
 }) {
-  const defaultName = `FacadeKit - ${project.name}`;
   const [hostInput, setHostInput] = useState(project.fpp.host ?? "");
   const [connected, setConnected] = useState<FppProbe | null>(null);
   const [problems, setProblems] = useState<string[]>([]);
   const [connectError, setConnectError] = useState<string | null>(null);
-  const [playlist, setPlaylist] = useState(defaultName);
+  const [sequences, setSequences] = useState<string[]>([]);
+  const [sequence, setSequence] = useState(() => readSequence(project.id));
+  const [playlistEdit, setPlaylistEdit] = useState<string | null>(null);
+  const [seqJob, setSeqJob] = useState<Job | null>(null);
+  const [seqError, setSeqError] = useState<string | null>(null);
+  const [seqRendering, setSeqRendering] = useState(false);
   const [startNow, setStartNow] = useState(true);
   const [sendJob, setSendJob] = useState<Job | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
@@ -46,6 +81,11 @@ export default function FppPanel({
   const [alignDone, setAlignDone] = useState(false);
   const [aligning, setAligning] = useState(false);
   const mounted = useRef(true);
+
+  const plainName = `FacadeKit - ${project.name}`;
+  const sequenceLabel = sequence.replace(/\.fseq$/i, "");
+  const defaultName = sequence ? `${plainName} + ${sequenceLabel}` : plainName;
+  const playlist = playlistEdit ?? defaultName;
 
   useEffect(() => {
     mounted.current = true;
@@ -98,6 +138,7 @@ export default function FppPanel({
     setConnectError(null);
     setProblems([]);
     setConnected(null);
+    setSequences([]);
     setHostInput(host);
     try {
       const probe = await fppProbe(host);
@@ -107,6 +148,15 @@ export default function FppPanel({
         useProjectStore.getState().update((d) => {
           d.fpp.host = host;
         });
+        let found: string[] = [];
+        try {
+          found = (await fppSequences(host)).sequences;
+        } catch {
+          found = [];
+        }
+        if (!mounted.current) return;
+        setSequences(found);
+        setSequence((cur) => (found.includes(cur) ? cur : ""));
       } else {
         setProblems(
           probe.problems.length > 0
@@ -135,12 +185,20 @@ export default function FppPanel({
     setSending(true);
     setSendJob(null);
     try {
-      const body: { host: string; render_id: string; playlist_name?: string; start: boolean } = {
+      const body: {
+        host: string;
+        render_id: string;
+        playlist_name?: string;
+        start: boolean;
+        sequence_name?: string;
+      } = {
         host,
         render_id: selectedRenderId,
         start: startNow,
       };
-      if (playlist !== defaultName) body.playlist_name = playlist;
+      // The server's own default is the plain name, so send the name whenever it differs from it.
+      if (playlist !== plainName) body.playlist_name = playlist;
+      if (sequence) body.sequence_name = sequence;
       const { job_id } = await publish(project.id, body);
       const final = await waitForJob(job_id, (j) => mounted.current && setSendJob(j));
       if (!mounted.current) return;
@@ -205,6 +263,43 @@ export default function FppPanel({
     }
   };
 
+  const chooseSequence = (value: string) => {
+    setSequence(value);
+    writeSequence(project.id, value);
+  };
+
+  const renderWithoutAudio = async () => {
+    setSeqError(null);
+    setSeqRendering(true);
+    setSeqJob(null);
+    try {
+      await useProjectStore.getState().saveNow();
+      const { job_id } = await startRender(project.id, {
+        preset: "pi3-1080p30",
+        include_audio: false,
+        kind: "show",
+      });
+      const final = await waitForJob(job_id, (j) => mounted.current && setSeqJob(j));
+      if (!mounted.current) return;
+      setSeqJob(null);
+      if (final.state === "succeeded") {
+        const rid = typeof final.result?.render_id === "string" ? final.result.render_id : "";
+        if (rid && onRendered) await onRendered(rid);
+      } else if (final.state === "failed") {
+        setSeqError(failureMessage(final, "Rendering without audio failed."));
+      }
+    } catch (e) {
+      if (mounted.current)
+        setSeqError(
+          e instanceof ApiError
+            ? userMessage(e.code, e.message)
+            : "Rendering without audio failed.",
+        );
+    } finally {
+      if (mounted.current) setSeqRendering(false);
+    }
+  };
+
   const cancel = (job: Job) => () => void cancelJob(job.id).catch(() => {});
 
   return (
@@ -239,13 +334,50 @@ export default function FppPanel({
             {status.current_playlist ? `FPP is playing ${status.current_playlist}` : "FPP is idle"}
           </p>
         ) : null}
+        {isConnected ? (
+          <div className={styles.row}>
+            <label>
+              Play together with a light sequence{" "}
+              <select
+                className={styles.input}
+                value={sequence}
+                onChange={(e) => chooseSequence(e.target.value)}
+              >
+                <option value="">None (video only)</option>
+                {sequences.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <span className={styles.note}>
+              Choose the sequence that uses the same song. FPP will start the lights and the
+              projection together.
+            </span>
+          </div>
+        ) : null}
+        {isConnected && sequence ? (
+          <div className={styles.reminder}>
+            <p>
+              Your light sequence and this video should not both play the song. Render the video{" "}
+              <strong>without audio</strong>, or remove the audio from the sequence's playlist
+              entry.
+            </p>
+            <button type="button" onClick={() => void renderWithoutAudio()} disabled={seqRendering}>
+              Render without audio now
+            </button>
+            {seqJob ? <JobProgress job={seqJob} onCancel={cancel(seqJob)} /> : null}
+            {seqError ? <ErrorBanner message={seqError} /> : null}
+          </div>
+        ) : null}
         <div className={styles.row}>
           <label>
             Playlist name{" "}
             <input
               className={styles.input}
               value={playlist}
-              onChange={(e) => setPlaylist(e.target.value)}
+              onChange={(e) => setPlaylistEdit(e.target.value)}
             />
           </label>
           <label>

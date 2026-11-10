@@ -12,6 +12,7 @@ const api = vi.hoisted(() => ({
   renderFileUrl: vi.fn((p: string, r: string) => `/r/${p}/${r}`),
   fppProbe: vi.fn(),
   fppStatus: vi.fn(),
+  fppSequences: vi.fn(),
   publish: vi.fn(),
   cancelJob: vi.fn(),
 }));
@@ -66,6 +67,8 @@ const saveNow = vi.fn(() => Promise.resolve());
 
 beforeEach(() => {
   vi.clearAllMocks();
+  window.localStorage.clear();
+  api.fppSequences.mockResolvedValue({ sequences: [] });
   api.listRenders.mockResolvedValue([r1]);
   api.fppStatus.mockResolvedValue({
     status_name: "idle",
@@ -190,5 +193,55 @@ describe("PublishPage", () => {
       kind: "alignment_check",
     });
     await screen.findByText(/Look at the house/);
+  });
+
+  it("lists light sequences after connect and sends the chosen one", async () => {
+    api.fppSequences.mockResolvedValue({ sequences: ["A.fseq", "b.fseq"] });
+    api.publish.mockResolvedValue({ job_id: "j2" });
+    waitForJob.mockResolvedValue(job({ kind: "publish", result: {} }));
+    renderPage();
+    await screen.findByText("old.mp4");
+    await connect();
+    await screen.findByRole("option", { name: "b.fseq" });
+    expect(api.fppSequences).toHaveBeenCalledWith("fpp.local");
+    expect(screen.queryByText(/should not both play the song/)).toBeNull();
+
+    fireEvent.change(screen.getByLabelText(/Play together with a light sequence/), {
+      target: { value: "A.fseq" },
+    });
+    expect(window.localStorage.getItem("fk.seq.prj_1")).toBe("A.fseq");
+    expect(await screen.findByText(/should not both play the song/)).toBeTruthy();
+    fireEvent.click(screen.getByText("Send to FPP"));
+    await waitFor(() =>
+      expect(api.publish).toHaveBeenCalledWith("prj_1", {
+        host: "fpp.local",
+        render_id: "r1",
+        start: true,
+        sequence_name: "A.fseq",
+        playlist_name: expect.stringMatching(/ \+ A$/),
+      }),
+    );
+  });
+
+  it("renders without audio from the sequence warning and selects the new render", async () => {
+    api.fppSequences.mockResolvedValue({ sequences: ["A.fseq"] });
+    api.startRender.mockResolvedValue({ job_id: "j3" });
+    waitForJob.mockResolvedValue(job({ result: { render_id: "r3" } }));
+    api.listRenders.mockResolvedValueOnce([r1]).mockResolvedValue([{ ...r1, render_id: "r3" }]);
+    renderPage();
+    await screen.findByText("old.mp4");
+    await connect();
+    await screen.findByRole("option", { name: "A.fseq" });
+    fireEvent.change(screen.getByLabelText(/Play together with a light sequence/), {
+      target: { value: "A.fseq" },
+    });
+    fireEvent.click(await screen.findByText("Render without audio now"));
+    await waitFor(() =>
+      expect(api.startRender).toHaveBeenCalledWith(
+        "prj_1",
+        expect.objectContaining({ include_audio: false, kind: "show" }),
+      ),
+    );
+    await waitFor(() => expect(api.listRenders).toHaveBeenCalledTimes(2));
   });
 });
