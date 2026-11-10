@@ -13,7 +13,7 @@ dependencies = [
     "uvicorn[standard]",
     "pydantic>=2",
     "numpy",
-    "opencv-python-headless",
+    "opencv-python-headless>=4.9,<5",
     "imageio-ffmpeg",
     "httpx",
     "python-multipart",
