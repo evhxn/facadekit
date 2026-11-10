@@ -15,6 +15,7 @@ export default function SetupPage() {
   const [step, setStep] = useState<number | null>(null);
   const [projectorReady, setProjectorReady] = useState(false);
   const [cameraId, setCameraId] = useState<string | null>(null);
+  const [piHost, setPiHost] = useState<string | null>(null); // FPP address when the projector is on the Pi
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -38,9 +39,16 @@ export default function SetupPage() {
       <p className={styles.steps}>
         Step {step} of 3: {TITLES[step - 1]}
       </p>
-      {step === 1 ? <StepProjector project={project} onReadyChange={setProjectorReady} /> : null}
+      {step === 1 ? (
+        <StepProjector
+          project={project}
+          piHost={piHost}
+          onPiHostChange={setPiHost}
+          onReadyChange={setProjectorReady}
+        />
+      ) : null}
       {step === 2 ? <StepCamera cameraId={cameraId} onCameraChange={setCameraId} /> : null}
-      {step === 3 ? <StepScan project={project} cameraId={cameraId} /> : null}
+      {step === 3 ? <StepScan project={project} cameraId={cameraId} piHost={piHost} /> : null}
       {step === 3 && project.calibration_id && project.surfaces.length > 0 ? (
         <StepRealign project={project} cameraId={cameraId} />
       ) : null}

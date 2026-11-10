@@ -12,8 +12,22 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict
 
 from facadekit.api.deps import AppState, get_state
-from facadekit.calib.pipeline import create_manual_calibration, load_calibration, run_calibration
+from facadekit.calib.patterns import PatternSpec, pattern_sequence
+from facadekit.calib.pipeline import (
+    create_manual_calibration,
+    load_calibration,
+    run_calibration,
+    run_calibration_from_capture,
+)
 from facadekit.calib.realign import apply_drift, estimate_drift
+from facadekit.calib.selfclock import (
+    RECORD_MARGIN_S,
+    SCAN_PLAYLIST,
+    record_and_capture,
+    render_pattern_video,
+    scan_media_name,
+    video_seconds,
+)
 from facadekit.devices.base import ProjectorDisplay
 from facadekit.devices.display_ws import WsDisplay
 from facadekit.errors import (
@@ -23,7 +37,10 @@ from facadekit.errors import (
     REVISION_CONFLICT,
     FkError,
 )
+from facadekit.fpp.client import FppClient
+from facadekit.fpp.publish import publish_render
 from facadekit.geom.homography import apply_h
+from facadekit.ids import new_id
 from facadekit.models.calibration import Calibration, CalibSettings
 from facadekit.models.project import Project
 
@@ -38,8 +55,9 @@ State = Annotated[AppState, Depends(get_state)]
 class CalibrationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    mode: Literal["scan", "manual"]
+    mode: Literal["scan", "manual", "scan_pi"]
     camera_id: str | None = None
+    host: str | None = None
     settings: CalibSettings | None = None
 
 
@@ -82,8 +100,13 @@ def start_calibration(pid: str, body: CalibrationRequest, state: State) -> dict[
 
     camera_id = body.camera_id
     if not camera_id:
-        raise FkError(BAD_REQUEST, "camera_id: required for mode 'scan'")
+        raise FkError(BAD_REQUEST, f"camera_id: required for mode '{body.mode}'")
     state.cameras.validate(camera_id)
+
+    if body.mode == "scan_pi":
+        if not body.host:
+            raise FkError(BAD_REQUEST, "host: required for mode 'scan_pi'")
+        return {"job_id": _submit_pi_scan(state, pid, project, body.host, camera_id, settings)}
 
     display: ProjectorDisplay
     if state.sim:
@@ -115,6 +138,65 @@ def start_calibration(pid: str, body: CalibrationRequest, state: State) -> dict[
         return _finish(state, pid, cal.id)
 
     return {"job_id": state.jobs.submit("calibration", scan_job).id}
+
+
+def _submit_pi_scan(
+    state: AppState, pid: str, project: Project, host: str, camera_id: str, settings: CalibSettings
+) -> str:
+    """Scan with the projector on the Pi: upload a pattern video, play it, record the camera."""
+    project_dir = state.store.project_dir(pid)
+    spec = PatternSpec(project.projector.width, project.projector.height, settings.skip_lsb)
+    n_patterns = len(pattern_sequence(spec))
+
+    def pi_job(progress: Progress, cancel: Cancel) -> dict[str, Any]:
+        def stage(lo: float, hi: float) -> Progress:
+            return lambda f, m: progress(lo + (hi - lo) * f, m)
+
+        out_dir = project_dir / "renders"
+        out_dir.mkdir(exist_ok=True)
+        video = out_dir / f"{new_id('rnd')}.mp4"
+        try:
+            progress(0.0, "Rendering the pattern video")
+            render_pattern_video(spec, video)
+            publish_render(
+                host,
+                video,
+                media_name=scan_media_name(pid),
+                playlist_name=SCAN_PLAYLIST,
+                start=False,
+                progress=stage(0.1, 0.3),
+                cancel=cancel,
+            )
+        finally:
+            video.unlink(missing_ok=True)  # a scan video is not a show render
+        camera = state.cameras.acquire(camera_id)
+        fpp = FppClient(host)
+        try:
+            camera.open()
+            try:
+                capture = record_and_capture(
+                    camera,
+                    spec,
+                    lambda: fpp.start_playlist(SCAN_PLAYLIST),
+                    total_seconds=video_seconds(n_patterns) + RECORD_MARGIN_S,
+                    progress=stage(0.3, 0.8),
+                    cancel=cancel,
+                )
+            finally:
+                camera.close()
+                try:
+                    fpp.stop()
+                except FkError:
+                    pass
+        finally:
+            fpp.close()
+            state.cameras.release(camera_id)
+        cal = run_calibration_from_capture(
+            project_dir, capture, camera_id, settings, progress=stage(0.8, 1.0), cancel=cancel
+        )
+        return _finish(state, pid, cal.id)
+
+    return state.jobs.submit("calibration", pi_job).id
 
 
 def _finish(state: AppState, project_id: str, calibration_id: str) -> dict[str, Any]:

@@ -136,7 +136,12 @@ export const projectorTransport = (body: {
 
 export const startCalibration = (
   pid: string,
-  body: { mode: "scan" | "manual"; camera_id?: string; settings?: CalibSettings },
+  body: {
+    mode: "scan" | "manual" | "scan_pi";
+    camera_id?: string;
+    host?: string;
+    settings?: CalibSettings;
+  },
 ) => request<{ job_id: string }>("POST", `/projects/${enc(pid)}/calibrations`, body);
 export const getCalibration = (pid: string, cid: string) =>
   request<Calibration>("GET", `/projects/${enc(pid)}/calibrations/${enc(cid)}`);

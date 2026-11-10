@@ -24,6 +24,7 @@ vi.mock("../api/client", async (orig) => ({
   measuredMaskUrl: vi.fn(() => "/mask.png"),
   cancelJob: vi.fn(),
   realign: vi.fn(),
+  fppProbe: vi.fn(),
 }));
 vi.mock("../api/events", () => ({
   connectEvents: vi.fn(() => () => {}),
@@ -138,6 +139,56 @@ describe("Step 1 - projector", () => {
   });
 });
 
+describe("Step 1 - projector on the Raspberry Pi", () => {
+  it("enables Next after a successful probe, without a projector window", async () => {
+    m.projectorStatus.mockResolvedValue({
+      connected: false,
+      width: null,
+      height: null,
+      dpr: null,
+      mode: "blank",
+    });
+    m.fppProbe.mockResolvedValue({
+      reachable: true,
+      version: "10.4",
+      major: 10,
+      ok: true,
+      problems: [],
+    });
+    renderSetup();
+    fireEvent.click(await screen.findByLabelText(/my Raspberry Pi/));
+    expect(next().disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText("FPP address"), { target: { value: "fpp.local" } });
+    fireEvent.click(screen.getByRole("button", { name: "Check connection" }));
+    await waitFor(() => expect(next().disabled).toBe(false));
+    expect(m.fppProbe).toHaveBeenCalledWith("fpp.local");
+    expect(m.projectorShow).not.toHaveBeenCalled();
+  });
+
+  it("keeps Next disabled when the probe fails", async () => {
+    m.projectorStatus.mockResolvedValue({
+      connected: false,
+      width: null,
+      height: null,
+      dpr: null,
+      mode: "blank",
+    });
+    m.fppProbe.mockResolvedValue({
+      reachable: false,
+      version: null,
+      major: null,
+      ok: false,
+      problems: ["Could not reach FPP at nope."],
+    });
+    renderSetup();
+    fireEvent.click(await screen.findByLabelText(/my Raspberry Pi/));
+    fireEvent.change(screen.getByLabelText("FPP address"), { target: { value: "nope" } });
+    fireEvent.click(screen.getByRole("button", { name: "Check connection" }));
+    expect(await screen.findByText(/Could not reach FPP at nope/)).toBeTruthy();
+    expect(next().disabled).toBe(true);
+  });
+});
+
 describe("Step 2 - camera", () => {
   it("says so when there is no camera", async () => {
     m.listCameras.mockResolvedValue([]);
@@ -204,6 +255,25 @@ describe("Step 3 - scan", () => {
     renderScan();
     fireEvent.click(screen.getByRole("button", { name: "Start scan" }));
     expect(await screen.findByText(/could not see the red areas/)).toBeTruthy();
+  });
+
+  it("starts a Pi-driven scan with the FPP host", async () => {
+    m.startCalibration.mockResolvedValue({ job_id: "j1" });
+    ev.waitForJob.mockResolvedValue(job({ state: "failed", error: null, result: null }));
+    render(
+      <MemoryRouter>
+        <StepScan project={project} cameraId="cam0" piHost="fpp.local" />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText(/FPP will stop whatever it is playing/)).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Start scan" }));
+    });
+    expect(m.startCalibration).toHaveBeenCalledWith("p1", {
+      mode: "scan_pi",
+      camera_id: "cam0",
+      host: "fpp.local",
+    });
   });
 
   it("skip scan starts manual mode", async () => {

@@ -19,6 +19,8 @@ import styles from "../SetupPage.module.css";
 interface Props {
   project: Project;
   cameraId: string | null;
+  /** FPP address when the projector is plugged into the Raspberry Pi; null = this computer. */
+  piHost?: string | null;
 }
 
 /** Projector-view photo; where the measured mask is black, a red tint is laid over it. */
@@ -60,7 +62,7 @@ function TintedView({ photoUrl, maskUrl }: { photoUrl: string; maskUrl?: string 
 
 type Phase = "idle" | "running" | "failed" | "done";
 
-export default function StepScan({ project, cameraId }: Props) {
+export default function StepScan({ project, cameraId, piHost = null }: Props) {
   const navigate = useNavigate();
   const pid = project.id;
   const [phase, setPhase] = useState<Phase>(project.calibration_id ? "done" : "idle");
@@ -95,7 +97,12 @@ export default function StepScan({ project, cameraId }: Props) {
       // The backend fills in the other fields, so only this one is sent.
       const settle_ms = fixedWait ? Math.min(1500, Math.max(300, Math.round(waitMs) || 300)) : 0;
       const settings = { settle_ms } as CalibSettings;
-      const body = mode === "scan" && cameraId ? { mode, camera_id: cameraId, settings } : { mode };
+      let body: Parameters<typeof startCalibration>[1] = { mode: "manual" };
+      if (mode === "scan" && cameraId) {
+        body = piHost
+          ? { mode: "scan_pi", camera_id: cameraId, host: piHost }
+          : { mode, camera_id: cameraId, settings };
+      }
       const { job_id } = await startCalibration(pid, body);
       const final = await waitForJob(job_id, (j) => mounted.current && setJob(j));
       if (!mounted.current) return;
@@ -179,8 +186,14 @@ export default function StepScan({ project, cameraId }: Props) {
         </>
       ) : (
         <>
-          <p>The projector will show stripes while the camera watches. This takes a few minutes.</p>
-          <details>
+          {piHost ? (
+            <p>The scan takes about a minute. FPP will stop whatever it is playing.</p>
+          ) : (
+            <p>
+              The projector will show stripes while the camera watches. This takes a few minutes.
+            </p>
+          )}
+          <details hidden={piHost !== null}>
             <summary>Advanced</summary>
             <p className={styles.note}>
               By default the scan measures how long the camera takes to see the projector and

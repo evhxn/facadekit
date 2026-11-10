@@ -10,7 +10,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from facadekit.calib.capture import precheck, run_capture
+from facadekit.calib.capture import CaptureSet, precheck, run_capture
 from facadekit.calib.decode import decode
 from facadekit.calib.maps import build_maps, make_proj_view
 from facadekit.calib.patterns import PatternSpec
@@ -98,9 +98,48 @@ def run_calibration(
         capture = run_capture(
             display, camera, spec, settings, progress=capture_progress, cancel=cancel, sleep=sleep
         )
-        camera_w, camera_h = camera.resolution
     finally:
         camera.close()
+
+    return run_calibration_from_capture(
+        project_dir, capture, camera_id, settings, progress=progress, cancel=cancel, pre=pre
+    )
+
+
+def _contrast_stats(capture: CaptureSet) -> dict[str, float]:
+    """Quality numbers from the black (first) and white (second) pattern images."""
+    contrast = capture.images[1] - capture.images[0]
+    thr = max(12.0, 0.15 * float(np.percentile(contrast, 95)))
+    lit = contrast > thr
+    median = float(np.median(contrast[lit])) if lit.any() else 0.0
+    return {"lit_fraction": float(lit.mean()), "median_contrast": median}
+
+
+def run_calibration_from_capture(
+    project_dir: Path,
+    capture: CaptureSet,
+    camera_id: str,
+    settings: CalibSettings,
+    *,
+    progress: Progress | None = None,
+    cancel: Cancel | None = None,
+    pre: dict[str, float] | None = None,
+) -> Calibration:
+    """Decode a finished capture, build the maps and write the calibration files."""
+    spec = capture.spec
+    camera_h, camera_w = capture.images.shape[1:]
+    if pre is None:  # a recorded (Pi-driven) capture had no separate precheck
+        pre = _contrast_stats(capture)
+        if pre["lit_fraction"] < 0.05:
+            raise FkError(
+                "CAMERA_NO_PROJECTION",
+                "The camera does not see the projected light. Check that the camera faces the "
+                "projection and that the projector is on.",
+            )
+
+    def report(fraction: float, message: str) -> None:
+        if progress is not None:
+            progress(fraction, message)
 
     _check_cancel(cancel)
     report(0.80, "Decoding")
