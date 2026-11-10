@@ -10,7 +10,8 @@ function json(body: unknown, status = 200): Response {
 describe("projectStore", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    useProjectStore.setState({ project: makeProject(), dirty: false, saving: false, error: null });
+    useProjectStore.getState().replace(makeProject());
+    useProjectStore.setState({ saving: false, error: null });
   });
   afterEach(() => {
     vi.useRealTimers();
@@ -58,5 +59,73 @@ describe("projectStore", () => {
     expect(s.project?.name).toBe("Server");
     expect(s.dirty).toBe(false);
     expect(s.error).toContain("reloaded");
+  });
+
+  describe("undo/redo", () => {
+    const rename = (name: string) => (d: Project) => {
+      d.name = name;
+    };
+    const name = () => useProjectStore.getState().project?.name;
+
+    it("three updates, two undos, one redo gives the second state", () => {
+      const s = useProjectStore.getState();
+      s.update(rename("one"));
+      s.update(rename("two"));
+      s.update(rename("three"));
+      s.undo();
+      s.undo();
+      expect(name()).toBe("one");
+      s.redo();
+      expect(name()).toBe("two");
+      expect(useProjectStore.getState().canRedo).toBe(true);
+      expect(useProjectStore.getState().canUndo).toBe(true);
+    });
+
+    it("coalesced updates form one undo step, but only within 500 ms", () => {
+      const original = name();
+      const s = useProjectStore.getState();
+      s.update(rename("a"), { coalesceKey: "drag" });
+      vi.advanceTimersByTime(100);
+      s.update(rename("b"), { coalesceKey: "drag" });
+      vi.advanceTimersByTime(100);
+      s.update(rename("c"), { coalesceKey: "drag" });
+      s.undo();
+      expect(name()).toBe(original);
+      expect(useProjectStore.getState().canUndo).toBe(false);
+      s.redo();
+      s.update(rename("d"), { coalesceKey: "x" });
+      vi.advanceTimersByTime(600);
+      s.update(rename("e"), { coalesceKey: "x" });
+      s.undo();
+      expect(name()).toBe("d");
+    });
+
+    it("undo keeps the current revision and marks the project dirty", () => {
+      const s = useProjectStore.getState();
+      s.update(rename("one"));
+      useProjectStore.setState((st) => ({
+        project: st.project ? { ...st.project, revision: 9 } : st.project,
+      }));
+      s.undo();
+      expect(useProjectStore.getState().project?.revision).toBe(9);
+      expect(useProjectStore.getState().dirty).toBe(true);
+    });
+
+    it("a new edit clears redo; load/replace clear the stacks", () => {
+      const s = useProjectStore.getState();
+      s.update(rename("one"));
+      s.undo();
+      s.update(rename("two"));
+      expect(useProjectStore.getState().canRedo).toBe(false);
+      s.replace(makeProject());
+      expect(useProjectStore.getState().canUndo).toBe(false);
+    });
+
+    it("keeps at most 100 snapshots", () => {
+      const s = useProjectStore.getState();
+      for (let i = 0; i < 120; i++) s.update(rename(`n${i}`));
+      for (let i = 0; i < 150; i++) useProjectStore.getState().undo();
+      expect(name()).toBe("n19");
+    });
   });
 });

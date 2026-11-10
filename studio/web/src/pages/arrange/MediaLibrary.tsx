@@ -12,6 +12,8 @@ interface Upload {
   error: string | null;
 }
 
+export const ASSET_DRAG_TYPE = "application/x-facadekit-asset";
+
 export function formatDuration(ms: number | null): string {
   if (ms === null) return "";
   const s = ms / 1000;
@@ -138,7 +140,15 @@ export default function MediaLibrary({
       ) : null}
       <ul className={styles.grid}>
         {assets.map((a) => (
-          <li key={a.id} className={styles.card}>
+          <li
+            key={a.id}
+            className={styles.card}
+            draggable
+            onDragStart={(e) => {
+              e.dataTransfer.setData(ASSET_DRAG_TYPE, a.id);
+              e.dataTransfer.effectAllowed = "copy";
+            }}
+          >
             <div className={styles.thumb}>
               {a.kind === "audio" ? (
                 <span aria-hidden="true" className={styles.note}>

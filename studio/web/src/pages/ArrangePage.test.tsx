@@ -144,4 +144,35 @@ describe("ArrangePage", () => {
     );
     expect(project().assets).toHaveLength(2);
   });
+
+  it("drops a media-library asset on the timeline to create a clip", () => {
+    renderPage();
+    const content = screen.getByTestId("new-layer-row").parentElement!;
+    fireEvent.drop(content, {
+      dataTransfer: { types: ["application/x-facadekit-asset"], getData: () => "ast_v" },
+    });
+    const clips = project().timeline.tracks[0]!.clips;
+    expect(clips).toHaveLength(1);
+    expect(clips[0]).toMatchObject({ asset_id: "ast_v", duration_ms: 8000, surface_id: "canvas" });
+  });
+
+  it("deletes the selected timeline clip with Delete and undoes it with Ctrl+Z", () => {
+    renderPage();
+    fireEvent.click(screen.getByText("Add clip"));
+    fireEvent.click(screen.getByText("Add to timeline"));
+    const bar = screen.getByRole("button", { name: "Clip clip.mp4" });
+    fireEvent.keyDown(bar.closest("[aria-label='Timeline']")!, { key: "Delete" });
+    expect(project().timeline.tracks.flatMap((t) => t.clips)).toHaveLength(0);
+    fireEvent.keyDown(window, { key: "z", ctrlKey: true });
+    expect(project().timeline.tracks.flatMap((t) => t.clips)).toHaveLength(1);
+  });
+
+  it("makes library cards draggable with the asset id", () => {
+    renderPage();
+    const card = screen.getByLabelText("Delete clip.mp4").closest("li")!;
+    expect(card.getAttribute("draggable")).toBe("true");
+    const setData = vi.fn();
+    fireEvent.dragStart(card, { dataTransfer: { setData } });
+    expect(setData).toHaveBeenCalledWith("application/x-facadekit-asset", "ast_v");
+  });
 });

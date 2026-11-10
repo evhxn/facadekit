@@ -113,3 +113,118 @@ export function setShowAudio(project: Project, asset: Asset | null): void {
   const noClips = tl.tracks.every((t) => t.clips.length === 0);
   if (noClips || tl.duration_ms === 60000) tl.duration_ms = asset.duration_ms;
 }
+
+export const MIN_CLIP_MS = 100;
+
+/**
+ * Move clips by deltaMs in time and deltaTracks in track index (positive = towards the top
+ * layer). Moving above the top creates new tracks. All-or-nothing: returns false and leaves
+ * the project untouched if any clip would start before 0, go below the bottom track or overlap.
+ */
+export function moveClips(
+  project: Project,
+  ids: string[],
+  deltaMs: number,
+  deltaTracks: number,
+): boolean {
+  const tracks = project.timeline.tracks;
+  const moving = new Set(ids);
+  const plan: { clip: Clip; target: number }[] = [];
+  for (const id of moving) {
+    const found = findClip(project, id);
+    if (!found) return false;
+    const target = tracks.indexOf(found.track) + deltaTracks;
+    const start = found.clip.start_ms + deltaMs;
+    if (target < 0 || start < 0) return false;
+    plan.push({ clip: { ...found.clip, start_ms: start }, target });
+  }
+  const resident = (i: number): Clip[] => (tracks[i]?.clips ?? []).filter((c) => !moving.has(c.id));
+  for (let i = 0; i < plan.length; i++) {
+    const a = plan[i]!;
+    if (resident(a.target).some((c) => overlaps(c, a.clip))) return false;
+    for (let j = i + 1; j < plan.length; j++) {
+      const b = plan[j]!;
+      if (a.target === b.target && overlaps(a.clip, b.clip)) return false;
+    }
+  }
+  for (const id of moving) {
+    const found = findClip(project, id);
+    if (found) found.track.clips.splice(found.track.clips.indexOf(found.clip), 1);
+  }
+  while (tracks.length <= Math.max(...plan.map((p) => p.target))) newTrack(project);
+  for (const { clip, target } of plan) tracks[target]!.clips.push(clip);
+  pruneEmptyTracks(project);
+  return true;
+}
+
+/**
+ * Trim one edge of a clip. Start trims keep the content in place (start_ms, duration_ms and
+ * in_offset_ms change together); the result is clamped to MIN_CLIP_MS, to neighbouring clips,
+ * to time 0 / in_offset 0 and, for non-looping clips with a known source length, to the source.
+ */
+export function trimClip(
+  project: Project,
+  clipId: string,
+  edge: "start" | "end",
+  newMs: number,
+  assetDurationMs: number | null,
+): void {
+  const found = findClip(project, clipId);
+  if (!found) return;
+  const { track, clip } = found;
+  const others = track.clips.filter((c) => c.id !== clip.id);
+  const end = clip.start_ms + clip.duration_ms;
+  if (edge === "start") {
+    const prevEnd = Math.max(
+      0,
+      ...others
+        .filter((c) => c.start_ms + c.duration_ms <= clip.start_ms)
+        .map((c) => c.start_ms + c.duration_ms),
+    );
+    const lowest = Math.max(prevEnd, clip.start_ms - clip.in_offset_ms);
+    const start = Math.round(Math.min(Math.max(newMs, lowest), end - MIN_CLIP_MS));
+    const delta = start - clip.start_ms;
+    clip.start_ms = start;
+    clip.duration_ms = end - start;
+    clip.in_offset_ms += delta;
+  } else {
+    const nextStart = Math.min(
+      Infinity,
+      ...others.filter((c) => c.start_ms >= end).map((c) => c.start_ms),
+    );
+    let highest = nextStart;
+    if (!clip.loop && assetDurationMs !== null) {
+      highest = Math.min(highest, clip.start_ms + Math.max(0, assetDurationMs - clip.in_offset_ms));
+    }
+    const newEnd = Math.round(Math.min(Math.max(newMs, clip.start_ms + MIN_CLIP_MS), highest));
+    clip.duration_ms = Math.max(MIN_CLIP_MS, newEnd - clip.start_ms);
+  }
+}
+
+/**
+ * Duplicate clips directly after the selection (shifted by the selection's span), each on the
+ * lowest track at or above its own where it fits. Returns the new clip ids.
+ */
+export function duplicateClips(project: Project, ids: string[]): string[] {
+  const originals: { clip: Clip; index: number }[] = [];
+  for (const id of ids) {
+    const found = findClip(project, id);
+    if (found) {
+      originals.push({
+        clip: { ...found.clip },
+        index: project.timeline.tracks.indexOf(found.track),
+      });
+    }
+  }
+  if (originals.length === 0) return [];
+  const span =
+    Math.max(...originals.map((o) => o.clip.start_ms + o.clip.duration_ms)) -
+    Math.min(...originals.map((o) => o.clip.start_ms));
+  const out: string[] = [];
+  for (const { clip, index } of originals) {
+    const copy: Clip = { ...clip, id: newId("clp"), start_ms: clip.start_ms + span };
+    placeFrom(project, copy, index);
+    out.push(copy.id);
+  }
+  return out;
+}

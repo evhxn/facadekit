@@ -3,11 +3,14 @@ import { makeProject } from "../../api/client.test";
 import type { Asset, Clip, Project } from "../../api/types";
 import {
   addClip,
+  duplicateClips,
   findClip,
+  moveClips,
   moveClipToTrack,
   overlaps,
   removeClip,
   setShowAudio,
+  trimClip,
   updateClip,
 } from "./clipOps";
 
@@ -104,5 +107,107 @@ describe("clipOps", () => {
     p.timeline.duration_ms = 45000;
     setShowAudio(p, audio);
     expect(p.timeline.duration_ms).toBe(45000);
+  });
+});
+
+describe("moveClips", () => {
+  const names = (p: Project) => p.timeline.tracks.map((t) => t.clips.map((c) => c.id));
+
+  it("moves in time and between tracks", () => {
+    const p = project([clip("a", 0, 1000)], [clip("b", 0, 1000)]);
+    expect(moveClips(p, ["a"], 2000, 1)).toBe(true);
+    expect(findClip(p, "a")?.clip.start_ms).toBe(2000);
+    expect(names(p)).toEqual([["b", "a"]]);
+  });
+
+  it("rejects an overlapping move atomically", () => {
+    const p = project([clip("a", 0, 1000), clip("b", 1500, 1000)], [clip("c", 0, 1000)]);
+    const before = structuredClone(p);
+    expect(moveClips(p, ["c", "a"], 1000, 0)).toBe(false);
+    expect(p).toEqual(before);
+  });
+
+  it("rejects negative starts and moves below the bottom track", () => {
+    const p = project([clip("a", 500, 1000)]);
+    expect(moveClips(p, ["a"], -600, 0)).toBe(false);
+    expect(moveClips(p, ["a"], 0, -1)).toBe(false);
+  });
+
+  it("creates a track when moving above the top", () => {
+    const p = project([clip("a", 0, 1000)]);
+    expect(moveClips(p, ["a"], 0, 1)).toBe(true);
+    expect(p.timeline.tracks).toHaveLength(1);
+    const q = project([clip("a", 0, 1000), clip("b", 2000, 1000)]);
+    expect(moveClips(q, ["a"], 0, 1)).toBe(true);
+    expect(names(q)).toEqual([["b"], ["a"]]);
+  });
+
+  it("lets a selection move over its own former positions", () => {
+    const p = project([clip("a", 0, 1000), clip("b", 1000, 1000)]);
+    expect(moveClips(p, ["a", "b"], 1000, 0)).toBe(true);
+    expect(names(p)).toEqual([["a", "b"]]);
+    expect(findClip(p, "a")?.clip.start_ms).toBe(1000);
+  });
+});
+
+describe("trimClip", () => {
+  it("start trim keeps the end fixed and shifts in_offset", () => {
+    const p = project([clip("a", 1000, 4000)]);
+    trimClip(p, "a", "start", 2000, null);
+    const c = findClip(p, "a")!.clip;
+    expect(c.start_ms).toBe(2000);
+    expect(c.duration_ms).toBe(3000);
+    expect(c.start_ms + c.duration_ms).toBe(5000);
+    expect(c.in_offset_ms).toBe(1000);
+  });
+
+  it("enforces the minimum duration and cannot reveal content before the source start", () => {
+    const p = project([clip("a", 1000, 4000)]);
+    trimClip(p, "a", "start", 9000, null);
+    expect(findClip(p, "a")!.clip.duration_ms).toBe(100);
+    trimClip(p, "a", "start", 0, null);
+    const c = findClip(p, "a")!.clip;
+    expect(c.in_offset_ms).toBe(0);
+    expect(c.start_ms).toBe(1000);
+  });
+
+  it("right trim clamps to the source length for non-looping clips", () => {
+    const p = project([{ ...clip("a", 0, 1000), loop: false, in_offset_ms: 500 }]);
+    trimClip(p, "a", "end", 99999, 8000);
+    expect(findClip(p, "a")!.clip.duration_ms).toBe(7500);
+    const q = project([clip("b", 0, 1000)]);
+    trimClip(q, "b", "end", 20000, 8000);
+    expect(findClip(q, "b")!.clip.duration_ms).toBe(20000);
+  });
+
+  it("does not trim into a neighbour", () => {
+    const p = project([clip("a", 0, 1000), clip("b", 2000, 1000)]);
+    trimClip(p, "a", "end", 5000, null);
+    expect(findClip(p, "a")!.clip.duration_ms).toBe(2000);
+    trimClip(p, "b", "start", 0, null);
+    expect(findClip(p, "b")!.clip.start_ms).toBe(2000);
+  });
+});
+
+describe("duplicateClips", () => {
+  it("returns new ids placed after the originals without overlaps", () => {
+    const p = project([clip("a", 0, 1000), clip("b", 1000, 1000)]);
+    const ids = duplicateClips(p, ["a", "b"]);
+    expect(ids).toHaveLength(2);
+    expect(ids).not.toContain("a");
+    for (const t of p.timeline.tracks) {
+      for (const x of t.clips) {
+        for (const y of t.clips) if (x !== y) expect(overlaps(x, y)).toBe(false);
+      }
+    }
+    expect(findClip(p, ids[0]!)?.clip.start_ms).toBe(2000);
+    expect(p.timeline.tracks.flatMap((t) => t.clips)).toHaveLength(4);
+  });
+
+  it("moves to a free track when the slot after is taken", () => {
+    const p = project([clip("a", 0, 1000), clip("b", 1000, 1000)]);
+    const ids = duplicateClips(p, ["a"]);
+    expect(p.timeline.tracks).toHaveLength(2);
+    expect(findClip(p, ids[0]!)?.track).toBe(p.timeline.tracks[1]);
   });
 });

@@ -1,0 +1,120 @@
+.root {
+  position: relative;
+  border: 1px solid #8884;
+  border-radius: 6px;
+  outline: none;
+  user-select: none;
+}
+.root:focus-visible {
+  border-color: #3a7bd5;
+}
+.scroller {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.content {
+  position: relative;
+  touch-action: none;
+}
+.ruler {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  border-bottom: 1px solid #8884;
+  font-size: 11px;
+  cursor: col-resize;
+}
+.tick {
+  position: absolute;
+  top: 2px;
+  padding-left: 3px;
+  border-left: 1px solid #8886;
+  height: 100%;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  box-sizing: border-box;
+  border-bottom: 1px solid #8882;
+}
+.newRow {
+  font-size: 11px;
+  opacity: 0.5;
+  padding: 2px 6px;
+  position: sticky;
+  left: 0;
+}
+.bar {
+  position: absolute;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 2px;
+  border: 1px solid #036;
+  border-radius: 3px;
+  background: #3a7bd5;
+  color: #fff;
+  font-size: 12px;
+  overflow: hidden;
+  white-space: nowrap;
+  cursor: grab;
+}
+.bar img {
+  height: 100%;
+  width: auto;
+  max-width: 60px;
+  object-fit: cover;
+  pointer-events: none;
+}
+.label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+.selected {
+  outline: 2px solid #fc0;
+  outline-offset: -1px;
+}
+.ghost {
+  opacity: 0.8;
+  z-index: 2;
+}
+.invalid {
+  background: #d33;
+  border-color: #600;
+}
+.handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: ew-resize;
+  background: #fff3;
+}
+.handleStart {
+  left: 0;
+}
+.handleEnd {
+  right: 0;
+}
+.box {
+  position: absolute;
+  border: 1px solid #fc0;
+  background: #fc03;
+  pointer-events: none;
+  z-index: 3;
+}
+.playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #e22;
+  pointer-events: none;
+  z-index: 4;
+}

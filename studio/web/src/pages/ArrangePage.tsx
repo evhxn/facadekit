@@ -15,7 +15,7 @@ import {
 } from "./arrange/clipOps";
 import MediaLibrary from "./arrange/MediaLibrary";
 import PreviewPane from "./arrange/PreviewPane";
-import TimelineStrip from "./arrange/TimelineStrip";
+import Timeline from "./arrange/Timeline";
 import { Transport } from "./arrange/transport";
 import styles from "./ArrangePage.module.css";
 
@@ -29,7 +29,9 @@ export default function ArrangePage() {
   const project = useProjectStore((s) => s.project);
   const load = useProjectStore((s) => s.load);
   const update = useProjectStore((s) => s.update);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selection, setSelection] = useState<string[]>([]);
+  const selectedId = selection.length === 1 ? (selection[0] ?? null) : null;
+  const setSelectedId = (id: string | null) => setSelection(id ? [id] : []);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -45,6 +47,21 @@ export default function ArrangePage() {
   }, [projectId, load]);
 
   useEffect(() => () => transport.pause(), [transport]);
+
+  // Undo / redo, everywhere on the page except while typing in a field.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.key.toLowerCase() !== "z") return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
+      e.preventDefault();
+      const s = useProjectStore.getState();
+      if (e.shiftKey) s.redo();
+      else s.undo();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   if (!project) return <p>{loadError ?? "Loading…"}</p>;
 
@@ -174,11 +191,15 @@ export default function ArrangePage() {
         <PreviewPane project={project} transport={transport} />
       </div>
       <div className={styles.strip}>
-        <TimelineStrip
+        <Timeline
           project={project}
           transport={transport}
-          selectedId={selectedId}
-          onSelect={(id) => {
+          selectedIds={selection}
+          onSelect={(ids) => {
+            setDraft(null);
+            setSelection(ids);
+          }}
+          onOpen={(id) => {
             setDraft(null);
             setSelectedId(id);
           }}

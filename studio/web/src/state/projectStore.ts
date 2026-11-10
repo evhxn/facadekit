@@ -4,6 +4,13 @@ import { userMessage } from "../api/errors";
 import type { Project } from "../api/types";
 
 const SAVE_DELAY_MS = 500;
+const MAX_HISTORY = 100;
+const COALESCE_MS = 500;
+
+export interface UpdateOptions {
+  /** Updates with the same key within 500 ms share one undo step (e.g. one drag). */
+  coalesceKey?: string;
+}
 
 interface ProjectState {
   project: Project | null;
@@ -11,7 +18,11 @@ interface ProjectState {
   saving: boolean;
   error: string | null;
   load: (id: string) => Promise<void>;
-  update: (mutator: (draft: Project) => void) => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  update: (mutator: (draft: Project) => void, opts?: UpdateOptions) => void;
+  undo: () => void;
+  redo: () => void;
   saveNow: () => Promise<void>;
   replace: (project: Project) => void;
 }
@@ -19,6 +30,16 @@ interface ProjectState {
 let timer: ReturnType<typeof setTimeout> | null = null;
 let chain: Promise<void> = Promise.resolve();
 let editCounter = 0;
+let past: Project[] = [];
+let future: Project[] = [];
+let lastKey: string | null = null;
+let lastKeyAt = 0;
+
+function resetHistory() {
+  past = [];
+  future = [];
+  lastKey = null;
+}
 
 function clearTimer() {
   if (timer !== null) {
@@ -51,7 +72,15 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         try {
           const fresh = await getProject(project.id);
           editCounter++;
-          set({ project: fresh, dirty: false, saving: false, error: message });
+          resetHistory();
+          set({
+            project: fresh,
+            dirty: false,
+            saving: false,
+            error: message,
+            canUndo: false,
+            canRedo: false,
+          });
         } catch (e2) {
           set({
             saving: false,
@@ -66,31 +95,66 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     }
   };
 
+  const commit = (next: Project) => {
+    editCounter++;
+    set({ project: next, dirty: true, canUndo: past.length > 0, canRedo: future.length > 0 });
+    clearTimer();
+    timer = setTimeout(() => {
+      timer = null;
+      void get().saveNow();
+    }, SAVE_DELAY_MS);
+  };
+
   return {
     project: null,
     dirty: false,
     saving: false,
     error: null,
+    canUndo: false,
+    canRedo: false,
 
     async load(id) {
       clearTimer();
       const project = await getProject(id);
       editCounter++;
-      set({ project, dirty: false, saving: false, error: null });
+      resetHistory();
+      set({ project, dirty: false, saving: false, error: null, canUndo: false, canRedo: false });
     },
 
-    update(mutator) {
+    update(mutator, opts) {
       const { project } = get();
       if (!project) return;
       const draft = structuredClone(project);
       mutator(draft);
-      editCounter++;
-      set({ project: draft, dirty: true });
-      clearTimer();
-      timer = setTimeout(() => {
-        timer = null;
-        void get().saveNow();
-      }, SAVE_DELAY_MS);
+      const now = Date.now();
+      const key = opts?.coalesceKey ?? null;
+      const coalesced = key !== null && key === lastKey && now - lastKeyAt < COALESCE_MS;
+      if (!coalesced) {
+        past.push(project);
+        if (past.length > MAX_HISTORY) past.shift();
+      }
+      future = [];
+      lastKey = key;
+      lastKeyAt = now;
+      commit(draft);
+    },
+
+    undo() {
+      const { project } = get();
+      const prev = past.pop();
+      if (!project || !prev) return;
+      future.push(project);
+      lastKey = null;
+      commit({ ...prev, revision: project.revision });
+    },
+
+    redo() {
+      const { project } = get();
+      const next = future.pop();
+      if (!project || !next) return;
+      past.push(project);
+      lastKey = null;
+      commit({ ...next, revision: project.revision });
     },
 
     saveNow() {
@@ -103,7 +167,8 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     replace(project) {
       clearTimer();
       editCounter++;
-      set({ project, dirty: false });
+      resetHistory();
+      set({ project, dirty: false, canUndo: false, canRedo: false });
     },
   };
 });
