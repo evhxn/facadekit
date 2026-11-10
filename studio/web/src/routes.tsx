@@ -1,4 +1,5 @@
 import type { RouteObject } from "react-router-dom";
+import DevParityPage from "./pages/DevParityPage";
 import ArrangePage from "./pages/ArrangePage";
 import ProjectsPage from "./pages/ProjectsPage";
 import PublishPage from "./pages/PublishPage";
@@ -16,3 +17,7 @@ export const routes: RouteObject[] = [
   { path: "/p/:projectId/publish", element: <PublishPage /> },
   { path: PROJECTOR_PATH, element: <ProjectorPage /> },
 ];
+
+if (import.meta.env.DEV || new URLSearchParams(window.location.search).get("dev") === "1") {
+  routes.push({ path: "/dev/parity", element: <DevParityPage /> });
+}

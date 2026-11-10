@@ -122,9 +122,14 @@ export class PreviewCompositor {
 
   constructor(
     private canvas: HTMLCanvasElement,
-    private opts: { assetUrl: (assetId: string) => string },
+    private opts: { assetUrl: (assetId: string) => string; preserveDrawingBuffer?: boolean },
   ) {
-    this.gl = canvas.getContext("webgl2", { alpha: false, premultipliedAlpha: false });
+    this.gl = canvas.getContext("webgl2", {
+      alpha: false,
+      premultipliedAlpha: true,
+      colorSpace: "srgb",
+      preserveDrawingBuffer: opts.preserveDrawingBuffer ?? false,
+    } as WebGLContextAttributes);
     if (this.gl) this.init(this.gl);
   }
 
@@ -182,6 +187,22 @@ export class PreviewCompositor {
         this.sources.delete(id);
       }
     }
+  }
+
+  /** Resolves once every image source has loaded (video sources are not awaited). */
+  ready(timeoutMs = 15000): Promise<void> {
+    const started = performance.now();
+    return new Promise((resolve, reject) => {
+      const check = () => {
+        const pending = [...this.sources.values()].some(
+          (e) => e.source instanceof ImageSource && !(e.source.width > 0),
+        );
+        if (!pending) resolve();
+        else if (performance.now() - started > timeoutMs) reject(new Error("sources not ready"));
+        else setTimeout(check, 20);
+      };
+      check();
+    });
   }
 
   render(tMs: number, playing: boolean): void {
