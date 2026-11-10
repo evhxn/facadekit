@@ -1,0 +1,47 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "facadekit"
+version = "0.1.0"
+description = "Projection mapping for holiday decorators, delivered through Falcon Player"
+requires-python = ">=3.11"
+license = "GPL-3.0-or-later"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic>=2",
+    "numpy",
+    "opencv-python-headless",
+    "imageio-ffmpeg",
+    "httpx",
+    "python-multipart",
+]
+
+[project.optional-dependencies]
+ai = ["librosa", "onnxruntime"]
+
+[project.scripts]
+facadekit = "facadekit.cli:main"
+
+[dependency-groups]
+dev = ["pytest", "ruff", "mypy"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/facadekit"]
+artifacts = ["src/facadekit/webdist/**"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+strict = true
+files = ["src"]
+
+[[tool.mypy.overrides]]
+module = ["cv2", "imageio_ffmpeg", "librosa", "onnxruntime"]
+ignore_missing_imports = true

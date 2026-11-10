@@ -1,0 +1,11 @@
+__pycache__/
+.venv/
+node_modules/
+dist/
+*.fkproj/
+studio/backend/src/facadekit/webdist/*
+!studio/backend/src/facadekit/webdist/.gitkeep
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.DS_Store
