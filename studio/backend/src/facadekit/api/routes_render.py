@@ -77,7 +77,14 @@ def get_frame(
         frame = compositor.frame(t_ms)
     finally:
         compositor.close()
-    ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+    # 4:4:4: default 4:2:0 chroma subsampling smears colour across hard edges.
+    params = [
+        cv2.IMWRITE_JPEG_QUALITY,
+        85,
+        cv2.IMWRITE_JPEG_SAMPLING_FACTOR,
+        cv2.IMWRITE_JPEG_SAMPLING_FACTOR_444,
+    ]
+    ok, buf = cv2.imencode(".jpg", frame, params)
     if not ok:
         raise FkError(INTERNAL, "could not encode frame")
     return Response(

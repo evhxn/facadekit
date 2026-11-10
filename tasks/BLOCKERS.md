@@ -1,15 +1,14 @@
 # Blockers
 
-## T-037: preview/render parity failures (real backend compositor bug, thresholds NOT loosened)
+None open.
 
-Scenes `stretch-trapezoid`, `fit-wide`, `canvas` fail the metric (< 0.5 % of pixels differing by > 24); the other four pass.
-Diff images are written by `cd studio/web && pnpm e2e` to:
+## Resolved
 
-- `studio/web/test-results/stretch-trapezoid/diff.png` (mad 1.75, 1.99 % pixels > 24)
-- `studio/web/test-results/fit-wide/diff.png` (mad 1.02, 0.96 %)
-- `studio/web/test-results/canvas/diff.png` (mad 1.01, 1.27 %)
+### T-037: preview/render parity (resolved)
 
-(`preview.png` and `backend.png` sit next to each diff.) The diffs are thin lines along edges *inside* the image content (checker square borders, letterbox border, split line), not along surface edges.
-Cause: the WebGL preview places image edges exactly (canvas scene: edges at x = 105, 240, 375), while `facadekit/render/compositor.py` (`cv2.warpPerspective`, lines ~130) places them about 0.5-1 px to the left/up (edge near 104.5, 238.7, 373.7). That is a half-pixel sampling-convention mismatch (pixel index vs pixel centre) in the backend homography/warp; fix it in the backend compositor (e.g. conjugate the homography with a 0.5 px translation) rather than relaxing thresholds.
+Cause was two backend issues that masked each other (so the earlier half-pixel experiment alone looked useless):
 
-Follow-up (orchestrator): tried conjugating the homography in `render/compositor.py` with a +0.5 px and a -0.5 px shift. Neither passes: unshifted 1.99 / 0.96 / 1.27 %, +0.5 shift canvas 1.48 %, -0.5 shift 2.11 / 1.39 % (stretch-trapezoid / fit-wide). So a plain half-pixel offset is not the (whole) cause; the change was reverted. Next idea: compare interpolation/edge handling (bilinear on a hard checker edge: WebGL LINEAR vs `cv2.INTER_LINEAR`, and the source-rect alpha warp) before touching the compositor.
+1. `GET /frame` encoded JPEG with OpenCV's default 4:2:0 chroma subsampling, which smears colour across 2x2 blocks at hard edges (e.g. black next to red at x = 104|105 gave R = 62 in a black pixel). Now 4:4:4.
+2. `render/compositor.py` used `cv2.warpPerspective` with pixel-index coordinates (integer = pixel centre) while the homography and WebGL use pixel-corner coordinates, and an alpha rect warped bilinearly against a constant black border (AA ramp at letterbox edges, darkened image border). Now the homography is conjugated by a half-pixel shift, colour uses BORDER_REPLICATE (CLAMP_TO_EDGE), and rect coverage is a hard nearest-sampled mask (matches the shader's discard).
+
+All seven scenes pass with thresholds unchanged.

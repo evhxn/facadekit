@@ -13,6 +13,9 @@ from facadekit.geom.mask import rasterize_mask
 from facadekit.media.reader import ClipSource
 from facadekit.models.project import Asset, Clip, Mask, Project, Surface
 
+_HALF_IN = np.array([[1.0, 0.0, 0.5], [0.0, 1.0, 0.5], [0.0, 0.0, 1.0]])
+_HALF_OUT = np.array([[1.0, 0.0, -0.5], [0.0, 1.0, -0.5], [0.0, 0.0, 1.0]])
+
 
 @dataclass
 class _SurfaceCache:
@@ -118,17 +121,26 @@ class Compositor:
         x0, y0, x1, y1 = (int(round(v)) for v in src_rect)
         rect = np.zeros((img.shape[0], img.shape[1]), dtype=np.uint8)
         rect[y0:y1, x0:x1] = 255
+        src_alpha = None
         if img.shape[2] == 4:
-            rect = (rect.astype(np.uint16) * img[:, :, 3] // 255).astype(np.uint8)
+            src_alpha = np.ascontiguousarray(img[:, :, 3])
             color = np.ascontiguousarray(img[:, :, :3])
         else:
             color = img
 
+        # cv2 treats integer coordinates as pixel centres on both sides, WebGL (and the
+        # homography) treat them as pixel corners: conjugate with a half-pixel shift.
         shift = np.array([[1.0, 0.0, -bx], [0.0, 1.0, -by], [0.0, 0.0, 1.0]])
-        h_box = shift @ h_mat
-        flags = dict(flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=0)
-        warped = cv2.warpPerspective(color, h_box, (bw, bh), **flags)  # type: ignore[call-overload]
-        warped_a = cv2.warpPerspective(rect, h_box, (bw, bh), **flags)  # type: ignore[call-overload]
+        h_box = _HALF_OUT @ shift @ h_mat @ _HALF_IN
+        size = (bw, bh)
+        clamp = cv2.BORDER_REPLICATE  # CLAMP_TO_EDGE
+        lin = cv2.INTER_LINEAR
+        warped = cv2.warpPerspective(color, h_box, size, flags=lin, borderMode=clamp)
+        # Hard rect coverage by pixel centre, like the shader's discard on the fit rect.
+        warped_a = cv2.warpPerspective(rect, h_box, size, flags=cv2.INTER_NEAREST)
+        if src_alpha is not None:
+            warped_sa = cv2.warpPerspective(src_alpha, h_box, size, flags=lin, borderMode=clamp)
+            warped_a = (warped_a.astype(np.uint16) * warped_sa // 255).astype(np.uint8)
 
         alpha = (
             warped_a.astype(np.float32)
