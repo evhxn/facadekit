@@ -4,7 +4,11 @@ export type Pt = [number, number];
 export type Rgb = [number, number, number];
 
 export interface SceneClip {
-  asset: string;
+  asset?: string; // omitted for generator clips
+  generator?: {
+    type: "solid" | "wash" | "outline" | "strobe";
+    params: Record<string, number | string>;
+  };
   surface: string; // key into scene.surfaces, or "canvas"
   track: number;
   fit: "fill" | "fit" | "stretch";
@@ -200,5 +204,59 @@ export const scenes: Scene[] = [
     },
     assets: { checker: checker() },
     clips: [{ asset: "checker", surface: "s", track: 0, fit: "stretch" }],
+  },
+  {
+    name: "gen-wash",
+    t_ms: 1500,
+    surfaces: {
+      s: {
+        quad: [
+          [100, 40],
+          [400, 60],
+          [430, 240],
+          [70, 215],
+        ],
+        aspect: 1.6,
+      },
+    },
+    assets: {},
+    clips: [
+      {
+        generator: {
+          type: "wash",
+          params: { color_a: "#ff8000", color_b: "#0040ff", period_s: 3, angle_deg: 30 },
+        },
+        surface: "s",
+        track: 0,
+        fit: "fill",
+      },
+    ],
+  },
+  {
+    name: "gen-outline",
+    t_ms: 1000,
+    surfaces: {
+      s: {
+        quad: [
+          [90, 30],
+          [390, 45],
+          [410, 235],
+          [70, 220],
+        ],
+        aspect: 1.6,
+      },
+    },
+    assets: {},
+    clips: [
+      {
+        generator: {
+          type: "outline",
+          params: { color: "#40ff80", width: 0.05, speed: 0.5, tail: 0.5 },
+        },
+        surface: "s",
+        track: 0,
+        fit: "fill",
+      },
+    ],
   },
 ];

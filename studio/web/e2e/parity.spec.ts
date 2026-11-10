@@ -119,8 +119,8 @@ async function buildProject(request: APIRequestContext, scene: Scene): Promise<s
     }
     tracks[c.track]!.clips.push({
       id: `clp_0000000${i + 1}`,
-      asset_id: assetIds[c.asset],
-      generator: null,
+      asset_id: c.asset ? assetIds[c.asset] : null,
+      generator: c.generator ?? null,
       surface_id: c.surface === "canvas" ? "canvas" : surfaceIds[c.surface],
       start_ms: 0,
       duration_ms: 5000,

@@ -275,3 +275,22 @@ def test_zero_mesh_identical_to_none(tmp_path: Path) -> None:
         assert np.array_equal(
             _render(plain, tmp_path, scale=scale), _render(zero, tmp_path, scale=scale)
         )
+
+
+def test_generator_clip(tmp_path: Path) -> None:
+    clip = Clip.model_validate(
+        {
+            "id": "g",
+            "asset_id": None,
+            "generator": {"type": "solid", "params": {"color": "#00ff00"}},
+            "surface_id": "s1",
+            "start_ms": 0,
+            "duration_ms": 2000,
+            "opacity": 0.5,
+        }
+    )
+    f = _render(_project([], [[clip]]), tmp_path)
+    assert all(abs(a - b) <= 2 for a, b in zip(_px(f, 160, 90), (0, 128, 0), strict=True))
+    assert _px(f, 20, 20) == (0, 0, 0)
+    clip.opacity = 1.0
+    assert _px(_render(_project([], [[clip]]), tmp_path), 160, 90) == (0, 255, 0)

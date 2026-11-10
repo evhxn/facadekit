@@ -1,5 +1,13 @@
 import { useEffect, useState } from "react";
-import type { Asset, Clip, Surface, Track } from "../../api/types";
+import type { Asset, Clip, Generator, Surface, Track } from "../../api/types";
+import {
+  GENERATOR_LABELS,
+  GENERATOR_PARAMS,
+  GENERATOR_TYPES,
+  defaultGenerator,
+  type GeneratorType,
+  type ParamSpec,
+} from "../../gl/generators";
 import styles from "./ClipForm.module.css";
 
 const FIT_HELP: Record<Clip["fit"], string> = {
@@ -51,6 +59,87 @@ export function SecondsInput({
   );
 }
 
+function NumberParam({
+  spec,
+  value,
+  onCommit,
+}: {
+  spec: ParamSpec;
+  value: number;
+  onCommit: (v: number) => void;
+}) {
+  const [text, setText] = useState(String(value));
+  useEffect(() => {
+    setText((prev) => (parseFloat(prev) === value ? prev : String(value)));
+  }, [value]);
+  return (
+    <label>
+      {spec.label}
+      <input
+        type="number"
+        step={spec.step}
+        min={spec.min}
+        value={text}
+        onChange={(e) => {
+          setText(e.target.value);
+          const v = parseFloat(e.target.value);
+          if (Number.isFinite(v) && (spec.min === undefined || v >= spec.min)) onCommit(v);
+        }}
+      />
+    </label>
+  );
+}
+
+function EffectFields({
+  generator,
+  onChange,
+}: {
+  generator: Generator;
+  onChange: (g: Generator) => void;
+}) {
+  const setParam = (key: string, v: number | string) =>
+    onChange({ ...generator, params: { ...generator.params, [key]: v } });
+  return (
+    <>
+      <label>
+        Effect
+        <select
+          value={generator.type}
+          onChange={(e) => onChange(defaultGenerator(e.target.value as GeneratorType))}
+        >
+          {GENERATOR_TYPES.map((t) => (
+            <option key={t} value={t}>
+              {GENERATOR_LABELS[t]}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div className={styles.row}>
+        {GENERATOR_PARAMS[generator.type].map((spec) => {
+          const raw = generator.params[spec.key] ?? spec.def;
+          return spec.kind === "color" ? (
+            <label key={spec.key}>
+              {spec.label}
+              <input
+                type="color"
+                value={typeof raw === "string" && /^#[0-9a-fA-F]{6}$/.test(raw) ? raw : "#ffffff"}
+                onChange={(e) => setParam(spec.key, e.target.value)}
+              />
+            </label>
+          ) : (
+            <NumberParam
+              key={spec.key}
+              spec={spec}
+              value={typeof raw === "number" ? raw : Number(raw) || 0}
+              onCommit={(v) => setParam(spec.key, v)}
+            />
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
 export default function ClipForm({
   clip,
   assets,
@@ -79,6 +168,7 @@ export default function ClipForm({
   onCancel?: () => void;
   onRemove?: () => void;
 }) {
+  const isEffect = clip.generator !== null;
   const visual = assets.filter((a) => a.kind !== "audio");
   const surfaceKnown =
     clip.surface_id === CANVAS_ID || surfaces.some((s) => s.id === clip.surface_id);
@@ -91,16 +181,44 @@ export default function ClipForm({
         onSubmit?.();
       }}
     >
-      <label>
-        Media
-        <select value={clip.asset_id ?? ""} onChange={(e) => onPatch({ asset_id: e.target.value })}>
-          {visual.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.original_name}
-            </option>
-          ))}
-        </select>
-      </label>
+      <fieldset className={styles.source}>
+        <legend>Source</legend>
+        <label className={styles.check}>
+          <input
+            type="radio"
+            name="clip-source"
+            checked={!isEffect}
+            onChange={() => onPatch({ asset_id: visual[0]?.id ?? null, generator: null })}
+          />
+          Media
+        </label>
+        <label className={styles.check}>
+          <input
+            type="radio"
+            name="clip-source"
+            checked={isEffect}
+            onChange={() => onPatch({ asset_id: null, generator: defaultGenerator("solid") })}
+          />
+          Effect
+        </label>
+      </fieldset>
+      {clip.generator ? (
+        <EffectFields generator={clip.generator} onChange={(generator) => onPatch({ generator })} />
+      ) : (
+        <label>
+          Media
+          <select
+            value={clip.asset_id ?? ""}
+            onChange={(e) => onPatch({ asset_id: e.target.value })}
+          >
+            {visual.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.original_name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <label>
         Surface
         <select value={clip.surface_id} onChange={(e) => onPatch({ surface_id: e.target.value })}>
@@ -139,29 +257,38 @@ export default function ClipForm({
           minExclusive
           onCommit={(ms) => onPatch({ duration_ms: ms })}
         />
-        <SecondsInput
-          label="In offset (s)"
-          valueMs={clip.in_offset_ms}
-          onCommit={(ms) => onPatch({ in_offset_ms: ms })}
-        />
+        {isEffect ? null : (
+          <SecondsInput
+            label="In offset (s)"
+            valueMs={clip.in_offset_ms}
+            onCommit={(ms) => onPatch({ in_offset_ms: ms })}
+          />
+        )}
       </div>
-      <label className={styles.check}>
-        <input
-          type="checkbox"
-          checked={clip.loop}
-          onChange={(e) => onPatch({ loop: e.target.checked })}
-        />
-        Loop
-      </label>
-      <label>
-        Fit
-        <select value={clip.fit} onChange={(e) => onPatch({ fit: e.target.value as Clip["fit"] })}>
-          <option value="fill">Fill</option>
-          <option value="fit">Fit</option>
-          <option value="stretch">Stretch</option>
-        </select>
-        <small>{FIT_HELP[clip.fit]}</small>
-      </label>
+      {isEffect ? null : (
+        <>
+          <label className={styles.check}>
+            <input
+              type="checkbox"
+              checked={clip.loop}
+              onChange={(e) => onPatch({ loop: e.target.checked })}
+            />
+            Loop
+          </label>
+          <label>
+            Fit
+            <select
+              value={clip.fit}
+              onChange={(e) => onPatch({ fit: e.target.value as Clip["fit"] })}
+            >
+              <option value="fill">Fill</option>
+              <option value="fit">Fit</option>
+              <option value="stretch">Stretch</option>
+            </select>
+            <small>{FIT_HELP[clip.fit]}</small>
+          </label>
+        </>
+      )}
       <label>
         Opacity ({Math.round(clip.opacity * 100)} %)
         <input

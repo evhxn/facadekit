@@ -52,14 +52,14 @@ const project = (clips: Clip[][]): Project =>
   }) as Project;
 
 describe("activeClips", () => {
-  it("returns track order, excludes out-of-range and generators", () => {
+  it("returns track order, excludes out-of-range, includes generators", () => {
     const p = project([
       [clip({ id: "a" }), clip({ id: "late", start_ms: 500 })],
       [clip({ id: "gen", asset_id: null, generator: { type: "solid", params: {} } })],
       [clip({ id: "b" })],
     ]);
-    expect(activeClips(p, 100).map((c) => c.id)).toEqual(["a", "b"]);
-    expect(activeClips(p, 600).map((c) => c.id)).toEqual(["a", "late", "b"]);
+    expect(activeClips(p, 100).map((c) => c.id)).toEqual(["a", "gen", "b"]);
+    expect(activeClips(p, 600).map((c) => c.id)).toEqual(["a", "late", "gen", "b"]);
     expect(activeClips(p, 1600)).toEqual([]);
   });
 });

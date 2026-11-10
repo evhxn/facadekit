@@ -11,18 +11,18 @@ import {
   type Pt,
   type Rect,
 } from "./homography";
+import { generatorUniforms } from "./generators";
 import { MaskTextureCache } from "./maskTexture";
 import { FRAGMENT_SRC, VERTEX_SRC } from "./shaders";
 import { ImageSource, VideoSource, type ClipTextureSource, type FrameSource } from "./sources";
 
 export type { FrameSource };
 
-/** Clips active at tMs, in track order. Generator clips are skipped. */
+/** Clips active at tMs, in track order (media and generator clips). */
 export function activeClips(project: Project, tMs: number): Clip[] {
   const out: Clip[] = [];
   for (const track of project.timeline.tracks) {
     for (const clip of track.clips) {
-      if (clip.generator) continue;
       if (clip.start_ms <= tMs && tMs < clip.start_ms + clip.duration_ms) out.push(clip);
     }
   }
@@ -89,7 +89,8 @@ export function clipUniforms(
   }
   const h = tryQuadHomography(1, 1, quad);
   if (!h) return null;
-  const { src, dst } = fitRects(srcW, srcH, aspect, clip.fit);
+  // Generator clips are evaluated in the unit square and drawn like stretched media.
+  const { src, dst } = fitRects(srcW, srcH, aspect, clip.generator ? "stretch" : clip.fit);
   const avgW = (dist(quad[0]!, quad[1]!) + dist(quad[3]!, quad[2]!)) / 2;
   const avgH = (dist(quad[0]!, quad[3]!) + dist(quad[1]!, quad[2]!)) / 2;
   const featherUv: [number, number] =
@@ -165,6 +166,11 @@ export class PreviewCompositor {
       "u_featherUv",
       "u_mask",
       "u_maskOn",
+      "u_genType",
+      "u_genColA",
+      "u_genColB",
+      "u_genP",
+      "u_genTc",
     ]) {
       this.loc[n] = gl.getUniformLocation(p, n);
     }
@@ -268,14 +274,30 @@ export class PreviewCompositor {
     gl.activeTexture(gl.TEXTURE0);
 
     for (const clip of active) {
-      const entry = this.sources.get(clip.id);
-      if (!entry) continue;
+      const gen = clip.generator;
+      const entry = gen ? undefined : this.sources.get(clip.id);
+      if (!gen && !entry) continue;
       const asset = project.assets.find((a) => a.id === clip.asset_id);
-      entry.source.setPlaying(playing);
-      const tex = entry.source.texture(gl, sourceTimeMs(clip, asset, tMs));
-      if (!tex) continue;
-      const u = clipUniforms(project, clip, asset, entry.source.width, entry.source.height);
+      let tex: WebGLTexture | null;
+      let u: ClipUniforms | null;
+      if (gen) {
+        tex = this.dummyMask;
+        u = clipUniforms(project, clip, asset, 1, 1);
+      } else {
+        entry!.source.setPlaying(playing);
+        tex = entry!.source.texture(gl, sourceTimeMs(clip, asset, tMs));
+        if (!tex) continue;
+        u = clipUniforms(project, clip, asset, entry!.source.width, entry!.source.height);
+      }
       if (!u) continue;
+      const gu = gen ? generatorUniforms(gen, (tMs - clip.start_ms) / 1000) : null;
+      gl.uniform1i(this.loc.u_genType!, gu ? gu.type : 0);
+      if (gu) {
+        gl.uniform3f(this.loc.u_genColA!, ...gu.colA);
+        gl.uniform3f(this.loc.u_genColB!, ...gu.colB);
+        gl.uniform4f(this.loc.u_genP!, ...gu.p);
+        gl.uniform1f(this.loc.u_genTc!, gu.tc);
+      }
       const quad = this.surfaceQuad(project, clip);
       if (!quad) continue;
       const surface = project.surfaces.find((x) => x.id === clip.surface_id);

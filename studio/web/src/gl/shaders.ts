@@ -1,3 +1,5 @@
+import { GEN_GLSL } from "./generators";
+
 export const VERTEX_SRC = `#version 300 es
 in vec2 a_pos;
 uniform vec2 u_size;
@@ -21,13 +23,14 @@ uniform sampler2D u_mask; // polygon mask (R8, half projector size)
 uniform float u_maskOn;   // 1 = multiply alpha by the mask, 0 = ignore
 uniform vec2 u_size;      // projector size in px
 out vec4 outColor;
+${GEN_GLSL}
 void main() {
   vec3 q = u_invH * vec3(v_pos, 1.0);
   vec2 uv = q.xy / q.z;
   if (uv.x < u_dst.x || uv.y < u_dst.y || uv.x > u_dst.z || uv.y > u_dst.w) discard;
   vec2 t = (uv - u_dst.xy) / (u_dst.zw - u_dst.xy);
   vec2 st = mix(u_src.xy, u_src.zw, t);
-  vec4 c = texture(u_tex, st);
+  vec4 c = u_genType == 0 ? texture(u_tex, st) : genColor(uv);
   float feather = 1.0;
   if (u_featherUv.x > 0.0 && u_featherUv.y > 0.0) {
     vec2 d = min(uv, 1.0 - uv) / u_featherUv;

@@ -13,6 +13,7 @@ from facadekit.geom.mask import rasterize_mask
 from facadekit.geom.mesh import mesh_inverse_map
 from facadekit.media.reader import ClipSource
 from facadekit.models.project import Asset, Clip, Mask, Mesh, Project, Surface
+from facadekit.render.generators import render_generator
 
 _HALF_IN = np.array([[1.0, 0.0, 0.5], [0.0, 1.0, 0.5], [0.0, 0.0, 1.0]])
 _HALF_OUT = np.array([[1.0, 0.0, -0.5], [0.0, 1.0, -0.5], [0.0, 0.0, 1.0]])
@@ -119,23 +120,29 @@ class Compositor:
         return out
 
     def _draw_clip(self, dst: np.ndarray, clip: Clip, t_ms: int) -> None:
-        if clip.generator is not None or clip.asset_id is None:
-            return
-        asset = self._assets[clip.asset_id]
-        source = self._source(clip, asset)
         cache = self._surfaces[clip.surface_id]
         bx, by, bw, bh = cache.box
         if bw == 0 or bh == 0:
             return
-
-        s = clip.in_offset_ms + (t_ms - clip.start_ms)
-        if clip.loop and asset.duration_ms:
-            s %= asset.duration_ms
-        img = source.frame_at(s)
-        src_w, src_h = source.size
-        h_mat, src_rect = clip_homography(src_w, src_h, cache.surface, clip.fit)
+        fit = clip.fit
+        if clip.generator is not None:
+            # Generators are evaluated in the surface unit square and drawn like stretched media.
+            img = render_generator(clip.generator, (t_ms - clip.start_ms) / 1000.0)
+            src_h, src_w = img.shape[:2]
+            fit = "stretch"
+        elif clip.asset_id is not None:
+            asset = self._assets[clip.asset_id]
+            source = self._source(clip, asset)
+            s = clip.in_offset_ms + (t_ms - clip.start_ms)
+            if clip.loop and asset.duration_ms:
+                s %= asset.duration_ms
+            img = source.frame_at(s)
+            src_w, src_h = source.size
+        else:
+            return
+        h_mat, src_rect = clip_homography(src_w, src_h, cache.surface, fit)
         if cache.map_u is not None:
-            self._draw_mesh(dst, clip, t_ms, cache, img, src_rect)
+            self._draw_mesh(dst, clip, t_ms, cache, img, src_rect, fit)
             return
 
         # Alpha plane in source space: src_rect region, times source alpha if present.
@@ -179,6 +186,7 @@ class Compositor:
         cache: _SurfaceCache,
         img: np.ndarray,
         src_rect: tuple[float, float, float, float],
+        fit: str,
     ) -> None:
         """Mesh path: sample the source through the precomputed (u, v) inverse map."""
         assert cache.map_u is not None and cache.map_v is not None
@@ -186,7 +194,7 @@ class Compositor:
         u = cache.map_u[by : by + bh, bx : bx + bw]
         v = cache.map_v[by : by + bh, bx : bx + bw]
         src_h, src_w = img.shape[:2]
-        _, (u0, v0, u1, v1) = fit_rects(float(src_w), float(src_h), cache.surface.aspect, clip.fit)
+        _, (u0, v0, u1, v1) = fit_rects(float(src_w), float(src_h), cache.surface.aspect, fit)
         x0, y0, x1, y1 = src_rect
         # Source position in pixel-corner units, then to cv2's pixel-centre indices.
         map_x = ((x0 + (u - u0) / (u1 - u0) * (x1 - x0)) - 0.5).astype(np.float32)

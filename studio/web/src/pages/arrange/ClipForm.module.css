@@ -33,3 +33,16 @@
   color: #b00;
   margin: 0;
 }
+.source {
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font-size: 13px;
+}
+.source legend {
+  padding: 0;
+  margin-bottom: 2px;
+}
