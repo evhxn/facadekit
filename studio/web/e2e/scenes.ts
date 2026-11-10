@@ -16,7 +16,15 @@ export interface SceneClip {
 export interface Scene {
   name: string;
   t_ms: number;
-  surfaces: Record<string, { quad: [Pt, Pt, Pt, Pt]; aspect: number }>;
+  surfaces: Record<
+    string,
+    {
+      quad: [Pt, Pt, Pt, Pt];
+      aspect: number;
+      mask?: { outer: Pt[]; holes: Pt[][] };
+      feather_px?: number;
+    }
+  >;
   assets: Record<string, Buffer>;
   clips: SceneClip[];
 }
@@ -154,5 +162,43 @@ export const scenes: Scene[] = [
     surfaces: {},
     assets: { split: split() },
     clips: [{ asset: "split", surface: "canvas", track: 0, fit: "fit" }],
+  },
+  {
+    name: "mask-hole",
+    t_ms: 1000,
+    surfaces: {
+      s: {
+        quad: [
+          [60, 30],
+          [420, 30],
+          [420, 240],
+          [60, 240],
+        ],
+        aspect: 1.7,
+        // Arched window with a rectangular cut-out, hard edges.
+        mask: {
+          outer: [
+            [80, 230],
+            [80, 110],
+            [130, 60],
+            [240, 40],
+            [350, 60],
+            [400, 110],
+            [400, 230],
+          ],
+          holes: [
+            [
+              [180, 120],
+              [300, 120],
+              [300, 190],
+              [180, 190],
+            ],
+          ],
+        },
+        feather_px: 0,
+      },
+    },
+    assets: { checker: checker() },
+    clips: [{ asset: "checker", surface: "s", track: 0, fit: "stretch" }],
   },
 ];

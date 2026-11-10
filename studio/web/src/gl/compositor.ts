@@ -11,6 +11,7 @@ import {
   type Pt,
   type Rect,
 } from "./homography";
+import { MaskTextureCache } from "./maskTexture";
 import { FRAGMENT_SRC, VERTEX_SRC } from "./shaders";
 import { ImageSource, VideoSource, type ClipTextureSource, type FrameSource } from "./sources";
 
@@ -119,6 +120,8 @@ export class PreviewCompositor {
   private loc: Record<string, WebGLUniformLocation | null> = {};
   private project: Project | null = null;
   private sources = new Map<string, Entry>();
+  private masks = new MaskTextureCache();
+  private dummyMask: WebGLTexture | null = null;
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -152,11 +155,37 @@ export class PreviewCompositor {
       throw new Error(`program link failed: ${gl.getProgramInfoLog(p)}`);
     }
     this.program = p;
-    for (const n of ["u_size", "u_tex", "u_invH", "u_src", "u_dst", "u_opacity", "u_featherUv"]) {
+    for (const n of [
+      "u_size",
+      "u_tex",
+      "u_invH",
+      "u_src",
+      "u_dst",
+      "u_opacity",
+      "u_featherUv",
+      "u_mask",
+      "u_maskOn",
+    ]) {
       this.loc[n] = gl.getUniformLocation(p, n);
     }
     this.buffer = gl.createBuffer();
     gl.enable(gl.BLEND);
+    this.dummyMask = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, this.dummyMask);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.texImage2D(
+      gl.TEXTURE_2D,
+      0,
+      gl.R8,
+      1,
+      1,
+      0,
+      gl.RED,
+      gl.UNSIGNED_BYTE,
+      new Uint8Array([255]),
+    );
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
   }
 
   setProject(project: Project): void {
@@ -232,6 +261,10 @@ export class PreviewCompositor {
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
     gl.uniform2f(this.loc.u_size!, width, height);
     gl.uniform1i(this.loc.u_tex!, 0);
+    gl.uniform1i(this.loc.u_mask!, 1);
+    const maskedIds = new Set<string>();
+    for (const s of project.surfaces) if (s.mask) maskedIds.add(s.id);
+    this.masks.prune(gl, maskedIds);
     gl.activeTexture(gl.TEXTURE0);
 
     for (const clip of active) {
@@ -245,12 +278,29 @@ export class PreviewCompositor {
       if (!u) continue;
       const quad = this.surfaceQuad(project, clip);
       if (!quad) continue;
+      const surface = project.surfaces.find((x) => x.id === clip.surface_id);
+      const maskTex = surface?.mask
+        ? this.masks.get(
+            gl,
+            surface.id,
+            surface.mask,
+            surface.feather_px,
+            project.projector.width,
+            project.projector.height,
+          )
+        : null;
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, maskTex ?? this.dummyMask);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.uniform1f(this.loc.u_maskOn!, maskTex ? 1 : 0);
       gl.bindTexture(gl.TEXTURE_2D, tex);
       gl.uniformMatrix3fv(this.loc.u_invH!, false, transpose(u.invH));
       gl.uniform4f(this.loc.u_src!, ...u.src);
       gl.uniform4f(this.loc.u_dst!, ...u.dst);
       gl.uniform1f(this.loc.u_opacity!, clip.opacity * fadeFactor(clip, tMs));
-      gl.uniform2f(this.loc.u_featherUv!, ...u.featherUv);
+      // A mask carries its own (blurred) edge; the analytic edge feather applies to plain quads.
+      const [fu, fv] = maskTex ? [0, 0] : u.featherUv;
+      gl.uniform2f(this.loc.u_featherUv!, fu, fv);
       if (u.blend === "add") gl.blendFunc(gl.ONE, gl.ONE);
       else if (u.blend === "screen") gl.blendFunc(gl.ONE_MINUS_DST_COLOR, gl.ONE);
       else gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
@@ -281,12 +331,15 @@ export class PreviewCompositor {
     const gl = this.gl;
     if (gl) {
       for (const e of this.sources.values()) e.source.dispose(gl);
+      this.masks.dispose(gl);
+      if (this.dummyMask) gl.deleteTexture(this.dummyMask);
       if (this.program) gl.deleteProgram(this.program);
       if (this.buffer) gl.deleteBuffer(this.buffer);
     }
     this.sources.clear();
     this.program = null;
     this.buffer = null;
+    this.dummyMask = null;
     this.project = null;
   }
 }

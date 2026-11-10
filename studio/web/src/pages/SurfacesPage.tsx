@@ -5,6 +5,7 @@ import { newId } from "../api/types";
 import type { Surface } from "../api/types";
 import { useProjectStore } from "../state/projectStore";
 import SurfaceCanvas from "./surfaces/SurfaceCanvas";
+import MaskEditor from "./surfaces/MaskEditor";
 import SurfaceList from "./surfaces/SurfaceList";
 import { estimateAspect, flipHorizontal, rotateCorners, type Quad } from "./surfaces/geometry";
 import styles from "./SurfacesPage.module.css";
@@ -183,6 +184,13 @@ export default function SurfacesPage() {
             setCorner(c);
           }}
           onChangeQuad={(id, quad) => patch(id, (s) => (s.quad = quad))}
+          onChangeMask={(id, mask) => patch(id, (s) => (s.mask = mask))}
+          onChangeShape={(id, quad, mask) =>
+            patch(id, (s) => {
+              s.quad = quad;
+              s.mask = mask;
+            })
+          }
           onCreate={create}
           onDelete={remove}
         />
@@ -230,6 +238,13 @@ export default function SurfacesPage() {
             onFeather={(f) => patch(selected.id, (s) => (s.feather_px = f))}
             onFlip={() => patch(selected.id, (s) => (s.quad = flipHorizontal(s.quad)))}
             onRotate={() => patch(selected.id, (s) => (s.quad = rotateCorners(s.quad)))}
+          />
+        )}
+        {selected && (
+          <MaskEditor
+            key={`shape-${selected.id}`}
+            surface={selected}
+            onChange={(mask) => patch(selected.id, (s) => (s.mask = mask))}
           />
         )}
       </aside>

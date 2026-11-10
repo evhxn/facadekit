@@ -104,8 +104,8 @@ async function buildProject(request: APIRequestContext, scene: Scene): Promise<s
       id,
       name: key,
       quad: s.quad,
-      mask: null,
-      feather_px: 0,
+      mask: s.mask ?? null,
+      feather_px: s.feather_px ?? 0,
       aspect: s.aspect,
       mesh: null,
     };
@@ -170,6 +170,10 @@ for (const scene of scenes) {
     expect([backend.width, backend.height]).toEqual([PROJECTOR.width, PROJECTOR.height]);
 
     const quads: Pt[][] = Object.values(scene.surfaces).map((s) => s.quad);
+    // Mask outlines are edges too (half-size texture vs the backend's exact raster).
+    for (const surf of Object.values(scene.surfaces)) {
+      if (surf.mask) quads.push(surf.mask.outer, ...surf.mask.holes);
+    }
     if (scene.clips.some((c) => c.surface === "canvas")) {
       quads.push([
         [0, 0],

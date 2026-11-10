@@ -17,6 +17,9 @@ uniform vec4 u_src;       // normalised source rect x0,y0,x1,y1
 uniform vec4 u_dst;       // dst rect in the surface unit square
 uniform float u_opacity;  // clip opacity * fade
 uniform vec2 u_featherUv; // feather width in uv units (0 = none)
+uniform sampler2D u_mask; // polygon mask (R8, half projector size)
+uniform float u_maskOn;   // 1 = multiply alpha by the mask, 0 = ignore
+uniform vec2 u_size;      // projector size in px
 out vec4 outColor;
 void main() {
   vec3 q = u_invH * vec3(v_pos, 1.0);
@@ -30,7 +33,8 @@ void main() {
     vec2 d = min(uv, 1.0 - uv) / u_featherUv;
     feather = smoothstep(0.0, 1.0, min(d.x, d.y));
   }
-  float a = c.a * u_opacity * feather;
+  float m = u_maskOn > 0.5 ? texture(u_mask, v_pos / u_size).r : 1.0;
+  float a = c.a * u_opacity * feather * m;
   outColor = vec4(c.rgb * a, a);
 }
 `;

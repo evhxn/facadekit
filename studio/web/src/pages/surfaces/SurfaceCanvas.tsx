@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PointerEvent as RPointerEvent } from "react";
-import type { Pt, Surface } from "../../api/types";
+import type { Mask, Pt, Surface } from "../../api/types";
 import {
   clampPt,
   hitTestCorner,
@@ -11,7 +11,17 @@ import {
   rectQuad,
   type Quad,
 } from "./geometry";
+import { addHole, maskIsSimple, removeMaskVertex, translateMask } from "./MaskEditor";
+import { insertVertex, nearestEdge, pointInPolygon } from "./polygon";
 import styles from "./SurfaceCanvas.module.css";
+
+function setVertex(m: Mask, ring: number, index: number, v: Pt): Mask {
+  if (ring < 0) return { ...m, outer: m.outer.map((q, i) => (i === index ? v : q)) };
+  return {
+    ...m,
+    holes: m.holes.map((h, k) => (k === ring ? h.map((q, i) => (i === index ? v : q)) : h)),
+  };
+}
 
 const CORNER_NAMES = ["top-left", "top-right", "bottom-right", "bottom-left"];
 const HANDLE = 8;
@@ -28,13 +38,17 @@ interface Props {
   corner: number | null;
   onSelect: (id: string | null, corner: number | null) => void;
   onChangeQuad: (id: string, quad: Quad) => void;
+  /** Mask edits, and moving a whole surface (quad and mask together). */
+  onChangeMask: (id: string, mask: Mask) => void;
+  onChangeShape: (id: string, quad: Quad, mask: Mask | null) => void;
   onCreate: (quad: Quad) => void;
   onDelete: (id: string) => void;
 }
 
 type Drag =
   | { kind: "corner"; id: string; index: number }
-  | { kind: "move"; id: string; start: Pt; quad: Quad }
+  | { kind: "move"; id: string; start: Pt; quad: Quad; mask: Mask | null }
+  | { kind: "vertex"; id: string; ring: number; index: number }
   | { kind: "pan"; start: Pt; panX: number; panY: number };
 
 export default function SurfaceCanvas(props: Props) {
@@ -50,6 +64,20 @@ export default function SurfaceCanvas(props: Props) {
   const [loaded, setLoaded] = useState(0);
   const [adding, setAdding] = useState<Pt[] | null>(null);
   const [cursor, setCursor] = useState<Pt | null>(null);
+  const [editMask, setEditMask] = useState(false);
+  const [vsel, setVsel] = useState<{ ring: number; index: number } | null>(null);
+  const [holeDraft, setHoleDraft] = useState<Pt[] | null>(null);
+  const [notice, setNotice] = useState("");
+  const selectedSurface = surfaces.find((x) => x.id === selectedId);
+  const hasMask = !!selectedSurface?.mask;
+
+  // A surface with a custom outline opens in outline editing.
+  useEffect(() => {
+    setEditMask(hasMask);
+    setVsel(null);
+    setHoleDraft(null);
+    setNotice("");
+  }, [selectedId, hasMask]);
 
   const view = makeView({
     imgW,
@@ -122,13 +150,16 @@ export default function SurfaceCanvas(props: Props) {
 
   // Esc cancels adding, even when focus left the canvas.
   useEffect(() => {
-    if (!adding) return;
+    if (!adding && !holeDraft) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setAdding(null);
+      if (e.key === "Escape") {
+        setAdding(null);
+        setHoleDraft(null);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [adding]);
+  }, [adding, holeDraft]);
 
   // Draw.
   useEffect(() => {
@@ -169,12 +200,38 @@ export default function SurfaceCanvas(props: Props) {
     for (const s of surfaces) {
       const selected = s.id === selectedId;
       const crossed = isSelfIntersecting(s.quad);
-      path(s.quad, true);
-      if (selected) {
-        ctx.fillStyle = "rgba(80,160,255,0.25)";
-        ctx.fill();
+      const m = s.mask;
+      const editing = selected && editMask && !!m;
+      if (m) {
+        ctx.beginPath();
+        for (const ring of [m.outer, ...m.holes]) {
+          ring.forEach((p, i) => {
+            const q = view.toScreen(p);
+            if (i === 0) ctx.moveTo(q[0], q[1]);
+            else ctx.lineTo(q[0], q[1]);
+          });
+          ctx.closePath();
+        }
+        if (selected) {
+          ctx.fillStyle = "rgba(80,160,255,0.25)";
+          ctx.fill("evenodd");
+        }
+        stroke(maskIsSimple(m) ? "#ffffff" : "#ff3030");
+        // The mapping quad stays visible as a thin dashed line.
+        path(s.quad, true);
+        ctx.setLineDash([4, 4]);
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = crossed ? "#ff3030" : "rgba(255,255,255,0.7)";
+        ctx.stroke();
+        ctx.setLineDash([]);
+      } else {
+        path(s.quad, true);
+        if (selected) {
+          ctx.fillStyle = "rgba(80,160,255,0.25)";
+          ctx.fill();
+        }
+        stroke(crossed ? "#ff3030" : "#ffffff");
       }
-      stroke(crossed ? "#ff3030" : "#ffffff");
       const cx = s.quad.reduce((t, p) => t + p[0], 0) / 4;
       const cy = s.quad.reduce((t, p) => t + p[1], 0) / 4;
       const c = view.toScreen([cx, cy]);
@@ -186,24 +243,62 @@ export default function SurfaceCanvas(props: Props) {
       ctx.strokeText(s.name, c[0], c[1]);
       ctx.fillStyle = "#fff";
       ctx.fillText(s.name, c[0], c[1]);
-      s.quad.forEach((p, i) => {
-        const q = view.toScreen(p);
-        ctx.beginPath();
-        if (i === 0) ctx.arc(q[0], q[1], HANDLE / 2 + 1, 0, Math.PI * 2);
-        else ctx.rect(q[0] - HANDLE / 2, q[1] - HANDLE / 2, HANDLE, HANDLE);
-        ctx.fillStyle = selected && corner === i ? "#ffcc00" : "#ffffff";
-        ctx.fill();
-        ctx.lineWidth = 1.5;
-        ctx.strokeStyle = "#000";
-        ctx.stroke();
-      });
+      if (editing && m) {
+        [m.outer, ...m.holes].forEach((ring, r) => {
+          ring.forEach((p, i) => {
+            const q = view.toScreen(p);
+            ctx.beginPath();
+            ctx.arc(q[0], q[1], HANDLE / 2, 0, Math.PI * 2);
+            ctx.fillStyle = vsel && vsel.ring === r - 1 && vsel.index === i ? "#ffcc00" : "#ffffff";
+            ctx.fill();
+            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = "#000";
+            ctx.stroke();
+          });
+        });
+      }
+      if (!editing)
+        s.quad.forEach((p, i) => {
+          const q = view.toScreen(p);
+          ctx.beginPath();
+          if (i === 0) ctx.arc(q[0], q[1], HANDLE / 2 + 1, 0, Math.PI * 2);
+          else ctx.rect(q[0] - HANDLE / 2, q[1] - HANDLE / 2, HANDLE, HANDLE);
+          ctx.fillStyle = selected && corner === i ? "#ffcc00" : "#ffffff";
+          ctx.fill();
+          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = "#000";
+          ctx.stroke();
+        });
+    }
+    if (holeDraft && holeDraft.length > 0) {
+      path(cursor ? [...holeDraft, cursor] : holeDraft, false);
+      stroke("#ffcc00");
+      const f = view.toScreen(holeDraft[0] as Pt);
+      ctx.beginPath();
+      ctx.arc(f[0], f[1], HANDLE / 2 + 1, 0, Math.PI * 2);
+      ctx.fillStyle = "#ffcc00";
+      ctx.fill();
     }
     if (adding && adding.length > 0) {
       const pts = cursor ? [...adding, cursor] : adding;
       path(pts, false);
       stroke("#ffcc00");
     }
-  }, [view, size, surfaces, selectedId, corner, adding, cursor, loaded, imgW, imgH]);
+  }, [
+    view,
+    size,
+    surfaces,
+    selectedId,
+    corner,
+    adding,
+    cursor,
+    loaded,
+    imgW,
+    imgH,
+    editMask,
+    vsel,
+    holeDraft,
+  ]);
 
   const toolPoint = useCallback(
     (e: { clientX: number; clientY: number }): Pt => {
@@ -258,6 +353,78 @@ export default function SurfaceCanvas(props: Props) {
       }
       return;
     }
+    if (holeDraft) {
+      const p = clampPt(view.toProjector(sp), imgW, imgH);
+      const first = holeDraft[0];
+      if (
+        first &&
+        holeDraft.length >= 3 &&
+        Math.hypot(p[0] - first[0], p[1] - first[1]) * view.scale <= HIT_RADIUS
+      ) {
+        closeHole(holeDraft);
+      } else {
+        setHoleDraft([...holeDraft, p]);
+      }
+      return;
+    }
+    if (selectedSurface?.mask && editMask) {
+      const m = selectedSurface.mask;
+      const p = view.toProjector(sp);
+      const radius = HIT_RADIUS / view.scale;
+      const rings = [m.outer, ...m.holes];
+      for (let r = 0; r < rings.length; r++) {
+        const ring = rings[r] as Pt[];
+        for (let i = 0; i < ring.length; i++) {
+          const v = ring[i] as Pt;
+          if (Math.hypot(p[0] - v[0], p[1] - v[1]) <= radius) {
+            setVsel({ ring: r - 1, index: i });
+            dragRef.current = { kind: "vertex", id: selectedSurface.id, ring: r - 1, index: i };
+            canvasRef.current?.setPointerCapture?.(e.pointerId);
+            return;
+          }
+        }
+      }
+      let best: { r: number; index: number; point: Pt; distance: number } | null = null;
+      for (let r = 0; r < rings.length; r++) {
+        const ne = nearestEdge(rings[r] as Pt[], p);
+        if (ne.distance <= radius * 0.7 && (!best || ne.distance < best.distance)) {
+          best = { r, index: ne.index, point: ne.point, distance: ne.distance };
+        }
+      }
+      if (best) {
+        const next: Mask =
+          best.r === 0
+            ? { ...m, outer: insertVertex(m.outer, best.index, best.point) }
+            : {
+                ...m,
+                holes: m.holes.map((hl, k) =>
+                  k === best.r - 1 ? insertVertex(hl, best.index, best.point) : hl,
+                ),
+              };
+        props.onChangeMask(selectedSurface.id, next);
+        setVsel({ ring: best.r - 1, index: best.index + 1 });
+        dragRef.current = {
+          kind: "vertex",
+          id: selectedSurface.id,
+          ring: best.r - 1,
+          index: best.index + 1,
+        };
+        canvasRef.current?.setPointerCapture?.(e.pointerId);
+        return;
+      }
+      if (pointInPolygon(p, m.outer)) {
+        setVsel(null);
+        dragRef.current = {
+          kind: "move",
+          id: selectedSurface.id,
+          start: p,
+          quad: selectedSurface.quad,
+          mask: m,
+        };
+        canvasRef.current?.setPointerCapture?.(e.pointerId);
+        return;
+      }
+    }
     const h = hit(sp);
     if (!h) {
       props.onSelect(null, null);
@@ -269,7 +436,7 @@ export default function SurfaceCanvas(props: Props) {
     dragRef.current =
       h.corner !== null
         ? { kind: "corner", id: h.id, index: h.corner }
-        : { kind: "move", id: h.id, start: view.toProjector(sp), quad: s.quad };
+        : { kind: "move", id: h.id, start: view.toProjector(sp), quad: s.quad, mask: s.mask };
     canvasRef.current?.setPointerCapture?.(e.pointerId);
   };
 
@@ -277,7 +444,7 @@ export default function SurfaceCanvas(props: Props) {
     const sp = toolPoint(e);
     const drag = dragRef.current;
     if (!drag) {
-      if (adding) setCursor(clampPt(view.toProjector(sp), imgW, imgH));
+      if (adding || holeDraft) setCursor(clampPt(view.toProjector(sp), imgW, imgH));
       return;
     }
     if (drag.kind === "pan") {
@@ -291,11 +458,36 @@ export default function SurfaceCanvas(props: Props) {
       const quad = s.quad.map((c) => [...c] as Pt) as Quad;
       quad[drag.index] = clampPt(p, imgW, imgH);
       props.onChangeQuad(drag.id, quad);
+    } else if (drag.kind === "vertex") {
+      const m = surfaces.find((x) => x.id === drag.id)?.mask;
+      if (!m) return;
+      const v = clampPt(p, imgW, imgH);
+      props.onChangeMask(drag.id, setVertex(m, drag.ring, drag.index, v));
     } else {
-      props.onChangeQuad(
-        drag.id,
-        moveQuadClamped(drag.quad, p[0] - drag.start[0], p[1] - drag.start[1], imgW, imgH),
-      );
+      moveSurface(drag.id, drag.quad, drag.mask, p[0] - drag.start[0], p[1] - drag.start[1]);
+    }
+  };
+
+  /** Move quad and mask together by the shift the quad clamp allows. */
+  const moveSurface = (id: string, quad: Quad, mask: Mask | null, dx: number, dy: number) => {
+    const moved = moveQuadClamped(quad, dx, dy, imgW, imgH);
+    if (!mask) {
+      props.onChangeQuad(id, moved);
+      return;
+    }
+    props.onChangeShape(
+      id,
+      moved,
+      translateMask(mask, moved[0][0] - quad[0][0], moved[0][1] - quad[0][1]),
+    );
+  };
+
+  const closeHole = (draft: Pt[]) => {
+    const m = selectedSurface?.mask;
+    setHoleDraft(null);
+    if (m && selectedSurface) {
+      props.onChangeMask(selectedSurface.id, addHole(m, draft));
+      setVsel({ ring: m.holes.length, index: 0 });
     }
   };
 
@@ -311,11 +503,43 @@ export default function SurfaceCanvas(props: Props) {
     }
     if (e.key === "Escape") {
       setAdding(null);
+      setHoleDraft(null);
+      return;
+    }
+    if (holeDraft) {
+      if (e.key === "Enter" && holeDraft.length >= 3) {
+        e.preventDefault();
+        closeHole(holeDraft);
+      }
       return;
     }
     const s = surfaces.find((x) => x.id === selectedId);
     if (!s) return;
-    if (e.key === "Delete") {
+    const editing = !!s.mask && editMask;
+    if (editing && s.mask && vsel && (e.key === "Delete" || e.key === "Backspace")) {
+      e.preventDefault();
+      const ring = vsel.ring < 0 ? s.mask.outer : s.mask.holes[vsel.ring];
+      if (!ring || ring.length <= 3) {
+        setNotice("A shape needs at least 3 points.");
+        return;
+      }
+      setNotice("");
+      props.onChangeMask(s.id, removeMaskVertex(s.mask, vsel.ring, vsel.index));
+      setVsel(null);
+    } else if (editing && s.mask && vsel && e.key.startsWith("Arrow")) {
+      e.preventDefault();
+      const step = e.shiftKey ? 10 : 1;
+      const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
+      const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
+      const ring = vsel.ring < 0 ? s.mask.outer : s.mask.holes[vsel.ring];
+      const cur = ring?.[vsel.index];
+      if (cur) {
+        props.onChangeMask(
+          s.id,
+          setVertex(s.mask, vsel.ring, vsel.index, clampPt([cur[0] + dx, cur[1] + dy], imgW, imgH)),
+        );
+      }
+    } else if (e.key === "Delete") {
       e.preventDefault();
       props.onDelete(s.id);
     } else if (e.key === "Tab") {
@@ -333,8 +557,8 @@ export default function SurfaceCanvas(props: Props) {
       const step = e.shiftKey ? 10 : 1;
       const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
       const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
-      if (corner === null) {
-        props.onChangeQuad(s.id, moveQuadClamped(s.quad, dx, dy, imgW, imgH));
+      if (corner === null || editing) {
+        moveSurface(s.id, s.quad, s.mask, dx, dy);
       } else {
         const quad = s.quad.map((c) => [...c] as Pt) as Quad;
         const cur = quad[corner] as Pt;
@@ -344,12 +568,18 @@ export default function SurfaceCanvas(props: Props) {
     }
   };
 
-  const selected = surfaces.find((s) => s.id === selectedId);
-  const hint = adding
-    ? `Click the ${CORNER_NAMES[adding.length]} corner (${adding.length + 1} of 4). Esc cancels.`
-    : selected && isSelfIntersecting(selected.quad)
-      ? "Corners are crossed"
-      : "Scroll to zoom, Space or middle button to pan.";
+  const selected = selectedSurface;
+  const hint = holeDraft
+    ? "Click the hole's points; click the first point or press Enter to close. Esc cancels."
+    : notice
+      ? notice
+      : selected?.mask && !maskIsSimple(selected.mask)
+        ? "The outline crosses itself"
+        : adding
+          ? `Click the ${CORNER_NAMES[adding.length]} corner (${adding.length + 1} of 4). Esc cancels.`
+          : selected && isSelfIntersecting(selected.quad)
+            ? "Corners are crossed"
+            : "Scroll to zoom, Space or middle button to pan.";
   const readout =
     selected && corner !== null
       ? `Corner ${CORNER_NAMES[corner]}: ${Math.round((selected.quad[corner] as Pt)[0])}, ${Math.round((selected.quad[corner] as Pt)[1])} px`
@@ -364,6 +594,16 @@ export default function SurfaceCanvas(props: Props) {
         <button type="button" onClick={() => props.onCreate(rectQuad(imgW, imgH, 0.4))}>
           Add rectangle
         </button>
+        {selected?.mask && (
+          <>
+            <button type="button" onClick={() => setHoleDraft([])} disabled={holeDraft !== null}>
+              Add hole
+            </button>
+            <button type="button" onClick={() => setEditMask((v) => !v)} aria-pressed={editMask}>
+              {editMask ? "Edit corners" : "Edit outline"}
+            </button>
+          </>
+        )}
         <span className={styles.hint} role="status">
           {hint}
         </span>
