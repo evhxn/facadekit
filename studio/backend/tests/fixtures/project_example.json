@@ -1,0 +1,16 @@
+{
+  "schema_version": 1, "id": "garage-2026", "name": "Garage 2026", "revision": 3,
+  "projector": {"width": 1920, "height": 1080, "fps": 30},
+  "calibration_id": "cal_0a1b2c3d",
+  "surfaces": [{"id": "srf_11111111", "name": "Garage door",
+    "quad": [[512.0, 610.5], [1320.2, 598.0], [1335.0, 1012.4], [498.7, 1020.0]],
+    "mask": null, "feather_px": 4.0, "aspect": 2.29, "mesh": null}],
+  "assets": [{"id": "ast_22222222", "kind": "video", "filename": "media/ast_22222222.mp4",
+    "original_name": "ghosts.mp4", "width": 1920, "height": 1080, "duration_ms": 45000,
+    "fps": 30.0, "has_audio": true, "has_alpha": false}],
+  "timeline": {"duration_ms": 60000, "audio_asset_id": null, "tracks": [{"id": "trk_33333333",
+    "name": "Track 1", "clips": [{"id": "clp_44444444", "asset_id": "ast_22222222", "generator": null,
+    "surface_id": "srf_11111111", "start_ms": 0, "duration_ms": 60000, "in_offset_ms": 0, "loop": true,
+    "fit": "fill", "opacity": 1.0, "fade_in_ms": 500, "fade_out_ms": 500, "blend": "normal"}]}]},
+  "markers": [], "fpp": {"host": "fpp.local", "playlist_name": null}
+}
