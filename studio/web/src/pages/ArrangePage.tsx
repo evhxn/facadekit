@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
+import { analyzeAsset, ApiError } from "../api/client";
+import { waitForJob } from "../api/events";
+import { defaultGenerator } from "../gl/generators";
 import type { Asset, Clip } from "../api/types";
 import { newId } from "../api/types";
 import { useProjectStore } from "../state/projectStore";
@@ -24,6 +27,11 @@ interface Draft {
   layer: number | "new";
 }
 
+function beatError(code: string, message?: string): string {
+  if (code === "AI_UNAVAILABLE") return "Beat detection is not installed. See the docs to add it.";
+  return message || "Finding beats failed.";
+}
+
 export default function ArrangePage() {
   const { projectId } = useParams();
   const project = useProjectStore((s) => s.project);
@@ -34,6 +42,7 @@ export default function ArrangePage() {
   const setSelectedId = (id: string | null) => setSelection(id ? [id] : []);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [beats, setBeats] = useState({ busy: false, progress: 0, error: null as string | null });
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const durationRef = useRef(0);
@@ -70,15 +79,16 @@ export default function ArrangePage() {
   const formClip = draft?.clip ?? found?.clip ?? null;
 
   function startDraft() {
-    if (!project || !firstVisual) return;
+    if (!project) return;
     setSelectedId(null);
     setMessage(null);
     setDraft({
       layer: 0,
       clip: {
         id: newId("clp"),
-        asset_id: firstVisual.id,
-        generator: null,
+        // No media yet: start from a solid effect so a project can be built without imports.
+        asset_id: firstVisual ? firstVisual.id : null,
+        generator: firstVisual ? null : defaultGenerator("solid"),
         surface_id: project.surfaces[0]?.id ?? CANVAS_ID,
         start_ms: 0,
         duration_ms: project.timeline.duration_ms > 0 ? project.timeline.duration_ms : 5000,
@@ -125,6 +135,34 @@ export default function ArrangePage() {
     }
   }
 
+  async function findBeats() {
+    const pid = project?.id;
+    const aid = project?.timeline.audio_asset_id;
+    if (!pid || !aid || beats.busy) return;
+    setBeats({ busy: true, progress: 0, error: null });
+    try {
+      await useProjectStore.getState().saveNow();
+      const { job_id } = await analyzeAsset(pid, aid);
+      const job = await waitForJob(job_id, (j) =>
+        setBeats((b) => ({ ...b, progress: j.progress })),
+      );
+      if (job.state === "succeeded") {
+        await load(pid);
+        setBeats({ busy: false, progress: 1, error: null });
+      } else {
+        const code = job.error?.code ?? "";
+        setBeats({ busy: false, progress: 0, error: beatError(code, job.error?.message) });
+      }
+    } catch (e) {
+      const code = e instanceof ApiError ? e.code : "";
+      setBeats({
+        busy: false,
+        progress: 0,
+        error: beatError(code, e instanceof Error ? e.message : undefined),
+      });
+    }
+  }
+
   function useAudio(asset: Asset | null) {
     update((p) => setShowAudio(p, asset));
   }
@@ -149,7 +187,6 @@ export default function ArrangePage() {
         <ClipList
           project={project}
           selectedId={selectedId}
-          canAdd={firstVisual !== undefined}
           onSelect={(id) => {
             setDraft(null);
             setMessage(null);
@@ -162,6 +199,8 @@ export default function ArrangePage() {
             })
           }
           onShowAudio={useAudio}
+          onFindBeats={() => void findBeats()}
+          beats={beats}
         />
         {formClip ? (
           <ClipForm

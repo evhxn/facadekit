@@ -10,6 +10,13 @@ const mocks = vi.hoisted(() => ({
   uploadAsset: vi.fn(),
   projectorShow: vi.fn(),
   projectorTransport: vi.fn(),
+  analyzeAsset: vi.fn(),
+}));
+
+const events = vi.hoisted(() => ({ waitForJob: vi.fn() }));
+vi.mock("../api/events", async (orig) => ({
+  ...(await orig<typeof import("../api/events")>()),
+  ...events,
 }));
 
 vi.mock("../api/client", async (orig) => ({
@@ -174,5 +181,81 @@ describe("ArrangePage", () => {
     const setData = vi.fn();
     fireEvent.dragStart(card, { dataTransfer: { setData } });
     expect(setData).toHaveBeenCalledWith("application/x-facadekit-asset", "ast_v");
+  });
+
+  it("adds a solid effect clip when there are no media assets", () => {
+    useProjectStore.setState({ project: { ...baseProject(), assets: [] } });
+    renderPage();
+    fireEvent.click(screen.getByText("Add clip"));
+    fireEvent.click(screen.getByText("Add to timeline"));
+    const clip = project().timeline.tracks[0]!.clips[0]!;
+    expect(clip.asset_id).toBeNull();
+    expect(clip.generator?.type).toBe("solid");
+    expect(screen.getByRole("button", { name: "Clip Effect: solid" })).toBeTruthy();
+    expect(screen.queryByText("Missing file")).toBeNull();
+    expect(screen.getAllByText("Effect: solid")).toHaveLength(2);
+  });
+
+  it("adds a user marker at the playhead when M is pressed", () => {
+    renderPage();
+    const content = screen.getByTestId("new-layer-row").parentElement!;
+    // jsdom has no PointerEvent: a MouseEvent of the same type carries the coordinates.
+    const ptr = (type: string) =>
+      fireEvent(content, new MouseEvent(type, { clientX: 100, clientY: 5, bubbles: true }));
+    ptr("pointerdown");
+    ptr("pointerup");
+    fireEvent.keyDown(window, { key: "m" });
+    expect(project().markers).toEqual([{ t_ms: 2000, kind: "user" }]);
+    fireEvent(
+      screen.getByLabelText("User marker at 2.00 s"),
+      new MouseEvent("pointerdown", { button: 0, bubbles: true }),
+    );
+    fireEvent.keyDown(window, { key: "Delete" });
+    expect(project().markers).toEqual([]);
+  });
+
+  it("Find beats analyses the show audio and reloads the project", async () => {
+    const load = vi.fn().mockResolvedValue(undefined);
+    useProjectStore.setState({
+      project: {
+        ...baseProject(),
+        timeline: { duration_ms: 60000, audio_asset_id: "ast_a", tracks: [] },
+      },
+      load,
+    });
+    mocks.analyzeAsset.mockResolvedValue({ job_id: "job_1" });
+    events.waitForJob.mockResolvedValue({
+      id: "job_1",
+      state: "succeeded",
+      progress: 1,
+      error: null,
+    });
+    renderPage();
+    fireEvent.click(screen.getByText("Find beats"));
+    await waitFor(() => expect(load).toHaveBeenCalledWith("prj_1"));
+    expect(mocks.analyzeAsset).toHaveBeenCalledWith("prj_1", "ast_a");
+  });
+
+  it("explains when beat detection is not installed", async () => {
+    useProjectStore.setState({
+      project: {
+        ...baseProject(),
+        timeline: { duration_ms: 60000, audio_asset_id: "ast_a", tracks: [] },
+      },
+    });
+    mocks.analyzeAsset.mockResolvedValue({ job_id: "job_1" });
+    events.waitForJob.mockResolvedValue({
+      id: "job_1",
+      state: "failed",
+      progress: 0,
+      error: { code: "AI_UNAVAILABLE", message: "x" },
+    });
+    renderPage();
+    fireEvent.click(screen.getByText("Find beats"));
+    await waitFor(() =>
+      expect(
+        screen.getByText("Beat detection is not installed. See the docs to add it."),
+      ).toBeTruthy(),
+    );
   });
 });

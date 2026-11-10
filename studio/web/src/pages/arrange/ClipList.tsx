@@ -25,24 +25,33 @@ export function assetName(project: Project, assetId: string | null): string {
   return project.assets.find((a) => a.id === assetId)?.original_name ?? "Missing file";
 }
 
+/** Label for a clip: its file name, or the effect type for generator clips. */
+export function clipLabel(project: Project, clip: Clip): string {
+  if (clip.generator) return `Effect: ${clip.generator.type}`;
+  return assetName(project, clip.asset_id);
+}
+
 const sec = (ms: number) => (ms / 1000).toFixed(1);
 
 export default function ClipList({
   project,
   selectedId,
-  canAdd,
   onSelect,
   onAdd,
   onDuration,
   onShowAudio,
+  onFindBeats,
+  beats,
 }: {
   project: Project;
   selectedId: string | null;
-  canAdd: boolean;
   onSelect: (id: string) => void;
   onAdd: () => void;
   onDuration: (ms: number) => void;
   onShowAudio: (asset: Asset | null) => void;
+  onFindBeats: () => void;
+  /** Beat detection state: progress 0..1 while running, an error message when it failed. */
+  beats: { busy: boolean; progress: number; error: string | null };
 }) {
   const rows = sortedClips(project);
   const eligible = project.assets.filter(
@@ -74,19 +83,26 @@ export default function ClipList({
             ))}
           </select>
         </label>
+        <button
+          type="button"
+          onClick={onFindBeats}
+          disabled={beats.busy || project.timeline.audio_asset_id === null}
+        >
+          {beats.busy ? `Finding beats… ${Math.round(beats.progress * 100)} %` : "Find beats"}
+        </button>
       </div>
+      {beats.error ? <p role="alert">{beats.error}</p> : null}
       <div className={styles.bar}>
         <h3>Clips</h3>
-        <button type="button" onClick={onAdd} disabled={!canAdd}>
+        <button type="button" onClick={onAdd}>
           Add clip
         </button>
       </div>
-      {!canAdd ? <p className={styles.hint}>Import a video or image to add clips.</p> : null}
       <table className={styles.table}>
         <thead>
           <tr>
             <th>Layer</th>
-            <th>File</th>
+            <th>File / effect</th>
             <th>Surface</th>
             <th>Start</th>
             <th>Length</th>
@@ -103,7 +119,7 @@ export default function ClipList({
               onClick={() => onSelect(clip.id)}
             >
               <td>{trackIndex + 1}</td>
-              <td>{assetName(project, clip.asset_id)}</td>
+              <td>{clipLabel(project, clip)}</td>
               <td>{surfaceName(project, clip.surface_id)}</td>
               <td>{sec(clip.start_ms)} s</td>
               <td>{sec(clip.duration_ms)} s</td>

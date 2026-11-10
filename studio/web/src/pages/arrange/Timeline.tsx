@@ -4,8 +4,10 @@ import type { Clip, Project } from "../../api/types";
 import { newId } from "../../api/types";
 import { useProjectStore } from "../../state/projectStore";
 import { CANVAS_ID } from "./ClipForm";
-import { assetName } from "./ClipList";
+import { clipLabel } from "./ClipList";
+import { alternateSurfaces, splitClipOnBeats } from "./beatOps";
 import { addClip, duplicateClips, findClip, moveClips, removeClip, trimClip } from "./clipOps";
+import Markers, { BeatMenu } from "./Markers";
 import { ASSET_DRAG_TYPE } from "./MediaLibrary";
 import Waveform, { WAVE_H } from "./Waveform";
 import { MAX_PX_PER_SEC, MIN_PX_PER_SEC, msToX, rulerTicks, snap, xToMs } from "./timelineMath";
@@ -65,6 +67,15 @@ export default function Timeline({ project, transport, selectedIds, onSelect, on
   const [pxPerSec, setPxPerSec] = useState(DEFAULT_PX_PER_SEC);
   const [ghosts, setGhosts] = useState<Map<string, Ghost> | null>(null);
   const [invalid, setInvalid] = useState(false);
+  const [showOnsets, setShowOnsets] = useState(false);
+  const [markerSel, setMarkerSel] = useState<number | null>(null);
+  const [menu, setMenu] = useState<{
+    x: number;
+    y: number;
+    clipId: string;
+    stage: string[] | null;
+    message: string | null;
+  } | null>(null);
   const [box, setBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
 
   const rootRef = useRef<HTMLDivElement>(null);
@@ -77,6 +88,8 @@ export default function Timeline({ project, transport, selectedIds, onSelect, on
   projectRef.current = project;
   const tRef = useRef(t);
   tRef.current = t;
+  const markerSelRef = useRef<number | null>(null);
+  markerSelRef.current = markerSel;
   const ppm = pxPerSec / 1000;
   const ppmRef = useRef(ppm);
   ppmRef.current = ppm;
@@ -106,6 +119,48 @@ export default function Timeline({ project, transport, selectedIds, onSelect, on
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
   }, []);
+
+  // M adds a user marker at the playhead; Delete removes the selected user marker.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
+      if (e.key.toLowerCase() === "m") {
+        e.preventDefault();
+        const ms = Math.max(0, Math.round(tRef.current));
+        update((d) => {
+          if (d.markers.some((m) => m.kind === "user" && m.t_ms === ms)) return;
+          d.markers.push({ t_ms: ms, kind: "user" });
+          d.markers.sort((a, b) => a.t_ms - b.t_ms);
+        });
+      } else if (e.key === "Delete" || e.key === "Backspace") {
+        const ms = markerSelRef.current;
+        if (ms === null) return;
+        e.preventDefault();
+        update((d) => {
+          d.markers = d.markers.filter((m) => !(m.kind === "user" && m.t_ms === ms));
+        });
+        setMarkerSel(null);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [update]);
+
+  useEffect(() => {
+    if (!menu) return;
+    const close = () => setMenu(null);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
+    window.addEventListener("pointerdown", close);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("pointerdown", close);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [menu]);
 
   useLayoutEffect(() => {
     const a = zoomAnchor.current;
@@ -155,6 +210,7 @@ export default function Timeline({ project, transport, selectedIds, onSelect, on
   function onClipPointerDown(e: React.PointerEvent<HTMLDivElement>, clip: Clip) {
     if (e.button !== 0) return;
     e.stopPropagation();
+    setMarkerSel(null);
     rootRef.current?.focus();
     const edge = (e.target as HTMLElement).dataset.edge as "start" | "end" | undefined;
     const wasSelected = selectedIds.includes(clip.id);
@@ -196,6 +252,7 @@ export default function Timeline({ project, transport, selectedIds, onSelect, on
 
   function onContentPointerDown(e: React.PointerEvent<HTMLDivElement>) {
     if (e.button !== 0) return;
+    setMarkerSel(null);
     rootRef.current?.focus();
     capture(e, e.currentTarget);
     const { x, y } = local(e);
@@ -383,6 +440,22 @@ export default function Timeline({ project, transport, selectedIds, onSelect, on
     onSelect([clip.id]);
   }
 
+  function split(everyN: number) {
+    if (!menu) return;
+    const clipId = menu.clipId;
+    let ids: string[] = [clipId];
+    update((d) => {
+      ids = splitClipOnBeats(d, clipId, everyN);
+    });
+    if (ids.length < 2) {
+      setMenu({ ...menu, message: "No beats to cut on inside this clip." });
+      return;
+    }
+    onSelect(ids);
+    if (projectRef.current.surfaces.length >= 2) setMenu({ ...menu, stage: ids, message: null });
+    else setMenu(null);
+  }
+
   const ticks = rulerTicks(0, duration, ppm);
 
   return (
@@ -393,6 +466,16 @@ export default function Timeline({ project, transport, selectedIds, onSelect, on
       aria-label="Timeline"
       onKeyDown={onKeyDown}
     >
+      <div style={{ padding: "2px 6px", fontSize: 12 }}>
+        <label>
+          <input
+            type="checkbox"
+            checked={showOnsets}
+            onChange={(e) => setShowOnsets(e.target.checked)}
+          />{" "}
+          Show onsets
+        </label>
+      </div>
       <div ref={scrollerRef} className={styles.scroller}>
         <div
           ref={contentRef}
@@ -439,7 +522,7 @@ export default function Timeline({ project, transport, selectedIds, onSelect, on
                 <div
                   key={clip.id}
                   role="button"
-                  aria-label={`Clip ${assetName(project, clip.asset_id)}`}
+                  aria-label={`Clip ${clipLabel(project, clip)}`}
                   data-clip-id={clip.id}
                   className={[
                     styles.bar,
@@ -454,6 +537,17 @@ export default function Timeline({ project, transport, selectedIds, onSelect, on
                     height: ROW_H - 6,
                   }}
                   onPointerDown={(e) => onClipPointerDown(e, clip)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    if (!selectedIds.includes(clip.id)) onSelect([clip.id]);
+                    setMenu({
+                      x: e.clientX,
+                      y: e.clientY,
+                      clipId: clip.id,
+                      stage: null,
+                      message: null,
+                    });
+                  }}
                   onDoubleClick={(e) => {
                     e.stopPropagation();
                     onOpen(clip.id);
@@ -463,7 +557,7 @@ export default function Timeline({ project, transport, selectedIds, onSelect, on
                   {asset && asset.kind !== "audio" ? (
                     <img src={assetThumbUrl(project.id, asset.id)} alt="" draggable={false} />
                   ) : null}
-                  <span className={styles.label}>{assetName(project, clip.asset_id)}</span>
+                  <span className={styles.label}>{clipLabel(project, clip)}</span>
                   <span className={`${styles.handle} ${styles.handleEnd}`} data-edge="end" />
                 </div>
               );
@@ -484,9 +578,38 @@ export default function Timeline({ project, transport, selectedIds, onSelect, on
               scrollerRef={scrollerRef}
             />
           ) : null}
+          <Markers
+            markers={project.markers}
+            ppm={ppm}
+            showOnsets={showOnsets}
+            rulerH={RULER_H}
+            wave={audioId ? { top: waveTop, height: WAVE_H } : null}
+            selectedUserMs={markerSel}
+            onSelectUser={(ms) => {
+              onSelect([]);
+              setMarkerSel(ms);
+              rootRef.current?.focus();
+            }}
+          />
           <div className={styles.playhead} style={{ left: msToX(t, ppm) }} data-testid="playhead" />
         </div>
       </div>
+      {menu ? (
+        <BeatMenu
+          project={project}
+          x={menu.x}
+          y={menu.y}
+          stage={menu.stage}
+          message={menu.message}
+          onSplit={split}
+          onAlternate={(surfaceIds) => {
+            const ids = menu.stage ?? [];
+            update((d) => alternateSurfaces(d, ids, surfaceIds));
+            setMenu(null);
+          }}
+          onClose={() => setMenu(null)}
+        />
+      ) : null}
     </div>
   );
 }

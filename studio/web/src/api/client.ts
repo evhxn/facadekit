@@ -205,3 +205,27 @@ export const realign = (
   pid: string,
   body: { old_calibration_id: string; new_calibration_id: string; apply: boolean },
 ) => request<RealignResponse>("POST", `/projects/${enc(pid)}/realign`, body);
+
+export interface SegmentPoint {
+  x: number;
+  y: number;
+  label: 0 | 1;
+}
+export interface SegmentResult {
+  outer: Pt[];
+  quad: Pt[];
+  score: number;
+  engine: "mobilesam" | "grabcut";
+}
+export const segment = (
+  pid: string,
+  points: SegmentPoint[],
+  prefer?: "auto" | "mobilesam" | "grabcut",
+) =>
+  request<SegmentResult>("POST", `/projects/${enc(pid)}/segment`, {
+    points,
+    ...(prefer ? { prefer } : {}),
+  });
+
+export const analyzeAsset = (pid: string, aid: string) =>
+  request<{ job_id: string }>("POST", `/projects/${enc(pid)}/assets/${enc(aid)}/analyze`);
