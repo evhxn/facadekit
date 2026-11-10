@@ -10,7 +10,7 @@ import {
 } from "../../api/client";
 import { userMessage } from "../../api/errors";
 import { waitForJob } from "../../api/events";
-import type { Calibration, Job, Project } from "../../api/types";
+import type { CalibSettings, Calibration, Job, Project } from "../../api/types";
 import ErrorBanner from "../../components/ErrorBanner";
 import JobProgress from "../../components/JobProgress";
 import { useProjectStore } from "../../state/projectStore";
@@ -67,6 +67,8 @@ export default function StepScan({ project, cameraId }: Props) {
   const [job, setJob] = useState<Job | null>(null);
   const [calibration, setCalibration] = useState<Calibration | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [fixedWait, setFixedWait] = useState(false);
+  const [waitMs, setWaitMs] = useState(300);
   const mounted = useRef(true);
 
   useEffect(() => {
@@ -89,7 +91,11 @@ export default function StepScan({ project, cameraId }: Props) {
     setPhase("running");
     setJob(null);
     try {
-      const body = mode === "scan" && cameraId ? { mode, camera_id: cameraId } : { mode };
+      // settle_ms 0 means "automatic": the backend measures the projector-to-camera delay.
+      // The backend fills in the other fields, so only this one is sent.
+      const settle_ms = fixedWait ? Math.min(1500, Math.max(300, Math.round(waitMs) || 300)) : 0;
+      const settings = { settle_ms } as CalibSettings;
+      const body = mode === "scan" && cameraId ? { mode, camera_id: cameraId, settings } : { mode };
       const { job_id } = await startCalibration(pid, body);
       const final = await waitForJob(job_id, (j) => mounted.current && setJob(j));
       if (!mounted.current) return;
@@ -174,6 +180,36 @@ export default function StepScan({ project, cameraId }: Props) {
       ) : (
         <>
           <p>The projector will show stripes while the camera watches. This takes a few minutes.</p>
+          <details>
+            <summary>Advanced</summary>
+            <p className={styles.note}>
+              By default the scan measures how long the camera takes to see the projector and
+              chooses exposure automatically.
+            </p>
+            <label>
+              <input
+                type="checkbox"
+                checked={fixedWait}
+                onChange={(e) => setFixedWait(e.target.checked)}
+              />{" "}
+              Use a fixed wait instead
+            </label>
+            {fixedWait ? (
+              <label>
+                {" "}
+                <input
+                  type="number"
+                  min={300}
+                  max={1500}
+                  step={50}
+                  value={waitMs}
+                  onChange={(e) => setWaitMs(Number(e.target.value))}
+                  aria-label="Wait after each image (ms)"
+                />{" "}
+                ms
+              </label>
+            ) : null}
+          </details>
           {phase === "failed" && error ? (
             <ErrorBanner
               message={error}

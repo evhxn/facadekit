@@ -8,6 +8,7 @@ import cv2
 import numpy as np
 
 from facadekit.calib.patterns import PatternFrame, PatternSpec, pattern_sequence, render_pattern
+from facadekit.calib.tuning import auto_exposure
 from facadekit.devices.base import Camera, ProjectorDisplay
 from facadekit.errors import FkError
 from facadekit.models.calibration import CalibSettings
@@ -49,6 +50,7 @@ def precheck(
     camera: Camera,
     spec: PatternSpec,
     *,
+    settings: CalibSettings | None = None,
     sleep: Callable[[float], None] = time.sleep,
 ) -> dict[str, float]:
     w, h = display.size
@@ -57,7 +59,7 @@ def precheck(
             "RESOLUTION_MISMATCH",
             f"Projector window is {w}x{h} but the project expects {spec.width}x{spec.height}.",
         )
-    settings = CalibSettings()
+    settings = settings or CalibSettings()
     black, _ = _shoot(
         display, camera, np.zeros((spec.height, spec.width), np.uint8), settings, sleep
     )
@@ -95,13 +97,7 @@ def run_capture(
     sleep: Callable[[float], None] = time.sleep,
 ) -> CaptureSet:
     controls = camera.set_controls(auto_exposure=False, auto_wb=False, autofocus=False)
-    white_img = np.full((spec.height, spec.width), 255, np.uint8)
-    if controls.get("auto_exposure"):
-        for e in (0.6, 0.5, 0.4, 0.3, 0.2, 0.1):
-            camera.set_controls(exposure=e)
-            gray, _ = _shoot(display, camera, white_img, settings, sleep)
-            if float(np.percentile(gray, 99)) < 250:
-                break
+    auto_exposure(display, camera, settings=settings, sleep=sleep)
 
     frames = pattern_sequence(spec)
     cam_w, cam_h = camera.resolution

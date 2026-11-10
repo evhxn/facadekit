@@ -173,7 +173,11 @@ describe("Step 3 - scan", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Start scan" }));
     });
-    expect(m.startCalibration).toHaveBeenCalledWith("p1", { mode: "scan", camera_id: "cam0" });
+    expect(m.startCalibration).toHaveBeenCalledWith("p1", {
+      mode: "scan",
+      camera_id: "cam0",
+      settings: { settle_ms: 0 },
+    });
     expect(await screen.findByText(/too bright to scan/)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
   });

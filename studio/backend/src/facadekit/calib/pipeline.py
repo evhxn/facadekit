@@ -14,6 +14,7 @@ from facadekit.calib.capture import precheck, run_capture
 from facadekit.calib.decode import decode
 from facadekit.calib.maps import build_maps, make_proj_view
 from facadekit.calib.patterns import PatternSpec
+from facadekit.calib.tuning import measure_latency
 from facadekit.devices.base import Camera, ProjectorDisplay
 from facadekit.errors import FkError
 from facadekit.ids import new_id
@@ -68,6 +69,7 @@ def run_calibration(
     progress: Progress | None = None,
     cancel: Cancel | None = None,
     sleep: Callable[[float], None] = time.sleep,
+    clock: Callable[[], float] = time.monotonic,
 ) -> Calibration:
     def report(fraction: float, message: str) -> None:
         if progress is not None:
@@ -79,9 +81,18 @@ def run_calibration(
     spec = PatternSpec(*display.size, skip_lsb=settings.skip_lsb)
     camera.open()
     try:
-        report(0.0, "Checking setup")
+        tuned: CalibSettings | None = None
+        if settings.settle_ms == 0:  # automatic: measure the projector-to-camera delay
+            report(0.0, "Tuning camera…")
+            lat = measure_latency(display, camera, clock=clock, sleep=sleep)
+            settings = settings.model_copy(
+                update={"settle_ms": lat.settle_ms, "discard_frames": lat.discard_frames}
+            )
+            tuned = settings
+        else:
+            report(0.0, "Checking setup")
         _check_cancel(cancel)
-        pre = precheck(display, camera, spec, sleep=sleep)
+        pre = precheck(display, camera, spec, settings=tuned, sleep=sleep)
         report(0.05, "Checking setup")
         _check_cancel(cancel)
         capture = run_capture(
