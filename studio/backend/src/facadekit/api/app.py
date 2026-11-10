@@ -10,7 +10,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
 
 from facadekit import __version__
-from facadekit.api import routes_jobs, routes_projects
+from facadekit.api import routes_assets, routes_jobs, routes_projects
 from facadekit.api.deps import AppState
 from facadekit.config import projects_dir
 from facadekit.errors import BAD_REQUEST, NOT_FOUND, FkError, http_status
@@ -65,6 +65,7 @@ def create_app(*, data_dir: Path | None = None, sim: bool = False) -> FastAPI:
         return {"status": "ok", "version": __version__, "sim": state.sim}
 
     api.include_router(routes_projects.router)
+    api.include_router(routes_assets.router)
     api.include_router(routes_jobs.router)
     app.include_router(api)
 
