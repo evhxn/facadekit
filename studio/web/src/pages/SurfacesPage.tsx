@@ -2,11 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ApiError, projectorShow, projectorStatus, projViewUrl } from "../api/client";
 import { newId } from "../api/types";
-import type { Surface } from "../api/types";
+import type { Mesh, Pt, Surface } from "../api/types";
 import RemoteDialog from "../components/RemoteDialog";
 import { useProjectStore } from "../state/projectStore";
 import SurfaceCanvas from "./surfaces/SurfaceCanvas";
 import MaskEditor from "./surfaces/MaskEditor";
+import MeshEditor from "./surfaces/MeshEditor";
+import { gridPolylines } from "./surfaces/meshMath";
 import SurfaceList from "./surfaces/SurfaceList";
 import { estimateAspect, flipHorizontal, rotateCorners, type Quad } from "./surfaces/geometry";
 import styles from "./SurfacesPage.module.css";
@@ -24,6 +26,7 @@ export default function SurfacesPage() {
   const [notConnected, setNotConnected] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [remoteOpen, setRemoteOpen] = useState(false);
+  const [testPattern, setTestPattern] = useState(true);
 
   useEffect(() => {
     if (projectId && useProjectStore.getState().project?.id !== projectId) {
@@ -51,8 +54,18 @@ export default function SurfacesPage() {
     again: false,
     dead: false,
   });
-  const latest = useRef({ projectId: "", selectedId: null as string | null });
-  latest.current = { projectId: project?.id ?? "", selectedId };
+  const latest = useRef({
+    projectId: "",
+    selectedId: null as string | null,
+    grids: undefined as Record<string, Pt[][]> | undefined,
+  });
+  // While the mesh editor is open (selected surface has a mesh) the projector also draws its grid.
+  const meshed = project?.surfaces.find((s) => s.id === selectedId && s.mesh) ?? null;
+  latest.current = {
+    projectId: project?.id ?? "",
+    selectedId,
+    grids: meshed && testPattern ? { [meshed.id]: gridPolylines(meshed) } : undefined,
+  };
 
   const runSync = useCallback(async () => {
     const st = sync.current;
@@ -66,11 +79,12 @@ export default function SurfacesPage() {
         st.again = false;
         await useProjectStore.getState().saveNow();
         if (st.dead) return;
-        const { projectId: pid, selectedId: sel } = latest.current;
+        const { projectId: pid, selectedId: sel, grids } = latest.current;
         await projectorShow({
           mode: "outlines",
           project_id: pid,
           ...(sel ? { selected_id: sel } : {}),
+          ...(grids ? { grids } : {}),
         });
       } while (st.again && !st.dead);
     } catch (e) {
@@ -85,7 +99,7 @@ export default function SurfacesPage() {
 
   const surfaces = project?.surfaces;
   const shapeKey = useMemo(
-    () => JSON.stringify((surfaces ?? []).map((s) => [s.id, s.quad])),
+    () => JSON.stringify((surfaces ?? []).map((s) => [s.id, s.quad, s.mesh])),
     [surfaces],
   );
   useEffect(() => {
@@ -101,7 +115,7 @@ export default function SurfacesPage() {
       st.timer = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [outlines, shapeKey, selectedId, project?.id, runSync]);
+  }, [outlines, shapeKey, selectedId, testPattern, project?.id, runSync]);
 
   useEffect(() => {
     const st = sync.current;
@@ -187,6 +201,7 @@ export default function SurfacesPage() {
           }}
           onChangeQuad={(id, quad) => patch(id, (s) => (s.quad = quad))}
           onChangeMask={(id, mask) => patch(id, (s) => (s.mask = mask))}
+          onChangeMesh={(id, mesh) => patch(id, (s) => (s.mesh = mesh))}
           onChangeShape={(id, quad, mask) =>
             patch(id, (s) => {
               s.quad = quad;
@@ -251,6 +266,15 @@ export default function SurfacesPage() {
             key={`shape-${selected.id}`}
             surface={selected}
             onChange={(mask) => patch(selected.id, (s) => (s.mask = mask))}
+          />
+        )}
+        {selected && (
+          <MeshEditor
+            key={`mesh-${selected.id}`}
+            surface={selected}
+            onChange={(mesh: Mesh | null) => patch(selected.id, (s) => (s.mesh = mesh))}
+            testPattern={testPattern}
+            onTestPattern={setTestPattern}
           />
         )}
       </aside>

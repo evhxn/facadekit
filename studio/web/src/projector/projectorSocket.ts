@@ -3,6 +3,8 @@ export interface Quad {
   name: string;
   quad: [number, number][];
   selected: boolean;
+  /** Mesh editor preview: grid polylines in projector px. */
+  grid?: [number, number][][];
 }
 
 export interface OutlinesMessage {

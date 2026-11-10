@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PointerEvent as RPointerEvent } from "react";
-import type { Mask, Pt, Surface } from "../../api/types";
+import type { Mask, Mesh, Pt, Surface } from "../../api/types";
 import {
   clampPt,
   hitTestCorner,
@@ -12,6 +12,7 @@ import {
   type Quad,
 } from "./geometry";
 import { addHole, maskIsSimple, removeMaskVertex, translateMask } from "./MaskEditor";
+import { controlPoint, gridPolylines, setControlPoint } from "./meshMath";
 import { insertVertex, nearestEdge, pointInPolygon } from "./polygon";
 import styles from "./SurfaceCanvas.module.css";
 
@@ -21,6 +22,10 @@ function setVertex(m: Mask, ring: number, index: number, v: Pt): Mask {
     ...m,
     holes: m.holes.map((h, k) => (k === ring ? h.map((q, i) => (i === index ? v : q)) : h)),
   };
+}
+
+function isMeshCorner(mesh: Mesh, p: { i: number; j: number }): boolean {
+  return (p.i === 0 || p.i === mesh.rows) && (p.j === 0 || p.j === mesh.cols);
 }
 
 const CORNER_NAMES = ["top-left", "top-right", "bottom-right", "bottom-left"];
@@ -40,6 +45,7 @@ interface Props {
   onChangeQuad: (id: string, quad: Quad) => void;
   /** Mask edits, and moving a whole surface (quad and mask together). */
   onChangeMask: (id: string, mask: Mask) => void;
+  onChangeMesh?: (id: string, mesh: Mesh) => void;
   onChangeShape: (id: string, quad: Quad, mask: Mask | null) => void;
   onCreate: (quad: Quad) => void;
   onDelete: (id: string) => void;
@@ -49,6 +55,7 @@ type Drag =
   | { kind: "corner"; id: string; index: number }
   | { kind: "move"; id: string; start: Pt; quad: Quad; mask: Mask | null }
   | { kind: "vertex"; id: string; ring: number; index: number }
+  | { kind: "mesh"; id: string; i: number; j: number }
   | { kind: "pan"; start: Pt; panX: number; panY: number };
 
 export default function SurfaceCanvas(props: Props) {
@@ -67,17 +74,23 @@ export default function SurfaceCanvas(props: Props) {
   const [editMask, setEditMask] = useState(false);
   const [vsel, setVsel] = useState<{ ring: number; index: number } | null>(null);
   const [holeDraft, setHoleDraft] = useState<Pt[] | null>(null);
+  const [editMesh, setEditMesh] = useState(false);
+  const [msel, setMsel] = useState<{ i: number; j: number } | null>(null);
   const [notice, setNotice] = useState("");
   const selectedSurface = surfaces.find((x) => x.id === selectedId);
   const hasMask = !!selectedSurface?.mask;
+  const hasMesh = !!selectedSurface?.mesh;
+  const meshMode = editMesh && hasMesh;
 
-  // A surface with a custom outline opens in outline editing.
+  // A surface with a custom outline opens in outline editing; a bent one in mesh editing.
   useEffect(() => {
-    setEditMask(hasMask);
+    setEditMask(hasMask && !hasMesh);
+    setEditMesh(hasMesh);
+    setMsel(null);
     setVsel(null);
     setHoleDraft(null);
     setNotice("");
-  }, [selectedId, hasMask]);
+  }, [selectedId, hasMask, hasMesh]);
 
   const view = makeView({
     imgW,
@@ -257,7 +270,33 @@ export default function SurfaceCanvas(props: Props) {
           });
         });
       }
-      if (!editing)
+      const meshEditing = selected && meshMode && !!s.mesh;
+      if (meshEditing && s.mesh) {
+        // Quad shown thin and dashed; the warped grid and its handles are what you edit.
+        path(s.quad, true);
+        ctx.setLineDash([4, 4]);
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = "rgba(255,255,255,0.6)";
+        ctx.stroke();
+        ctx.setLineDash([]);
+        for (const line of gridPolylines(s)) {
+          path(line, false);
+          stroke("#40e0ff");
+        }
+        for (let i = 0; i <= s.mesh.rows; i++) {
+          for (let j = 0; j <= s.mesh.cols; j++) {
+            const q = view.toScreen(controlPoint(s, i, j));
+            ctx.beginPath();
+            ctx.arc(q[0], q[1], HANDLE / 2, 0, Math.PI * 2);
+            ctx.fillStyle = msel && msel.i === i && msel.j === j ? "#ffcc00" : "#ffffff";
+            ctx.fill();
+            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = "#000";
+            ctx.stroke();
+          }
+        }
+      }
+      if (!editing && !meshEditing)
         s.quad.forEach((p, i) => {
           const q = view.toScreen(p);
           ctx.beginPath();
@@ -296,6 +335,8 @@ export default function SurfaceCanvas(props: Props) {
     imgW,
     imgH,
     editMask,
+    meshMode,
+    msel,
     vsel,
     holeDraft,
   ]);
@@ -366,6 +407,30 @@ export default function SurfaceCanvas(props: Props) {
         setHoleDraft([...holeDraft, p]);
       }
       return;
+    }
+    if (selectedSurface?.mesh && meshMode) {
+      const p = view.toProjector(sp);
+      const radius = HIT_RADIUS / view.scale;
+      const mesh = selectedSurface.mesh;
+      let best: { i: number; j: number; d: number } | null = null;
+      for (let i = 0; i <= mesh.rows; i++) {
+        for (let j = 0; j <= mesh.cols; j++) {
+          const c = controlPoint(selectedSurface, i, j);
+          const d = Math.hypot(p[0] - c[0], p[1] - c[1]);
+          if (d <= radius && (!best || d < best.d)) best = { i, j, d };
+        }
+      }
+      if (best) {
+        setMsel({ i: best.i, j: best.j });
+        dragRef.current = { kind: "mesh", id: selectedSurface.id, i: best.i, j: best.j };
+        canvasRef.current?.setPointerCapture?.(e.pointerId);
+        return;
+      }
+      // Inside the surface: do nothing (no accidental moves while bending).
+      if (pointInQuad(p, selectedSurface.quad)) {
+        setMsel(null);
+        return;
+      }
     }
     if (selectedSurface?.mask && editMask) {
       const m = selectedSurface.mask;
@@ -458,6 +523,10 @@ export default function SurfaceCanvas(props: Props) {
       const quad = s.quad.map((c) => [...c] as Pt) as Quad;
       quad[drag.index] = clampPt(p, imgW, imgH);
       props.onChangeQuad(drag.id, quad);
+    } else if (drag.kind === "mesh") {
+      const s = surfaces.find((x) => x.id === drag.id);
+      if (!s?.mesh) return;
+      props.onChangeMesh?.(drag.id, setControlPoint(s.mesh, s.quad, drag.i, drag.j, p));
     } else if (drag.kind === "vertex") {
       const m = surfaces.find((x) => x.id === drag.id)?.mask;
       if (!m) return;
@@ -516,6 +585,18 @@ export default function SurfaceCanvas(props: Props) {
     const s = surfaces.find((x) => x.id === selectedId);
     if (!s) return;
     const editing = !!s.mask && editMask;
+    if (s.mesh && meshMode && msel && e.key.startsWith("Arrow")) {
+      e.preventDefault();
+      const step = e.shiftKey ? 10 : 1;
+      const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
+      const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
+      const cur = controlPoint(s, msel.i, msel.j);
+      props.onChangeMesh?.(
+        s.id,
+        setControlPoint(s.mesh, s.quad, msel.i, msel.j, [cur[0] + dx, cur[1] + dy]),
+      );
+      return;
+    }
     if (editing && s.mask && vsel && (e.key === "Delete" || e.key === "Backspace")) {
       e.preventDefault();
       const ring = vsel.ring < 0 ? s.mask.outer : s.mask.holes[vsel.ring];
@@ -579,11 +660,19 @@ export default function SurfaceCanvas(props: Props) {
           ? `Click the ${CORNER_NAMES[adding.length]} corner (${adding.length + 1} of 4). Esc cancels.`
           : selected && isSelfIntersecting(selected.quad)
             ? "Corners are crossed"
-            : "Scroll to zoom, Space or middle button to pan.";
+            : selected?.mesh && meshMode
+              ? msel && isMeshCorner(selected.mesh, msel)
+                ? "To move the whole corner, edit the surface corners instead."
+                : "Drag a grid point to bend the surface. Arrow keys nudge the selected point."
+              : "Scroll to zoom, Space or middle button to pan.";
   const readout =
-    selected && corner !== null
-      ? `Corner ${CORNER_NAMES[corner]}: ${Math.round((selected.quad[corner] as Pt)[0])}, ${Math.round((selected.quad[corner] as Pt)[1])} px`
-      : "";
+    selected?.mesh && meshMode && msel
+      ? `Point ${msel.i},${msel.j}: ${controlPoint(selected, msel.i, msel.j)
+          .map((v) => Math.round(v))
+          .join(", ")} px`
+      : selected && corner !== null
+        ? `Corner ${CORNER_NAMES[corner]}: ${Math.round((selected.quad[corner] as Pt)[0])}, ${Math.round((selected.quad[corner] as Pt)[1])} px`
+        : "";
 
   return (
     <div className={styles.root}>
@@ -599,10 +688,29 @@ export default function SurfaceCanvas(props: Props) {
             <button type="button" onClick={() => setHoleDraft([])} disabled={holeDraft !== null}>
               Add hole
             </button>
-            <button type="button" onClick={() => setEditMask((v) => !v)} aria-pressed={editMask}>
+            <button
+              type="button"
+              onClick={() => {
+                setEditMask((v) => !v);
+                setEditMesh(false);
+              }}
+              aria-pressed={editMask}
+            >
               {editMask ? "Edit corners" : "Edit outline"}
             </button>
           </>
+        )}
+        {selected?.mesh && (
+          <button
+            type="button"
+            onClick={() => {
+              setEditMesh((v) => !v);
+              setEditMask(false);
+            }}
+            aria-pressed={meshMode}
+          >
+            {meshMode ? "Done bending" : "Edit bend"}
+          </button>
         )}
         <span className={styles.hint} role="status">
           {hint}

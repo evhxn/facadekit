@@ -27,6 +27,7 @@ export interface Scene {
       aspect: number;
       mask?: { outer: Pt[]; holes: Pt[][] };
       feather_px?: number;
+      mesh?: { cols: number; rows: number; offsets: Pt[] };
     }
   >;
   assets: Record<string, Buffer>;
@@ -258,5 +259,28 @@ export const scenes: Scene[] = [
         fit: "fill",
       },
     ],
+  },
+  {
+    name: "mesh-bend",
+    t_ms: 1000,
+    surfaces: {
+      s: {
+        quad: [
+          [90, 30],
+          [400, 40],
+          [420, 240],
+          [70, 230],
+        ],
+        aspect: 1.5,
+        // 4x4 cells, only the centre control point (row 2, column 2) moved by (25, -15).
+        mesh: {
+          cols: 4,
+          rows: 4,
+          offsets: Array.from({ length: 25 }, (_, k): Pt => (k === 12 ? [25, -15] : [0, 0])),
+        },
+      },
+    },
+    assets: { checker: checker() },
+    clips: [{ asset: "checker", surface: "s", track: 0, fit: "stretch" }],
   },
 ];

@@ -18,6 +18,8 @@ class ShowRequest(BaseModel):
     mode: Literal["blank", "white", "grid", "outlines", "compositor"]
     project_id: str | None = None
     selected_id: str | None = None
+    # surface id -> grid polylines (mesh editor preview); passed through to the outlines message
+    grids: dict[str, list[list[list[float]]]] | None = None
 
 
 class TransportRequest(BaseModel):
@@ -47,15 +49,19 @@ def projector_show(body: ShowRequest, state: State) -> ProjectorStatus:
         else:
             message["width"] = project.projector.width
             message["height"] = project.projector.height
-            message["surfaces"] = [
-                {
+            grids = body.grids or {}
+            surfaces: list[dict[str, Any]] = []
+            for s in project.surfaces:
+                entry: dict[str, Any] = {
                     "id": s.id,
                     "name": s.name,
                     "quad": [list(p) for p in s.quad],
                     "selected": s.id == body.selected_id,
                 }
-                for s in project.surfaces
-            ]
+                if s.id in grids:
+                    entry["grid"] = grids[s.id]
+                surfaces.append(entry)
+            message["surfaces"] = surfaces
     hub.send(message, wait_ack=False)
     hub.set_mode(body.mode)
     return hub.status()

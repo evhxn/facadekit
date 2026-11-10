@@ -8,6 +8,7 @@ import type {
   Job,
   Project,
   ProjectorSpec,
+  Pt,
   ProjectorStatus,
   ProjectSummary,
   RenderInfo,
@@ -125,8 +126,13 @@ export const setCameraControls = (
   );
 
 export const projectorStatus = () => request<ProjectorStatus>("GET", "/projector/status");
-export const projectorShow = (body: { mode: string; project_id?: string; selected_id?: string }) =>
-  request<ProjectorStatus>("POST", "/projector/show", body);
+export const projectorShow = (body: {
+  mode: string;
+  project_id?: string;
+  selected_id?: string;
+  /** Surface id -> grid polylines drawn on the outlines view (mesh editor). */
+  grids?: Record<string, Pt[][]>;
+}) => request<ProjectorStatus>("POST", "/projector/show", body);
 export const projectorTransport = (body: {
   project_id: string;
   playing: boolean;

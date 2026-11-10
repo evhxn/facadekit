@@ -107,7 +107,7 @@ async function buildProject(request: APIRequestContext, scene: Scene): Promise<s
       mask: s.mask ?? null,
       feather_px: s.feather_px ?? 0,
       aspect: s.aspect,
-      mesh: null,
+      mesh: s.mesh ?? null,
     };
   });
 

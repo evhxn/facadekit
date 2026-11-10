@@ -61,6 +61,18 @@ export function drawOutlines(
     ctx.closePath();
     ctx.stroke();
 
+    if (surf.grid) {
+      ctx.lineWidth = 2;
+      for (const line of surf.grid) {
+        const [g0, ...rest] = line;
+        if (!g0) continue;
+        ctx.beginPath();
+        ctx.moveTo(g0[0] * s, g0[1] * s);
+        for (const p of rest) ctx.lineTo(p[0] * s, p[1] * s);
+        ctx.stroke();
+      }
+    }
+
     ctx.fillStyle = color;
     ctx.beginPath();
     ctx.arc(first[0], first[1], 4, 0, Math.PI * 2);

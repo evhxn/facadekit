@@ -1,5 +1,5 @@
 import { getProject, assetUrl as apiAssetUrl } from "../api/client";
-import type { Asset, Clip, Project } from "../api/types";
+import type { Asset, Clip, Project, Surface } from "../api/types";
 import type { LiveRenderer } from "../projector/ProjectorPage";
 import type { TransportMessage } from "../projector/projectorSocket";
 import {
@@ -13,6 +13,8 @@ import {
 } from "./homography";
 import { generatorUniforms } from "./generators";
 import { MaskTextureCache } from "./maskTexture";
+import { buildMeshVertices, type MeshVertices } from "./meshGeometry";
+import { isZeroMesh } from "../pages/surfaces/meshMath";
 import { FRAGMENT_SRC, VERTEX_SRC } from "./shaders";
 import { ImageSource, VideoSource, type ClipTextureSource, type FrameSource } from "./sources";
 
@@ -118,6 +120,9 @@ export class PreviewCompositor {
   private gl: WebGL2RenderingContext | null;
   private program: WebGLProgram | null = null;
   private buffer: WebGLBuffer | null = null;
+  private uvwBuffer: WebGLBuffer | null = null;
+  private indexBuffer: WebGLBuffer | null = null;
+  private meshCache = new Map<string, { surface: Surface; verts: MeshVertices }>();
   private loc: Record<string, WebGLUniformLocation | null> = {};
   private project: Project | null = null;
   private sources = new Map<string, Entry>();
@@ -151,6 +156,7 @@ export class PreviewCompositor {
     gl.attachShader(p, compile(gl.VERTEX_SHADER, VERTEX_SRC));
     gl.attachShader(p, compile(gl.FRAGMENT_SHADER, FRAGMENT_SRC));
     gl.bindAttribLocation(p, 0, "a_pos");
+    gl.bindAttribLocation(p, 1, "a_uvw");
     gl.linkProgram(p);
     if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
       throw new Error(`program link failed: ${gl.getProgramInfoLog(p)}`);
@@ -171,10 +177,13 @@ export class PreviewCompositor {
       "u_genColB",
       "u_genP",
       "u_genTc",
+      "u_meshOn",
     ]) {
       this.loc[n] = gl.getUniformLocation(p, n);
     }
     this.buffer = gl.createBuffer();
+    this.uvwBuffer = gl.createBuffer();
+    this.indexBuffer = gl.createBuffer();
     gl.enable(gl.BLEND);
     this.dummyMask = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, this.dummyMask);
@@ -265,6 +274,7 @@ export class PreviewCompositor {
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.vertexAttrib3f(1, 0, 0, 1);
     gl.uniform2f(this.loc.u_size!, width, height);
     gl.uniform1i(this.loc.u_tex!, 0);
     gl.uniform1i(this.loc.u_mask!, 1);
@@ -326,6 +336,25 @@ export class PreviewCompositor {
       if (u.blend === "add") gl.blendFunc(gl.ONE, gl.ONE);
       else if (u.blend === "screen") gl.blendFunc(gl.ONE_MINUS_DST_COLOR, gl.ONE);
       else gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+      const meshed =
+        surface && surface.mesh && !isZeroMesh(surface.mesh) ? this.meshVerts(surface) : null;
+      if (meshed) {
+        gl.uniform1f(this.loc.u_meshOn!, 1);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+        gl.bufferData(gl.ARRAY_BUFFER, meshed.positions, gl.DYNAMIC_DRAW);
+        gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.uvwBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, meshed.uvw, gl.DYNAMIC_DRAW);
+        gl.enableVertexAttribArray(1);
+        gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, meshed.indices, gl.DYNAMIC_DRAW);
+        gl.drawElements(gl.TRIANGLES, meshed.indices.length, gl.UNSIGNED_SHORT, 0);
+        gl.disableVertexAttribArray(1);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+        continue;
+      }
+      gl.uniform1f(this.loc.u_meshOn!, 0);
       const [a, b, c, d] = quad as [Pt, Pt, Pt, Pt];
       gl.bufferData(
         gl.ARRAY_BUFFER,
@@ -334,6 +363,14 @@ export class PreviewCompositor {
       );
       gl.drawArrays(gl.TRIANGLES, 0, 6);
     }
+  }
+
+  private meshVerts(surface: Surface): MeshVertices {
+    const hit = this.meshCache.get(surface.id);
+    if (hit && hit.surface === surface) return hit.verts;
+    const verts = buildMeshVertices(surface, 4);
+    this.meshCache.set(surface.id, { surface, verts });
+    return verts;
   }
 
   private surfaceQuad(project: Project, clip: Clip): Pt[] | null {
@@ -357,10 +394,15 @@ export class PreviewCompositor {
       if (this.dummyMask) gl.deleteTexture(this.dummyMask);
       if (this.program) gl.deleteProgram(this.program);
       if (this.buffer) gl.deleteBuffer(this.buffer);
+      if (this.uvwBuffer) gl.deleteBuffer(this.uvwBuffer);
+      if (this.indexBuffer) gl.deleteBuffer(this.indexBuffer);
     }
     this.sources.clear();
     this.program = null;
     this.buffer = null;
+    this.uvwBuffer = null;
+    this.indexBuffer = null;
+    this.meshCache.clear();
     this.dummyMask = null;
     this.project = null;
   }

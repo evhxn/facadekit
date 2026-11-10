@@ -164,4 +164,45 @@ describe("SurfacesPage", () => {
     expect(screen.getByText(/Projector window is not open/)).toBeTruthy();
     await act(async () => {});
   });
+
+  it("turning the mesh on stores a zero mesh, reset zeroes it, and outlines carry grids", async () => {
+    projectorStatus.mockResolvedValue({ connected: true });
+    renderPage();
+    fireEvent.click(await screen.findByText("Door"));
+    const surf = () => useProjectStore.getState().project!.surfaces[0]!;
+    expect(surf().mesh).toBeNull();
+    fireEvent.change(screen.getByLabelText(/Grid size/), { target: { value: "2" } });
+    expect(surf().mesh!.cols).toBe(2);
+    expect(surf().mesh!.offsets).toHaveLength(9);
+    expect(surf().mesh!.offsets.every((o) => o[0] === 0 && o[1] === 0)).toBe(true);
+    await waitFor(() =>
+      expect(projectorShow).toHaveBeenLastCalledWith(
+        expect.objectContaining({ mode: "outlines", grids: { srf_a: expect.any(Array) } }),
+      ),
+    );
+
+    // Nudge centre point with the arrow keys, then reset.
+    const canvas = screen.getByLabelText("Surface canvas");
+    act(() => {
+      useProjectStore.getState().update((d) => {
+        d.surfaces[0]!.mesh!.offsets[4] = [5, -7];
+      });
+    });
+    expect(surf().mesh!.offsets[4]).toEqual([5, -7]);
+    fireEvent.click(screen.getByText("Reset bend"));
+    expect(surf().mesh!.offsets.every((o) => o[0] === 0 && o[1] === 0)).toBe(true);
+    expect(canvas).toBeTruthy();
+
+    // Resize keeps the bend (resample); Off removes the mesh.
+    act(() => {
+      useProjectStore.getState().update((d) => {
+        d.surfaces[0]!.mesh!.offsets[4] = [8, 8];
+      });
+    });
+    fireEvent.change(screen.getByLabelText(/Grid size/), { target: { value: "4" } });
+    expect(surf().mesh!.cols).toBe(4);
+    expect(surf().mesh!.offsets[12]).toEqual([8, 8]);
+    fireEvent.change(screen.getByLabelText(/Grid size/), { target: { value: "0" } });
+    expect(surf().mesh).toBeNull();
+  });
 });

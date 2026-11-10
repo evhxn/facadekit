@@ -88,8 +88,40 @@ def test_outlines(client: TestClient) -> None:
         ]
         client.post(f"{API}/projector/show", json={"mode": "outlines", "project_id": "show"})
         assert ws.receive_json()["surfaces"][0]["selected"] is False
+        assert "grid" not in msg["surfaces"][0]
         bad = client.post(f"{API}/projector/show", json={"mode": "compositor"})
         assert bad.status_code == 422
+
+
+def test_outlines_grids_pass_through(client: TestClient) -> None:
+    project = client.post(f"{API}/projects", json={"name": "Grid"}).json()
+    project["surfaces"] = [
+        {
+            "id": "srf_1",
+            "name": "A",
+            "quad": [[0, 0], [100, 0], [100, 50], [0, 50]],
+            "aspect": 2.0,
+        },
+        {
+            "id": "srf_2",
+            "name": "B",
+            "quad": [[0, 0], [100, 0], [100, 50], [0, 50]],
+            "aspect": 2.0,
+        },
+    ]
+    assert client.put(f"{API}/projects/grid", json=project).status_code == 200
+    grid = [[[0.0, 0.0], [10.0, 5.0]], [[0.0, 10.0], [10.0, 12.5]]]
+    with client.websocket_connect("/ws/projector") as ws:
+        _hello(ws)
+        _wait_width(client, 1920)
+        resp = client.post(
+            f"{API}/projector/show",
+            json={"mode": "outlines", "project_id": "grid", "grids": {"srf_1": grid}},
+        )
+        assert resp.status_code == 200
+        surfaces = ws.receive_json()["surfaces"]
+        assert surfaces[0]["grid"] == grid
+        assert "grid" not in surfaces[1]
 
 
 def test_ws_display(client: TestClient) -> None:
