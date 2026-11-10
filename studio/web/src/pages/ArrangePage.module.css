@@ -1,0 +1,28 @@
+.page {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr) minmax(300px, 420px);
+  grid-template-areas:
+    "library centre preview"
+    "strip strip strip";
+  gap: 16px;
+  align-items: start;
+}
+.library {
+  grid-area: library;
+  min-width: 0;
+}
+.centre {
+  grid-area: centre;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.preview {
+  grid-area: preview;
+  min-width: 0;
+}
+.strip {
+  grid-area: strip;
+  min-width: 0;
+}
