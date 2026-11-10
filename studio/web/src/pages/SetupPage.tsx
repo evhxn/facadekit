@@ -4,6 +4,7 @@ import { useProjectStore } from "../state/projectStore";
 import styles from "./SetupPage.module.css";
 import StepCamera from "./setup/StepCamera";
 import StepProjector from "./setup/StepProjector";
+import StepRealign from "./setup/StepRealign";
 import StepScan from "./setup/StepScan";
 
 const TITLES = ["Projector", "Camera", "Scan"];
@@ -40,6 +41,9 @@ export default function SetupPage() {
       {step === 1 ? <StepProjector project={project} onReadyChange={setProjectorReady} /> : null}
       {step === 2 ? <StepCamera cameraId={cameraId} onCameraChange={setCameraId} /> : null}
       {step === 3 ? <StepScan project={project} cameraId={cameraId} /> : null}
+      {step === 3 && project.calibration_id && project.surfaces.length > 0 ? (
+        <StepRealign project={project} cameraId={cameraId} />
+      ) : null}
       <div className={styles.nav}>
         <button type="button" disabled={step === 1} onClick={() => setStep(step - 1)}>
           Back

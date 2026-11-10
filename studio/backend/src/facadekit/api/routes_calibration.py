@@ -5,12 +5,15 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
+import cv2
+import numpy as np
 from fastapi import APIRouter, Depends
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict
 
 from facadekit.api.deps import AppState, get_state
 from facadekit.calib.pipeline import create_manual_calibration, load_calibration, run_calibration
+from facadekit.calib.realign import apply_drift, estimate_drift
 from facadekit.devices.base import ProjectorDisplay
 from facadekit.devices.display_ws import WsDisplay
 from facadekit.errors import (
@@ -20,7 +23,9 @@ from facadekit.errors import (
     REVISION_CONFLICT,
     FkError,
 )
+from facadekit.geom.homography import apply_h
 from facadekit.models.calibration import Calibration, CalibSettings
+from facadekit.models.project import Project
 
 Progress = Callable[[float, str], None]
 Cancel = Callable[[], bool]
@@ -140,3 +145,64 @@ def proj_view(pid: str, cid: str, state: State) -> FileResponse:
 @router.get("/projects/{pid}/calibrations/{cid}/measured_mask.png")
 def measured_mask(pid: str, cid: str, state: State) -> FileResponse:
     return _image(state, pid, cid, "measured_mask.png")
+
+
+class RealignRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    old_calibration_id: str
+    new_calibration_id: str
+    apply: bool = False
+
+
+class RealignResponse(BaseModel):
+    inliers: int
+    reproj_error_px: float
+    max_shift_px: float
+    project: Project | None
+
+
+def _read_view(project_dir: Path, cid: str, name: str, *, required: bool) -> np.ndarray | None:
+    load_calibration(project_dir, cid)  # validates the id, NOT_FOUND
+    path = project_dir / "calibration" / cid / name
+    flag = cv2.IMREAD_COLOR if name == "proj_view.png" else cv2.IMREAD_GRAYSCALE
+    img = cv2.imread(str(path), flag) if path.is_file() else None
+    if img is None and required:
+        raise FkError(NOT_FOUND, f"{name} not found for calibration {cid}")
+    return img
+
+
+@router.post("/projects/{pid}/realign")
+def realign(pid: str, body: RealignRequest, state: State) -> RealignResponse:
+    project_dir = state.store.project_dir(pid)
+    project = state.store.load(pid)
+    old_view = _read_view(project_dir, body.old_calibration_id, "proj_view.png", required=True)
+    new_view = _read_view(project_dir, body.new_calibration_id, "proj_view.png", required=True)
+    assert old_view is not None and new_view is not None
+    result = estimate_drift(
+        old_view,
+        new_view,
+        old_mask=_read_view(
+            project_dir, body.old_calibration_id, "measured_mask.png", required=False
+        ),
+        new_mask=_read_view(
+            project_dir, body.new_calibration_id, "measured_mask.png", required=False
+        ),
+    )
+    moved = apply_drift(project, result.h_old2new)
+    shifts = [
+        float(np.linalg.norm(apply_h(result.h_old2new, np.array([p]))[0] - np.array(p)))
+        for surface in project.surfaces
+        for p in surface.quad
+    ]
+    max_shift = max(shifts, default=0.0)
+    out: Project = moved
+    if body.apply:
+        out = state.store.save(moved.model_copy(update={"calibration_id": body.new_calibration_id}))
+        state.events.publish({"type": "project", "project_id": pid, "revision": out.revision})
+    return RealignResponse(
+        inliers=result.inliers,
+        reproj_error_px=result.reproj_error_px,
+        max_shift_px=max_shift,
+        project=out,
+    )

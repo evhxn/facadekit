@@ -183,3 +183,14 @@ export interface RemoteInfo {
 export const remoteInfo = () => request<RemoteInfo>("GET", "/remote/info");
 export const remotePair = (code: string) =>
   request<{ ok: boolean }>("POST", "/remote/pair", { code });
+
+export interface RealignResponse {
+  inliers: number;
+  reproj_error_px: number;
+  max_shift_px: number;
+  project: Project | null;
+}
+export const realign = (
+  pid: string,
+  body: { old_calibration_id: string; new_calibration_id: string; apply: boolean },
+) => request<RealignResponse>("POST", `/projects/${enc(pid)}/realign`, body);

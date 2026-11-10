@@ -23,6 +23,7 @@ vi.mock("../api/client", async (orig) => ({
   projViewUrl: vi.fn(() => "/projview.png"),
   measuredMaskUrl: vi.fn(() => "/mask.png"),
   cancelJob: vi.fn(),
+  realign: vi.fn(),
 }));
 vi.mock("../api/events", () => ({
   connectEvents: vi.fn(() => () => {}),
@@ -213,5 +214,76 @@ describe("Step 3 - scan", () => {
       fireEvent.click(screen.getByRole("button", { name: "Skip scan (manual mode)" }));
     });
     expect(m.startCalibration).toHaveBeenCalledWith("p1", { mode: "manual" });
+  });
+});
+
+describe("Quick re-align", () => {
+  const calibrated = {
+    ...project,
+    calibration_id: "c1",
+    surfaces: [
+      {
+        id: "s1",
+        name: "Door",
+        quad: [
+          [10, 10],
+          [100, 10],
+          [100, 80],
+          [10, 80],
+        ],
+        mask: null,
+        feather_px: 0,
+        aspect: 1.3,
+        mesh: null,
+      },
+    ],
+  } as unknown as Project;
+
+  function setupRealign(realignImpl: () => Promise<client.RealignResponse>) {
+    useProjectStore.setState({ project: calibrated, dirty: false });
+    m.getProject.mockResolvedValue(calibrated);
+    m.getCalibration.mockResolvedValue(calibration());
+    m.startCalibration.mockResolvedValue({ job_id: "j1" });
+    ev.waitForJob.mockResolvedValue(job({ result: { calibration_id: "c2" } }));
+    m.realign.mockImplementation(realignImpl);
+  }
+
+  const preview = {
+    inliers: 100,
+    reproj_error_px: 0.5,
+    max_shift_px: 17.6,
+    project: calibrated,
+  };
+
+  it("shows the shift and applies", async () => {
+    setupRealign(() => Promise.resolve(preview));
+    renderSetup();
+    fireEvent.click(await screen.findByRole("button", { name: /Projector moved/ }));
+    expect(await screen.findByText(/moved by up to 18 px/)).toBeTruthy();
+    expect(m.realign).toHaveBeenCalledWith("p1", {
+      old_calibration_id: "c1",
+      new_calibration_id: "c2",
+      apply: false,
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+    await screen.findByText(/re-render the show/);
+    expect(m.realign).toHaveBeenLastCalledWith("p1", {
+      old_calibration_id: "c1",
+      new_calibration_id: "c2",
+      apply: true,
+    });
+  });
+
+  it("hides Apply when the scans cannot be lined up", async () => {
+    setupRealign(() =>
+      Promise.reject(
+        new client.ApiError("REALIGN_FAILED", "The two scans look too different.", 422),
+      ),
+    );
+    renderSetup();
+    fireEvent.click(await screen.findByRole("button", { name: /Projector moved/ }));
+    expect(await screen.findByText(/too different/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Apply" })).toBeNull();
+    expect(screen.getByRole("button", { name: /place surfaces by hand/ })).toBeTruthy();
   });
 });

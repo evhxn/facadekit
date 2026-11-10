@@ -36,6 +36,7 @@ HTTP_STATUS: dict[str, int] = {
     BAD_REQUEST: 422,
     UNSUPPORTED_MEDIA: 422,
     UNKNOWN_PRESET: 422,
+    REALIGN_FAILED: 422,
 }
 
 
