@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createLiveRenderer } from "../gl/compositor";
 import { drawBlank, drawGrid, drawImage, drawOutlines, drawText, drawWhite } from "./draw";
 import {
   connectProjector,
@@ -101,6 +102,11 @@ export default function ProjectorPage() {
     connRef.current?.sendHello(window.innerWidth, window.innerHeight, s.dpr);
     if (lastRef.current) render(lastRef.current);
   }, [render]);
+
+  useEffect(() => {
+    setLiveRenderer(createLiveRenderer());
+    return () => setLiveRenderer(null);
+  }, []);
 
   useEffect(() => {
     const conn = connectProjector({
