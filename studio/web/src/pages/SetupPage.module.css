@@ -1,0 +1,49 @@
+.page {
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: 1rem;
+}
+.nav {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 1.5rem;
+}
+.steps {
+  color: #666;
+  margin: 0 0 1rem;
+}
+.note {
+  color: #666;
+  font-size: 0.9rem;
+}
+.live {
+  display: block;
+  width: 100%;
+  max-width: 40rem;
+  background: #111;
+  min-height: 6rem;
+}
+.viewWrap {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+}
+.view {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+.overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 0.75rem 0;
+  flex-wrap: wrap;
+}

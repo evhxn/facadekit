@@ -1,0 +1,16 @@
+.banner {
+  background: #fdecea;
+  border: 1px solid #e57373;
+  border-radius: 6px;
+  color: #7f1d1d;
+  padding: 0.75rem 1rem;
+  margin: 1rem 0;
+}
+.message {
+  margin: 0;
+}
+.actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
