@@ -58,7 +58,7 @@ def _project(
         id="p",
         name="p",
         # ProjectorSpec enforces height >= 240; the ticket's 320x180 fixture bypasses validation.
-        projector=ProjectorSpec.model_construct(width=320, height=180, fps=30),
+        projector=ProjectorSpec(width=320, height=180, fps=30),
         surfaces=[_surface()] if surfaces is None else surfaces,
         assets=assets,
         timeline=Timeline(

@@ -150,3 +150,14 @@ def test_calibration_and_job_models() -> None:
     assert job.error is None
     stamp = utc_now_iso()
     assert len(stamp) == 20 and stamp.endswith("Z")
+
+
+def test_projector_minimum_allows_320x180() -> None:
+    from facadekit.models.project import ProjectorSpec
+
+    spec = ProjectorSpec(width=320, height=180)
+    assert (spec.width, spec.height) == (320, 180)
+    with pytest.raises(ValidationError):
+        ProjectorSpec(width=159, height=180)
+    with pytest.raises(ValidationError):
+        ProjectorSpec(width=320, height=89)

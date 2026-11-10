@@ -13,8 +13,8 @@ CANVAS = "canvas"
 class ProjectorSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    width: int = Field(default=1920, ge=320, le=4096)
-    height: int = Field(default=1080, ge=240, le=2160)
+    width: int = Field(default=1920, ge=160, le=4096)
+    height: int = Field(default=1080, ge=90, le=2160)
     fps: Literal[24, 25, 30, 50, 60] = 30
 
 

@@ -37,8 +37,8 @@ Pydantic models live in `facadekit/models/project.py`. All models use `model_con
 Point = tuple[float, float]                      # (x, y) projector pixels
 
 class ProjectorSpec(BaseModel):
-    width: int = 1920                            # 320..4096
-    height: int = 1080                           # 240..2160
+    width: int = 1920                            # 160..4096
+    height: int = 1080                           # 90..2160
     fps: int = 30                                # one of 24, 25, 30, 50, 60
 
 class Mask(BaseModel):                           # (v1 UI; renderer supports it in MVP)
