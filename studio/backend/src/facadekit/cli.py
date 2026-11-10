@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import os
 import platform
+import socket
 import subprocess
 import sys
 import threading
@@ -13,6 +14,9 @@ from pathlib import Path
 from facadekit import __version__
 from facadekit.errors import BAD_REQUEST, INTERNAL, NOT_FOUND, RESOLUTION_MISMATCH, FkError
 from facadekit.ids import slugify
+
+DEFAULT_PORT = 8137
+FALLBACK_PORTS = range(8138, 8148)
 
 COMMANDS = ["serve", "new", "calibrate", "render", "publish", "doctor", "sim"]
 
@@ -25,7 +29,7 @@ def build_parser() -> argparse.ArgumentParser:
         sp = sub.add_parser(name)
         if name == "serve":
             sp.add_argument("--host", default="127.0.0.1")
-            sp.add_argument("--port", type=int, default=8137)
+            sp.add_argument("--port", type=int, default=DEFAULT_PORT)
             sp.add_argument("--data-dir", default=None)
             sp.add_argument("--no-browser", action="store_true")
             sp.add_argument("--sim", action="store_true")
@@ -62,6 +66,35 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _port_free(host: str, port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        try:
+            sock.bind((host, port))
+        except OSError:
+            return False
+    return True
+
+
+def pick_port(host: str, requested: int) -> int:
+    """Return the port ``serve`` should listen on.
+
+    0 means any free port. The default 8137 falls back to 8138-8147 when busy.
+    Any other explicit port is used as-is or reported as busy.
+    """
+    if requested == 0:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.bind((host, 0))
+            return int(sock.getsockname()[1])
+    candidates = [requested]
+    if requested == DEFAULT_PORT:
+        candidates += list(FALLBACK_PORTS)
+    for port in candidates:
+        if _port_free(host, port):
+            return port
+    tried = f"{candidates[0]}-{candidates[-1]}" if len(candidates) > 1 else str(requested)
+    raise FkError(BAD_REQUEST, f"Port {tried} is already in use. Try --port 0 for a free port.")
+
+
 def _run(body: Callable[[], int]) -> int:
     try:
         return body()
@@ -77,21 +110,23 @@ def _cmd_serve(args: argparse.Namespace) -> int:
 
     if args.data_dir:
         os.environ["FACADEKIT_DATA"] = args.data_dir
+    host = "0.0.0.0" if args.lan else args.host  # LAN is opt-in only
+    port = pick_port(host, args.port)
+    url = f"http://127.0.0.1:{port}/"
+    print(f"FacadeKit is running at {url}", flush=True)
     if not args.no_browser:
-        timer = threading.Timer(1.0, webbrowser.open, args=(f"http://127.0.0.1:{args.port}/",))
+        timer = threading.Timer(1.0, webbrowser.open, args=(url,))
         timer.daemon = True
         timer.start()
-    host = args.host
     app = create_app(sim=args.sim, lan=args.lan)
     if args.lan:
         from facadekit.api.remote_auth import lan_addresses
 
-        host = "0.0.0.0"  # opt-in only; the default stays loopback
         print("LAN mode is ON: other devices on your network can reach this server.")
         print(f"Pairing code for your phone: {app.state.remote.code}")
         for ip in lan_addresses():
-            print(f"  http://{ip}:{args.port}")
-    uvicorn.run(app, host=host, port=args.port, log_level="info")
+            print(f"  http://{ip}:{port}")
+    uvicorn.run(app, host=host, port=port, log_level="info")
     return 0
 
 

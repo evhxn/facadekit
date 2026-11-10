@@ -9,3 +9,4 @@ studio/backend/src/facadekit/webdist/*
 .ruff_cache/
 .pytest_cache/
 .DS_Store
+build/

@@ -47,3 +47,50 @@ def test_calibrate_sim_resolution_mismatch(tmp_path: Path) -> None:
 def test_doctor_no_cameras(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["doctor", "--no-cameras"]) == 0
     assert "ffmpeg: " in capsys.readouterr().out
+
+
+def test_pick_port_default_free() -> None:
+    from facadekit.cli import DEFAULT_PORT, pick_port
+
+    port = pick_port("127.0.0.1", DEFAULT_PORT)
+    assert port == DEFAULT_PORT or 8138 <= port <= 8147
+
+
+def test_pick_port_skips_busy_ports() -> None:
+    import socket
+
+    from facadekit.cli import DEFAULT_PORT, pick_port
+
+    held: list[socket.socket] = []
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            s.bind(("127.0.0.1", DEFAULT_PORT))
+        except OSError:
+            pass  # already occupied elsewhere: the premise still holds
+        held.append(s)
+        port = pick_port("127.0.0.1", DEFAULT_PORT)
+        assert port != DEFAULT_PORT
+        assert 8138 <= port <= 8147
+    finally:
+        for s in held:
+            s.close()
+
+
+def test_pick_port_zero_is_free_ephemeral() -> None:
+    from facadekit.cli import pick_port
+
+    assert pick_port("127.0.0.1", 0) > 0
+
+
+def test_pick_port_explicit_busy_raises() -> None:
+    import socket
+
+    from facadekit.cli import pick_port
+    from facadekit.errors import FkError
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        busy = int(s.getsockname()[1])
+        with pytest.raises(FkError):
+            pick_port("127.0.0.1", busy)
