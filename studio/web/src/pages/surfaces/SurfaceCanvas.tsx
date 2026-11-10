@@ -13,6 +13,7 @@ import {
 } from "./geometry";
 import { addHole, maskIsSimple, removeMaskVertex, translateMask } from "./MaskEditor";
 import { controlPoint, gridPolylines, setControlPoint } from "./meshMath";
+import { drawMagic, MagicControls, useMagicSelect, type MagicProps } from "./MagicSelect";
 import { insertVertex, nearestEdge, pointInPolygon } from "./polygon";
 import styles from "./SurfaceCanvas.module.css";
 
@@ -49,6 +50,8 @@ interface Props {
   onChangeShape: (id: string, quad: Quad, mask: Mask | null) => void;
   onCreate: (quad: Quad) => void;
   onDelete: (id: string) => void;
+  /** Enables the Magic select tool. */
+  magic?: MagicProps;
 }
 
 type Drag =
@@ -77,6 +80,7 @@ export default function SurfaceCanvas(props: Props) {
   const [editMesh, setEditMesh] = useState(false);
   const [msel, setMsel] = useState<{ i: number; j: number } | null>(null);
   const [notice, setNotice] = useState("");
+  const ms = useMagicSelect(props.magic);
   const selectedSurface = surfaces.find((x) => x.id === selectedId);
   const hasMask = !!selectedSurface?.mask;
   const hasMesh = !!selectedSurface?.mesh;
@@ -318,6 +322,7 @@ export default function SurfaceCanvas(props: Props) {
       ctx.fillStyle = "#ffcc00";
       ctx.fill();
     }
+    if (ms.active) drawMagic(ctx, view, ms);
     if (adding && adding.length > 0) {
       const pts = cursor ? [...adding, cursor] : adding;
       path(pts, false);
@@ -339,6 +344,7 @@ export default function SurfaceCanvas(props: Props) {
     msel,
     vsel,
     holeDraft,
+    ms,
   ]);
 
   const toolPoint = useCallback(
@@ -380,6 +386,13 @@ export default function SurfaceCanvas(props: Props) {
       e.preventDefault();
       dragRef.current = { kind: "pan", start: sp, panX: pan.x, panY: pan.y };
       canvasRef.current?.setPointerCapture?.(e.pointerId);
+      return;
+    }
+    if (ms.active) {
+      if (e.button === 0 || e.button === 2) {
+        const p = clampPt(view.toProjector(sp), imgW, imgH);
+        ms.addPoint(p, e.button === 2 || e.altKey ? 0 : 1);
+      }
       return;
     }
     if (e.button !== 0) return;
@@ -570,6 +583,7 @@ export default function SurfaceCanvas(props: Props) {
       e.preventDefault();
       return;
     }
+    if (ms.active) return;
     if (e.key === "Escape") {
       setAdding(null);
       setHoleDraft(null);
@@ -650,21 +664,23 @@ export default function SurfaceCanvas(props: Props) {
   };
 
   const selected = selectedSurface;
-  const hint = holeDraft
-    ? "Click the hole's points; click the first point or press Enter to close. Esc cancels."
-    : notice
-      ? notice
-      : selected?.mask && !maskIsSimple(selected.mask)
-        ? "The outline crosses itself"
-        : adding
-          ? `Click the ${CORNER_NAMES[adding.length]} corner (${adding.length + 1} of 4). Esc cancels.`
-          : selected && isSelfIntersecting(selected.quad)
-            ? "Corners are crossed"
-            : selected?.mesh && meshMode
-              ? msel && isMeshCorner(selected.mesh, msel)
-                ? "To move the whole corner, edit the surface corners instead."
-                : "Drag a grid point to bend the surface. Arrow keys nudge the selected point."
-              : "Scroll to zoom, Space or middle button to pan.";
+  const hint = ms.active
+    ? "Click to include, right-click or Alt+click to exclude. Enter creates, Esc cancels."
+    : holeDraft
+      ? "Click the hole's points; click the first point or press Enter to close. Esc cancels."
+      : notice
+        ? notice
+        : selected?.mask && !maskIsSimple(selected.mask)
+          ? "The outline crosses itself"
+          : adding
+            ? `Click the ${CORNER_NAMES[adding.length]} corner (${adding.length + 1} of 4). Esc cancels.`
+            : selected && isSelfIntersecting(selected.quad)
+              ? "Corners are crossed"
+              : selected?.mesh && meshMode
+                ? msel && isMeshCorner(selected.mesh, msel)
+                  ? "To move the whole corner, edit the surface corners instead."
+                  : "Drag a grid point to bend the surface. Arrow keys nudge the selected point."
+                : "Scroll to zoom, Space or middle button to pan.";
   const readout =
     selected?.mesh && meshMode && msel
       ? `Point ${msel.i},${msel.j}: ${controlPoint(selected, msel.i, msel.j)
@@ -677,6 +693,7 @@ export default function SurfaceCanvas(props: Props) {
   return (
     <div className={styles.root}>
       <div className={styles.toolbar}>
+        {props.magic && <MagicControls ms={ms} />}
         <button type="button" onClick={() => setAdding([])} disabled={adding !== null}>
           Add surface
         </button>

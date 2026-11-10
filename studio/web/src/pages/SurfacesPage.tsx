@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ApiError, projectorShow, projectorStatus, projViewUrl } from "../api/client";
+import {
+  ApiError,
+  getCalibration,
+  projectorShow,
+  projectorStatus,
+  projViewUrl,
+} from "../api/client";
 import { newId } from "../api/types";
-import type { Mesh, Pt, Surface } from "../api/types";
+import type { Mask, Mesh, Pt, Surface } from "../api/types";
 import RemoteDialog from "../components/RemoteDialog";
 import { useProjectStore } from "../state/projectStore";
 import SurfaceCanvas from "./surfaces/SurfaceCanvas";
@@ -27,6 +33,24 @@ export default function SurfacesPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [remoteOpen, setRemoteOpen] = useState(false);
   const [testPattern, setTestPattern] = useState(true);
+  const [manualCalib, setManualCalib] = useState(false);
+  const calibId = project?.calibration_id ?? null;
+  const projId = project?.id ?? "";
+
+  // Magic select needs a camera photo, so it is off for manual calibrations.
+  useEffect(() => {
+    setManualCalib(false);
+    if (!projId || !calibId) return;
+    let cancelled = false;
+    getCalibration(projId, calibId)
+      .then((c) => {
+        if (!cancelled) setManualCalib(c.mode === "manual");
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [projId, calibId]);
 
   useEffect(() => {
     if (projectId && useProjectStore.getState().project?.id !== projectId) {
@@ -164,6 +188,23 @@ export default function SurfacesPage() {
     setCorner(null);
   };
 
+  const createMagic = (quad: Quad, mask: Mask | null) => {
+    const id = newId("srf");
+    update((d) => {
+      d.surfaces.push({
+        id,
+        name: `Surface ${d.surfaces.length + 1}`,
+        quad,
+        mask,
+        feather_px: 2,
+        aspect: Math.round(estimateAspect(quad) * 100) / 100 || 1,
+        mesh: null,
+      });
+    });
+    setSelectedId(id);
+    setCorner(null);
+  };
+
   const remove = (id: string) => {
     const used = project.timeline.tracks.reduce(
       (n, t) => n + t.clips.filter((c) => c.surface_id === id).length,
@@ -209,6 +250,16 @@ export default function SurfacesPage() {
             })
           }
           onCreate={create}
+          magic={{
+            projectId: project.id,
+            onAccept: createMagic,
+            ...(manualCalib
+              ? {
+                  disabledReason:
+                    "Magic select needs a scanned photo (not available in manual mode).",
+                }
+              : {}),
+          }}
           onDelete={remove}
         />
       </div>
