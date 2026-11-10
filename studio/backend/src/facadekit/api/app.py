@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Res
 
 from facadekit import __version__
 from facadekit.api import (
+    routes_ai,
     routes_assets,
     routes_calibration,
     routes_devices,
@@ -110,6 +111,7 @@ def create_app(*, data_dir: Path | None = None, sim: bool = False) -> FastAPI:
     api.include_router(routes_jobs.router)
     api.include_router(routes_render.router)
     api.include_router(routes_fpp.router)
+    api.include_router(routes_ai.router)
     api.include_router(routes_projector.router)
     app.include_router(api)
     app.include_router(ws_module.router)
