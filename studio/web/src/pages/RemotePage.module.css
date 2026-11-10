@@ -1,0 +1,80 @@
+.page {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  touch-action: manipulation;
+  user-select: none;
+}
+.status {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9em;
+}
+.picker {
+  display: grid;
+  grid-template-columns: 64px 1fr 64px;
+  gap: 8px;
+  align-items: center;
+  text-align: center;
+}
+.big {
+  min-height: 64px;
+  font-size: 1.4em;
+  border-radius: 10px;
+  border: 2px solid #888;
+  background: #f4f4f4;
+  color: #111;
+}
+.on {
+  background: #1a73e8;
+  border-color: #1a73e8;
+  color: #fff;
+}
+.corners {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.dpad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 72px);
+  gap: 8px;
+}
+.dpad button {
+  min-height: 72px;
+  font-size: 2em;
+}
+.up {
+  grid-area: 1 / 2;
+}
+.left {
+  grid-area: 2 / 1;
+}
+.right {
+  grid-area: 2 / 3;
+}
+.down {
+  grid-area: 3 / 2;
+}
+.steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.pair {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.pair input {
+  font-size: 2em;
+  text-align: center;
+  letter-spacing: 0.2em;
+}
+.error {
+  color: #c00;
+}

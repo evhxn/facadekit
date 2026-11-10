@@ -1,6 +1,7 @@
 import type { RouteObject } from "react-router-dom";
 import DevParityPage from "./pages/DevParityPage";
 import ArrangePage from "./pages/ArrangePage";
+import RemotePage from "./pages/RemotePage";
 import ProjectsPage from "./pages/ProjectsPage";
 import PublishPage from "./pages/PublishPage";
 import SetupPage from "./pages/SetupPage";
@@ -15,6 +16,7 @@ export const routes: RouteObject[] = [
   { path: "/p/:projectId/surfaces", element: <SurfacesPage /> },
   { path: "/p/:projectId/arrange", element: <ArrangePage /> },
   { path: "/p/:projectId/publish", element: <PublishPage /> },
+  { path: "/remote/:projectId", element: <RemotePage /> },
   { path: PROJECTOR_PATH, element: <ProjectorPage /> },
 ];
 

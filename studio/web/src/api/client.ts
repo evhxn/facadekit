@@ -174,3 +174,12 @@ export const publish = (
 
 export const getJob = (id: string) => request<Job>("GET", `/jobs/${enc(id)}`);
 export const cancelJob = (id: string) => request<Job>("POST", `/jobs/${enc(id)}/cancel`);
+
+export interface RemoteInfo {
+  enabled: boolean;
+  code: string | null;
+  urls: string[];
+}
+export const remoteInfo = () => request<RemoteInfo>("GET", "/remote/info");
+export const remotePair = (code: string) =>
+  request<{ ok: boolean }>("POST", "/remote/pair", { code });

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Res
 
 from facadekit import __version__
 from facadekit.api import (
+    remote_auth,
     routes_ai,
     routes_assets,
     routes_calibration,
@@ -42,7 +43,14 @@ def _error(status: int, code: str, message: str) -> JSONResponse:
     return JSONResponse(status_code=status, content={"error": {"code": code, "message": message}})
 
 
-def create_app(*, data_dir: Path | None = None, sim: bool = False) -> FastAPI:
+def create_app(
+    *,
+    data_dir: Path | None = None,
+    sim: bool = False,
+    lan: bool = False,
+    pairing_code: str | None = None,
+    client_addr_override: Callable[[], str] | None = None,
+) -> FastAPI:
     root = data_dir / "projects" if data_dir is not None else projects_dir()
     events = ws_module.EventHub()
     projector = ws_module.ProjectorHub(events, sim_size=(1920, 1080) if sim else None)
@@ -80,6 +88,13 @@ def create_app(*, data_dir: Path | None = None, sim: bool = False) -> FastAPI:
 
     app = FastAPI(title="FacadeKit Studio", lifespan=lifespan)
     app.state.fk = state
+    app.state.remote = remote_auth.RemoteAuth(
+        lan=lan,
+        code=pairing_code,
+        client_addr_override=client_addr_override,
+        on_pair=lambda host: print(f"Device paired: {host}", flush=True),
+    )
+    app.add_middleware(remote_auth.RemoteAccessMiddleware, auth=app.state.remote)
 
     @app.exception_handler(FkError)
     async def _fk_error(_request: Request, exc: Exception) -> JSONResponse:
@@ -113,6 +128,7 @@ def create_app(*, data_dir: Path | None = None, sim: bool = False) -> FastAPI:
     api.include_router(routes_fpp.router)
     api.include_router(routes_ai.router)
     api.include_router(routes_projector.router)
+    api.include_router(remote_auth.router)
     app.include_router(api)
     app.include_router(ws_module.router)
 

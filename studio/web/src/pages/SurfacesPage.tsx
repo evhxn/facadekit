@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { ApiError, projectorShow, projectorStatus, projViewUrl } from "../api/client";
 import { newId } from "../api/types";
 import type { Surface } from "../api/types";
+import RemoteDialog from "../components/RemoteDialog";
 import { useProjectStore } from "../state/projectStore";
 import SurfaceCanvas from "./surfaces/SurfaceCanvas";
 import MaskEditor from "./surfaces/MaskEditor";
@@ -22,6 +23,7 @@ export default function SurfacesPage() {
   const [outlines, setOutlines] = useState(false);
   const [notConnected, setNotConnected] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [remoteOpen, setRemoteOpen] = useState(false);
 
   useEffect(() => {
     if (projectId && useProjectStore.getState().project?.id !== projectId) {
@@ -207,6 +209,10 @@ export default function SurfacesPage() {
           />{" "}
           Show outlines on projector
         </label>
+        <button type="button" onClick={() => setRemoteOpen(true)}>
+          Use phone as remote
+        </button>
+        {remoteOpen && <RemoteDialog projectId={project.id} onClose={() => setRemoteOpen(false)} />}
         {notConnected && (
           <p className={styles.note}>
             Projector window is not open. <Link to={setupLink}>Open Setup</Link>

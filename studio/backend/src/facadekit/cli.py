@@ -29,6 +29,7 @@ def build_parser() -> argparse.ArgumentParser:
             sp.add_argument("--data-dir", default=None)
             sp.add_argument("--no-browser", action="store_true")
             sp.add_argument("--sim", action="store_true")
+            sp.add_argument("--lan", action="store_true")
         elif name == "new":
             sp.add_argument("project_dir")
             sp.add_argument("--name", required=True)
@@ -80,7 +81,17 @@ def _cmd_serve(args: argparse.Namespace) -> int:
         timer = threading.Timer(1.0, webbrowser.open, args=(f"http://127.0.0.1:{args.port}/",))
         timer.daemon = True
         timer.start()
-    uvicorn.run(create_app(sim=args.sim), host=args.host, port=args.port, log_level="info")
+    host = args.host
+    app = create_app(sim=args.sim, lan=args.lan)
+    if args.lan:
+        from facadekit.api.remote_auth import lan_addresses
+
+        host = "0.0.0.0"  # opt-in only; the default stays loopback
+        print("LAN mode is ON: other devices on your network can reach this server.")
+        print(f"Pairing code for your phone: {app.state.remote.code}")
+        for ip in lan_addresses():
+            print(f"  http://{ip}:{args.port}")
+    uvicorn.run(app, host=host, port=args.port, log_level="info")
     return 0
 
 
