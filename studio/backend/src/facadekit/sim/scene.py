@@ -83,9 +83,11 @@ class SimScene:
                 img[y : y + 24, x : x + 2] = mortar
         for name, (x0, y0, x1, y1) in self.features_world.items():
             ix0, iy0, ix1, iy1 = (int(round(v)) for v in (x0, y0, x1, y1))
-            img[iy0:iy1, ix0:ix1] = (30, 30, 30)
+            # The 6 px dark frame sits just outside the feature rectangle, so the light fill
+            # covers exactly the rectangle that feature_quad_proj() reports.
+            img[max(iy0 - 6, 0) : iy1 + 6, max(ix0 - 6, 0) : ix1 + 6] = (30, 30, 30)
             fill = (200, 200, 200) if name == "garage_door" else (90, 60, 40)
-            img[iy0 + 6 : iy1 - 6, ix0 + 6 : ix1 - 6] = fill
+            img[iy0:iy1, ix0:ix1] = fill
         return img
 
     def feature_quad_proj(self, name: str) -> list[Point]:
