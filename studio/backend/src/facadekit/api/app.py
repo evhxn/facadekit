@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -10,7 +11,15 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
 
 from facadekit import __version__
-from facadekit.api import routes_assets, routes_fpp, routes_jobs, routes_projects, routes_render
+from facadekit.api import (
+    routes_assets,
+    routes_fpp,
+    routes_jobs,
+    routes_projector,
+    routes_projects,
+    routes_render,
+)
+from facadekit.api import ws as ws_module
 from facadekit.api.deps import AppState
 from facadekit.config import projects_dir
 from facadekit.errors import BAD_REQUEST, NOT_FOUND, FkError, http_status
@@ -29,10 +38,20 @@ def _error(status: int, code: str, message: str) -> JSONResponse:
 
 def create_app(*, data_dir: Path | None = None, sim: bool = False) -> FastAPI:
     root = data_dir / "projects" if data_dir is not None else projects_dir()
-    state = AppState(store=ProjectStore(root), jobs=JobRunner(), sim=sim)
+    events = ws_module.EventHub()
+    projector = ws_module.ProjectorHub(events, sim_size=(1920, 1080) if sim else None)
+    jobs = JobRunner(
+        on_update=lambda job: events.publish({"type": "job", "job": job.model_dump(mode="json")})
+    )
+    state = AppState(
+        store=ProjectStore(root), jobs=jobs, events=events, projector=projector, sim=sim
+    )
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        loop = asyncio.get_running_loop()
+        events.bind_loop(loop)
+        projector.bind_loop(loop)
         try:
             yield
         finally:
@@ -69,7 +88,9 @@ def create_app(*, data_dir: Path | None = None, sim: bool = False) -> FastAPI:
     api.include_router(routes_jobs.router)
     api.include_router(routes_render.router)
     api.include_router(routes_fpp.router)
+    api.include_router(routes_projector.router)
     app.include_router(api)
+    app.include_router(ws_module.router)
 
     @app.get("/{full_path:path}", include_in_schema=False)
     def spa(full_path: str) -> Response:

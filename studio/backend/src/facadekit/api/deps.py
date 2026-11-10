@@ -5,6 +5,7 @@ from typing import cast
 
 from fastapi import Request
 
+from facadekit.api.ws import EventHub, ProjectorHub
 from facadekit.jobs.runner import JobRunner
 from facadekit.store.project_store import ProjectStore
 
@@ -13,8 +14,10 @@ from facadekit.store.project_store import ProjectStore
 class AppState:
     store: ProjectStore
     jobs: JobRunner
+    events: EventHub
+    projector: ProjectorHub
     sim: bool = False
-    # later tickets add: projector hub, event hub, cameras
+    # later tickets add: cameras
 
 
 def get_state(request: Request) -> AppState:
