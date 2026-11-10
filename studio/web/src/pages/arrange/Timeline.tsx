@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { assetThumbUrl } from "../../api/client";
+import { assetThumbUrl, assetUrl } from "../../api/client";
 import type { Clip, Project } from "../../api/types";
 import { newId } from "../../api/types";
 import { useProjectStore } from "../../state/projectStore";
@@ -7,6 +7,7 @@ import { CANVAS_ID } from "./ClipForm";
 import { assetName } from "./ClipList";
 import { addClip, duplicateClips, findClip, moveClips, removeClip, trimClip } from "./clipOps";
 import { ASSET_DRAG_TYPE } from "./MediaLibrary";
+import Waveform, { WAVE_H } from "./Waveform";
 import { MAX_PX_PER_SEC, MIN_PX_PER_SEC, msToX, rulerTicks, snap, xToMs } from "./timelineMath";
 import { useTransportTime, type Transport } from "./transport";
 import styles from "./Timeline.module.css";
@@ -84,7 +85,9 @@ export default function Timeline({ project, transport, selectedIds, onSelect, on
   const nTracks = tracks.length;
   const duration = project.timeline.duration_ms;
   const width = Math.max(msToX(duration, ppm) + 80, 200);
-  const height = RULER_H + (nTracks + 1) * ROW_H;
+  const waveTop = RULER_H + (nTracks + 1) * ROW_H;
+  const audioId = project.timeline.audio_asset_id;
+  const height = waveTop + (audioId ? WAVE_H : 0);
   // Display row 0 is the "new layer" row; rows 1..n are the tracks, top layer first.
   const rowOfTrack = (i: number) => nTracks - i;
 
@@ -470,6 +473,15 @@ export default function Timeline({ project, transport, selectedIds, onSelect, on
             <div
               className={styles.box}
               style={{ left: box.x, top: box.y, width: box.w, height: box.h }}
+            />
+          ) : null}
+          {audioId ? (
+            <Waveform
+              url={assetUrl(project.id, audioId)}
+              pxPerMs={ppm}
+              contentWidth={width}
+              top={waveTop}
+              scrollerRef={scrollerRef}
             />
           ) : null}
           <div className={styles.playhead} style={{ left: msToX(t, ppm) }} data-testid="playhead" />
