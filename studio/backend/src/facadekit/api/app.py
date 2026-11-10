@@ -13,6 +13,8 @@ from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Res
 from facadekit import __version__
 from facadekit.api import (
     routes_assets,
+    routes_calibration,
+    routes_devices,
     routes_fpp,
     routes_jobs,
     routes_projector,
@@ -21,9 +23,12 @@ from facadekit.api import (
 )
 from facadekit.api import ws as ws_module
 from facadekit.api.deps import AppState
+from facadekit.api.routes_devices import CameraManager
 from facadekit.config import projects_dir
 from facadekit.errors import BAD_REQUEST, NOT_FOUND, FkError, http_status
 from facadekit.jobs.runner import JobRunner
+from facadekit.sim.devices import SimCamera, SimDisplay
+from facadekit.sim.scene import default_scene
 from facadekit.store.project_store import ProjectStore
 
 WEBDIST = Path(__file__).resolve().parent.parent / "webdist"
@@ -43,8 +48,22 @@ def create_app(*, data_dir: Path | None = None, sim: bool = False) -> FastAPI:
     jobs = JobRunner(
         on_update=lambda job: events.publish({"type": "job", "job": job.model_dump(mode="json")})
     )
+    sim_scene = default_scene() if sim else None
+    sim_display = SimDisplay(sim_scene) if sim_scene is not None else None
+    sim_camera_factory = (
+        (lambda: SimCamera(sim_scene, sim_display))
+        if sim_scene is not None and sim_display is not None
+        else None
+    )
     state = AppState(
-        store=ProjectStore(root), jobs=jobs, events=events, projector=projector, sim=sim
+        store=ProjectStore(root),
+        jobs=jobs,
+        events=events,
+        projector=projector,
+        cameras=CameraManager(sim_camera_factory=sim_camera_factory),
+        sim=sim,
+        sim_scene=sim_scene,
+        sim_display=sim_display,
     )
 
     @asynccontextmanager
@@ -56,6 +75,7 @@ def create_app(*, data_dir: Path | None = None, sim: bool = False) -> FastAPI:
             yield
         finally:
             state.jobs.shutdown()
+            state.cameras.close()
 
     app = FastAPI(title="FacadeKit Studio", lifespan=lifespan)
     app.state.fk = state
@@ -85,6 +105,8 @@ def create_app(*, data_dir: Path | None = None, sim: bool = False) -> FastAPI:
 
     api.include_router(routes_projects.router)
     api.include_router(routes_assets.router)
+    api.include_router(routes_devices.router)
+    api.include_router(routes_calibration.router)
     api.include_router(routes_jobs.router)
     api.include_router(routes_render.router)
     api.include_router(routes_fpp.router)
