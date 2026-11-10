@@ -8,10 +8,11 @@ import cv2
 import numpy as np
 
 from facadekit.errors import FkError
-from facadekit.geom.homography import canvas_surface, clip_homography
+from facadekit.geom.homography import canvas_surface, clip_homography, fit_rects
 from facadekit.geom.mask import rasterize_mask
+from facadekit.geom.mesh import mesh_inverse_map
 from facadekit.media.reader import ClipSource
-from facadekit.models.project import Asset, Clip, Mask, Project, Surface
+from facadekit.models.project import Asset, Clip, Mask, Mesh, Project, Surface
 
 _HALF_IN = np.array([[1.0, 0.0, 0.5], [0.0, 1.0, 0.5], [0.0, 0.0, 1.0]])
 _HALF_OUT = np.array([[1.0, 0.0, -0.5], [0.0, 1.0, -0.5], [0.0, 0.0, 1.0]])
@@ -22,6 +23,8 @@ class _SurfaceCache:
     surface: Surface
     mask: np.ndarray  # float32 (H, W)
     box: tuple[int, int, int, int]  # x, y, w, h of mask > 0 (w or h == 0 if empty)
+    map_u: np.ndarray | None = None  # float32 (H, W) mesh inverse map, None without a mesh
+    map_v: np.ndarray | None = None
 
 
 def _scale_surface(surface: Surface, scale: float) -> Surface:
@@ -38,10 +41,17 @@ def _scale_surface(surface: Surface, scale: float) -> Surface:
         )
     )
     quad = surface.quad
+    mesh = surface.mesh
+    scaled_mesh = (
+        None
+        if mesh is None
+        else Mesh(cols=mesh.cols, rows=mesh.rows, offsets=[pt(o) for o in mesh.offsets])
+    )
     return surface.model_copy(
         update={
             "quad": (pt(quad[0]), pt(quad[1]), pt(quad[2]), pt(quad[3])),
             "mask": scaled_mask,
+            "mesh": scaled_mesh,
             "feather_px": surface.feather_px * scale,
         }
     )
@@ -75,9 +85,17 @@ class Compositor:
             outer = surface.mask.outer if surface.mask is not None else list(surface.quad)
             holes = surface.mask.holes if surface.mask is not None else []
             mask = rasterize_mask(width, height, outer, holes, surface.feather_px)
+            map_u: np.ndarray | None = None
+            map_v: np.ndarray | None = None
+            if surface.mesh is not None and any(o != (0.0, 0.0) for o in surface.mesh.offsets):
+                map_u, map_v = mesh_inverse_map(surface, self.size)
+                if surface.mask is None:
+                    mask = (map_u >= 0).astype(np.float32)
+                    if surface.feather_px > 0:
+                        mask = cv2.GaussianBlur(mask, (0, 0), surface.feather_px / 2.0)
             bx, by, bw, bh = cv2.boundingRect((mask > 0).astype(np.uint8))
             box = (int(bx), int(by), int(bw), int(bh))
-            self._surfaces[base.id] = _SurfaceCache(surface, mask, box)
+            self._surfaces[base.id] = _SurfaceCache(surface, mask, box, map_u, map_v)
 
     def _source(self, clip: Clip, asset: Asset) -> ClipSource:
         source = self._sources.get(clip.id)
@@ -116,6 +134,9 @@ class Compositor:
         img = source.frame_at(s)
         src_w, src_h = source.size
         h_mat, src_rect = clip_homography(src_w, src_h, cache.surface, clip.fit)
+        if cache.map_u is not None:
+            self._draw_mesh(dst, clip, t_ms, cache, img, src_rect)
+            return
 
         # Alpha plane in source space: src_rect region, times source alpha if present.
         x0, y0, x1, y1 = (int(round(v)) for v in src_rect)
@@ -148,6 +169,55 @@ class Compositor:
             * cache.mask[by : by + bh, bx : bx + bw]
             * np.float32(clip.opacity * _fade(clip, t_ms))
         )
+        self._blend(dst, clip, cache.box, warped, alpha)
+
+    def _draw_mesh(
+        self,
+        dst: np.ndarray,
+        clip: Clip,
+        t_ms: int,
+        cache: _SurfaceCache,
+        img: np.ndarray,
+        src_rect: tuple[float, float, float, float],
+    ) -> None:
+        """Mesh path: sample the source through the precomputed (u, v) inverse map."""
+        assert cache.map_u is not None and cache.map_v is not None
+        bx, by, bw, bh = cache.box
+        u = cache.map_u[by : by + bh, bx : bx + bw]
+        v = cache.map_v[by : by + bh, bx : bx + bw]
+        src_h, src_w = img.shape[:2]
+        _, (u0, v0, u1, v1) = fit_rects(float(src_w), float(src_h), cache.surface.aspect, clip.fit)
+        x0, y0, x1, y1 = src_rect
+        # Source position in pixel-corner units, then to cv2's pixel-centre indices.
+        map_x = ((x0 + (u - u0) / (u1 - u0) * (x1 - x0)) - 0.5).astype(np.float32)
+        map_y = ((y0 + (v - v0) / (v1 - v0) * (y1 - y0)) - 0.5).astype(np.float32)
+        inside = (u >= u0) & (u <= u1) & (v >= v0) & (v <= v1) & (u >= 0)
+        if img.shape[2] == 4:
+            color = np.ascontiguousarray(img[:, :, :3])
+            src_alpha = np.ascontiguousarray(img[:, :, 3])
+        else:
+            color = img
+            src_alpha = None
+        lin = cv2.INTER_LINEAR
+        clamp = cv2.BORDER_REPLICATE
+        warped = cv2.remap(color, map_x, map_y, lin, borderMode=clamp)
+        cover = inside.astype(np.float32)
+        if src_alpha is not None:
+            sa = cv2.remap(src_alpha, map_x, map_y, lin, borderMode=clamp)
+            cover = cover * sa.astype(np.float32) * np.float32(1.0 / 255.0)
+        alpha = cover * cache.mask[by : by + bh, bx : bx + bw]
+        alpha = alpha * np.float32(clip.opacity * _fade(clip, t_ms))
+        self._blend(dst, clip, cache.box, warped, alpha)
+
+    @staticmethod
+    def _blend(
+        dst: np.ndarray,
+        clip: Clip,
+        box: tuple[int, int, int, int],
+        warped: np.ndarray,
+        alpha: np.ndarray,
+    ) -> None:
+        bx, by, bw, bh = box
         a3 = alpha[:, :, None]
         src_f = warped.astype(np.float32) * np.float32(1.0 / 255.0)
         region = dst[by : by + bh, bx : bx + bw]

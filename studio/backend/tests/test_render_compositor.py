@@ -223,3 +223,55 @@ def test_missing_media(tmp_path: Path) -> None:
     with Compositor(p, tmp_path) as comp, pytest.raises(FkError) as exc:
         comp.frame(0)
     assert exc.value.code == "NOT_FOUND"
+
+
+def _stripes(tmp_path: Path) -> Asset:
+    img = np.zeros((100, 100, 3), np.uint8)
+    img[:, :50] = (0, 0, 255)  # red
+    img[:, 50:] = (255, 0, 0)  # blue
+    return _png(tmp_path, "stripes", img)
+
+
+def _mesh_surface(offset: tuple[float, float]) -> Surface:
+    from facadekit.models.project import Mesh
+
+    offsets = [(0.0, 0.0)] * 9
+    offsets[4] = offset
+    return _surface().model_copy(update={"mesh": Mesh(cols=2, rows=2, offsets=offsets)})
+
+
+def _boundary_x(frame: np.ndarray, y: int) -> float:
+    row = frame[y, :, :].astype(int)
+    for x in range(100, 220):
+        if row[x, 0] > row[x, 2]:  # blue dominates
+            return float(x)
+    raise AssertionError("no boundary")
+
+
+def test_mesh_shifts_boundary(tmp_path: Path) -> None:
+    asset = _stripes(tmp_path)
+    flat = _render(_project([asset], [[_clip("c", "stripes")]]), tmp_path)
+    mesh = _render(
+        _project([asset], [[_clip("c", "stripes")]], [_mesh_surface((20.0, 0.0))]), tmp_path
+    )
+    mid = 90
+    assert abs(_boundary_x(mesh, mid) - (_boundary_x(flat, mid) + 20)) <= 2
+    assert abs(_boundary_x(mesh, 42) - _boundary_x(flat, 42)) <= 2
+    assert _px(mesh, 200, 90)[0] == 255  # right of the boundary is blue
+    assert _px(mesh, 105, 90) == (0, 0, 255)
+
+
+def test_zero_mesh_identical_to_none(tmp_path: Path) -> None:
+    from facadekit.geom.mesh import identity_mesh
+
+    asset = _stripes(tmp_path)
+    plain = _project([asset], [[_clip("c", "stripes", fit="fill")]])
+    zero = _project(
+        [asset],
+        [[_clip("c", "stripes", fit="fill")]],
+        [_surface().model_copy(update={"mesh": identity_mesh(4, 3)})],
+    )
+    for scale in (1.0, 0.5):
+        assert np.array_equal(
+            _render(plain, tmp_path, scale=scale), _render(zero, tmp_path, scale=scale)
+        )
