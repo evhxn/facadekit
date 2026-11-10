@@ -21,7 +21,7 @@ AI model files are downloaded at run time, never bundled.
 ## How releases are produced
 
 Pushing a tag `v*` runs `.github/workflows/release.yml`: build the web UI, then freeze on
-`windows-latest`, `macos-14` (arm64) and `macos-13` (x64), smoke-test each (health check, `/` serves the
+`windows-latest`, `macos-14` (arm64) and `macos-15-intel` (x64; GitHub retired `macos-13`), smoke-test each (health check, `/` serves the
 UI, `sim e2e` exits 0), zip, and attach the zips, wheel, sdist and `SHA256SUMS.txt` to a GitHub Release.
 CI also generates `THIRD_PARTY_NOTICES.txt` (`pip-licenses`); `LICENSE` is bundled too. FacadeKit is
 GPL-3.0-or-later and the bundled ffmpeg is a GPL build.
