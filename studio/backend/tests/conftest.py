@@ -50,3 +50,44 @@ def fake_fpp(tmp_path: Path) -> Iterator[FakeFpp]:
     finally:
         server.should_exit = True
         thread.join(timeout=10)
+
+
+@pytest.fixture(scope="session")
+def sample_video(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """2 s, 320x180, 30 fps H.264 + AAC test clip generated with ffmpeg."""
+    from facadekit.media.ffmpeg import run_ffmpeg
+
+    out = tmp_path_factory.mktemp("media_video") / "sample.mp4"
+    run_ffmpeg(
+        [
+            "-f", "lavfi", "-i", "testsrc2=size=320x180:rate=30:duration=2",
+            "-f", "lavfi", "-i", "sine=frequency=440:duration=2",
+            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest",
+            str(out),
+        ]
+    )  # fmt: skip
+    return out
+
+
+@pytest.fixture(scope="session")
+def sample_image(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """64x48 PNG with an alpha channel."""
+    import cv2
+    import numpy as np
+
+    out = tmp_path_factory.mktemp("media_image") / "sample.png"
+    img = np.zeros((48, 64, 4), dtype=np.uint8)
+    img[:, :, 2] = 200
+    img[:, :, 3] = 128
+    cv2.imwrite(str(out), img)
+    return out
+
+
+@pytest.fixture(scope="session")
+def sample_audio(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """3 s sine WAV generated with ffmpeg."""
+    from facadekit.media.ffmpeg import run_ffmpeg
+
+    out = tmp_path_factory.mktemp("media_audio") / "sample.wav"
+    run_ffmpeg(["-f", "lavfi", "-i", "sine=frequency=440:duration=3", str(out)])
+    return out
