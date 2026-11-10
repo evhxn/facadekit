@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 import uvicorn
 from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 from facadekit.fpp.fake import create_fake_fpp
 
@@ -91,3 +92,12 @@ def sample_audio(tmp_path_factory: pytest.TempPathFactory) -> Path:
     out = tmp_path_factory.mktemp("media_audio") / "sample.wav"
     run_ffmpeg(["-f", "lavfi", "-i", "sine=frequency=440:duration=3", str(out)])
     return out
+
+
+@pytest.fixture
+def client(tmp_path: Path) -> Iterator[TestClient]:
+    """TestClient around create_app(data_dir=tmp_path), used as a context manager."""
+    from facadekit.api.app import create_app
+
+    with TestClient(create_app(data_dir=tmp_path)) as test_client:
+        yield test_client

@@ -1,0 +1,85 @@
+from __future__ import annotations
+
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from pathlib import Path
+from typing import Any
+
+from fastapi import APIRouter, FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
+
+from facadekit import __version__
+from facadekit.api import routes_jobs, routes_projects
+from facadekit.api.deps import AppState
+from facadekit.config import projects_dir
+from facadekit.errors import BAD_REQUEST, NOT_FOUND, FkError, http_status
+from facadekit.jobs.runner import JobRunner
+from facadekit.store.project_store import ProjectStore
+
+WEBDIST = Path(__file__).resolve().parent.parent / "webdist"
+NO_UI_MESSAGE = (
+    "FacadeKit backend is running. The web UI has not been built (run `make build-web`)."
+)
+
+
+def _error(status: int, code: str, message: str) -> JSONResponse:
+    return JSONResponse(status_code=status, content={"error": {"code": code, "message": message}})
+
+
+def create_app(*, data_dir: Path | None = None, sim: bool = False) -> FastAPI:
+    root = data_dir / "projects" if data_dir is not None else projects_dir()
+    state = AppState(store=ProjectStore(root), jobs=JobRunner(), sim=sim)
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        try:
+            yield
+        finally:
+            state.jobs.shutdown()
+
+    app = FastAPI(title="FacadeKit Studio", lifespan=lifespan)
+    app.state.fk = state
+
+    @app.exception_handler(FkError)
+    async def _fk_error(_request: Request, exc: Exception) -> JSONResponse:
+        assert isinstance(exc, FkError)
+        return _error(http_status(exc.code), exc.code, exc.message)
+
+    @app.exception_handler(RequestValidationError)
+    async def _validation_error(_request: Request, exc: Exception) -> JSONResponse:
+        assert isinstance(exc, RequestValidationError)
+        errors = exc.errors()
+        if errors:
+            first = errors[0]
+            location = ".".join(str(part) for part in first["loc"])
+            message = f"{location}: {first['msg']}"
+        else:
+            message = "invalid request"
+        return _error(422, BAD_REQUEST, message)
+
+    api = APIRouter(prefix="/api/v1")
+
+    @api.get("/health")
+    def health() -> dict[str, Any]:
+        return {"status": "ok", "version": __version__, "sim": state.sim}
+
+    api.include_router(routes_projects.router)
+    api.include_router(routes_jobs.router)
+    app.include_router(api)
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    def spa(full_path: str) -> Response:
+        if full_path in ("api", "ws") or full_path.startswith(("api/", "ws/")):
+            return _error(404, NOT_FOUND, f"no such endpoint: /{full_path}")
+        index = WEBDIST / "index.html"
+        if not index.is_file():
+            return PlainTextResponse(NO_UI_MESSAGE)
+        if full_path:
+            root_dir = WEBDIST.resolve()
+            candidate = (root_dir / full_path).resolve()
+            if candidate.is_relative_to(root_dir) and candidate.is_file():
+                return FileResponse(candidate)
+        return FileResponse(index)
+
+    return app
