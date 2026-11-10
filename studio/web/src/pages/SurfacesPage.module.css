@@ -1,0 +1,35 @@
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 16px;
+  height: calc(100vh - 80px);
+}
+.canvasArea {
+  min-width: 0;
+  min-height: 0;
+}
+.panel {
+  overflow-y: auto;
+}
+.toggle {
+  display: block;
+  margin-bottom: 8px;
+}
+.note {
+  color: #c60;
+  margin: 4px 0 8px;
+}
+.props {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.props label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.row {
+  display: flex;
+  gap: 8px;
+}
