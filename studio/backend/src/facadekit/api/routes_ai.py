@@ -1,10 +1,14 @@
 from __future__ import annotations
 
-from typing import Annotated, Any
+import threading
+from typing import Annotated, Any, Literal
 
+import cv2
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel
 
 from facadekit.ai.beats import analyze_beats
+from facadekit.ai.segment import MobileSamSegmenter, get_segmenter
 from facadekit.api.deps import AppState, get_state
 from facadekit.errors import BAD_REQUEST, NOT_FOUND, REVISION_CONFLICT, FkError
 
@@ -42,3 +46,42 @@ def analyze_asset(pid: str, aid: str, state: State) -> dict[str, str]:
 
     job = state.jobs.submit("analyze", run)
     return {"job_id": job.id}
+
+
+class SegmentPoint(BaseModel):
+    x: float
+    y: float
+    label: Literal[0, 1]
+
+
+class SegmentRequest(BaseModel):
+    points: list[SegmentPoint]
+    prefer: Literal["auto", "mobilesam", "grabcut"] = "auto"
+
+
+_segment_lock = threading.Lock()
+
+
+@router.post("/projects/{pid}/segment")
+def segment(pid: str, body: SegmentRequest, state: State) -> dict[str, Any]:
+    project = state.store.load(pid)
+    if project.calibration_id is None:
+        raise FkError(BAD_REQUEST, "The project has no calibration")
+    if not any(p.label == 1 for p in body.points):
+        raise FkError(BAD_REQUEST, "At least one include point is required")
+    cid = project.calibration_id
+    image_path = state.store.project_dir(pid) / "calibration" / cid / "proj_view.png"
+    key = (pid, cid, body.prefer)
+    points: list[tuple[float, float, int]] = [(p.x, p.y, p.label) for p in body.points]
+    with _segment_lock:
+        segmenter = state.segmenters.get(key)
+        if segmenter is None:
+            image = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
+            if image is None:
+                raise FkError(NOT_FOUND, "proj_view.png not found for the calibration")
+            segmenter = get_segmenter(body.prefer)
+            segmenter.set_image(image)
+            state.segmenters[key] = segmenter
+        result = segmenter.segment(points)
+    engine = "mobilesam" if isinstance(segmenter, MobileSamSegmenter) else "grabcut"
+    return {"outer": result.outer, "quad": result.quad, "score": result.score, "engine": engine}

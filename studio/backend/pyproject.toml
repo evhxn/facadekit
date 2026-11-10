@@ -45,3 +45,6 @@ files = ["src"]
 [[tool.mypy.overrides]]
 module = ["cv2", "imageio_ffmpeg", "librosa", "onnxruntime"]
 ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+markers = ["models: needs downloaded AI models (set FK_TEST_MODELS=1)"]

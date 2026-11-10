@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, cast
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, cast
 
 from fastapi import Request
 
@@ -25,6 +25,7 @@ class AppState:
     sim: bool = False
     sim_scene: SimScene | None = None
     sim_display: SimDisplay | None = None
+    segmenters: dict[tuple[str, str, str], Any] = field(default_factory=dict)
 
 
 def get_state(request: Request) -> AppState:
