@@ -22,7 +22,7 @@ export default function SetupPage() {
     useProjectStore
       .getState()
       .load(projectId)
-      .catch(() => setLoadError("Could not open this project."));
+      .catch(() => setLoadError("Could not open this project. Go back to Projects and open it again."));
   }, [projectId]);
 
   const loaded = project !== null && project.id === projectId;

@@ -45,9 +45,9 @@ export default function RenderPanel({
 
   const hasAudio = project.timeline.audio_asset_id !== null;
   const warnings: string[] = [];
-  if (!project.timeline.tracks.some((t) => t.clips.length > 0)) warnings.push("The show is empty.");
-  if (project.surfaces.length === 0) warnings.push("There are no surfaces yet.");
-  if (!project.calibration_id) warnings.push("This project has no calibration.");
+  if (!project.timeline.tracks.some((t) => t.clips.length > 0)) warnings.push("The show is empty. Add a clip on the Arrange page.");
+  if (project.surfaces.length === 0) warnings.push("There are no surfaces yet. Add one on the Surfaces page.");
+  if (!project.calibration_id) warnings.push("This project has no calibration. Scan the house on the Setup page.");
 
   const render = async () => {
     setError(null);
@@ -69,14 +69,14 @@ export default function RenderPanel({
         if (mounted.current) setJob(null);
       } else if (final.state === "failed") {
         setError(
-          final.error ? userMessage(final.error.code, final.error.message) : "Rendering failed.",
+          final.error ? userMessage(final.error.code, final.error.message) : "Rendering failed. Try Render show again.",
         );
       } else if (final.state === "cancelled") {
         setJob(null);
       }
     } catch (e) {
       if (mounted.current)
-        setError(e instanceof ApiError ? userMessage(e.code, e.message) : "Rendering failed.");
+        setError(e instanceof ApiError ? userMessage(e.code, e.message) : "Rendering failed. Try Render show again.");
     } finally {
       if (mounted.current) setBusy(false);
     }

@@ -51,7 +51,7 @@ export default function ArrangePage() {
 
   useEffect(() => {
     if (projectId && useProjectStore.getState().project?.id !== projectId) {
-      load(projectId).catch(() => setLoadError("Could not load the project."));
+      load(projectId).catch(() => setLoadError("Could not load the project. Go back to Projects and open it again."));
     }
   }, [projectId, load]);
 
@@ -131,7 +131,7 @@ export default function ArrangePage() {
       update((proj) => {
         ok = moveClipToTrack(proj, id, layer);
       });
-      if (!ok) setMessage("That layer already has a clip at this time.");
+      if (!ok) setMessage("That layer already has a clip at this time. Drop it on another layer or pick a different time.");
     }
   }
 

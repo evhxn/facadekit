@@ -56,7 +56,7 @@ export default function StepRealign({ project, cameraId }: Props) {
         setError(
           final.error
             ? userMessage(final.error.code, final.error.message)
-            : "The scan did not work.",
+            : "The scan did not work. Try again, or keep the old scan and place surfaces by hand.",
         );
         setPhase("failed");
         return;
@@ -75,13 +75,13 @@ export default function StepRealign({ project, cameraId }: Props) {
         setPhase("preview");
       } catch (e) {
         if (!mounted.current) return;
-        setError(e instanceof ApiError ? userMessage(e.code, e.message) : "Re-align failed.");
+        setError(e instanceof ApiError ? userMessage(e.code, e.message) : "Re-align failed. Keep the new scan and place the surfaces by hand.");
         setPhase("failed");
         await useProjectStore.getState().load(pid);
       }
     } catch (e) {
       if (!mounted.current) return;
-      setError(e instanceof ApiError ? userMessage(e.code, e.message) : "The scan failed.");
+      setError(e instanceof ApiError ? userMessage(e.code, e.message) : "The scan failed. Check that the camera and projector window are open, then try again.");
       setPhase("failed");
     }
   };
@@ -99,7 +99,7 @@ export default function StepRealign({ project, cameraId }: Props) {
       if (mounted.current) setPhase("applied");
     } catch (e) {
       if (mounted.current) {
-        setError(e instanceof ApiError ? userMessage(e.code, e.message) : "Could not apply.");
+        setError(e instanceof ApiError ? userMessage(e.code, e.message) : "Could not apply the change. Try Apply again, or place the surfaces by hand.");
         setPhase("failed");
       }
     } finally {

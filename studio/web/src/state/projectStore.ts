@@ -89,7 +89,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         }
       } else {
         const message =
-          e instanceof ApiError ? userMessage(e.code, e.message) : "Saving the project failed.";
+          e instanceof ApiError ? userMessage(e.code, e.message) : "Saving the project failed. Check that FacadeKit is running, then make your last change again.";
         set({ saving: false, error: message });
       }
     }

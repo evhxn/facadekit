@@ -25,7 +25,7 @@ export default function PublishPage() {
 
   useEffect(() => {
     if (projectId && useProjectStore.getState().project?.id !== projectId) {
-      load(projectId).catch(() => setLoadError("Could not load the project."));
+      load(projectId).catch(() => setLoadError("Could not load the project. Go back to Projects and open it again."));
     }
   }, [projectId, load]);
 

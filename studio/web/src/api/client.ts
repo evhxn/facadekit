@@ -93,14 +93,14 @@ export function uploadAsset(
         try {
           resolve(JSON.parse(xhr.responseText) as { asset: Asset; project: Project });
         } catch {
-          reject(new ApiError("HTTP_ERROR", "Invalid server response", xhr.status));
+          reject(new ApiError("HTTP_ERROR", "FacadeKit sent an answer it could not read. Reload the page and try again.", xhr.status));
         }
       } else {
         reject(errorFromBody(xhr.status, xhr.responseText));
       }
     };
     xhr.onerror = () => reject(new ApiError("NETWORK", "Network error", 0));
-    xhr.onabort = () => reject(new ApiError("NETWORK", "Upload aborted", 0));
+    xhr.onabort = () => reject(new ApiError("NETWORK", "The upload was stopped. Import the file again.", 0));
     const form = new FormData();
     form.append("file", file);
     xhr.send(form);

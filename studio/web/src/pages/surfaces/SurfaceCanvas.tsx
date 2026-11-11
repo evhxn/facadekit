@@ -671,11 +671,11 @@ export default function SurfaceCanvas(props: Props) {
       : notice
         ? notice
         : selected?.mask && !maskIsSimple(selected.mask)
-          ? "The outline crosses itself"
+          ? "The outline crosses itself. Drag its points apart until the lines no longer cross."
           : adding
             ? `Click the ${CORNER_NAMES[adding.length]} corner (${adding.length + 1} of 4). Esc cancels.`
             : selected && isSelfIntersecting(selected.quad)
-              ? "Corners are crossed"
+              ? "Corners are crossed. Drag them so the four corners go around the shape in order."
               : selected?.mesh && meshMode
                 ? msel && isMeshCorner(selected.mesh, msel)
                   ? "To move the whole corner, edit the surface corners instead."

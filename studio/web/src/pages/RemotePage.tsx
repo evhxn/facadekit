@@ -49,7 +49,7 @@ export default function RemotePage() {
       setLoadError(null);
     } catch (e) {
       if (e instanceof ApiError && e.status === 403) setNeedsPair(true);
-      else setLoadError(e instanceof ApiError ? userMessage(e.code, e.message) : "Load failed.");
+      else setLoadError(e instanceof ApiError ? userMessage(e.code, e.message) : "Could not load the project. Reload this page, or scan the QR code on the computer again.");
     }
   }, [projectId, load]);
 

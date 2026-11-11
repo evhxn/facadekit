@@ -167,7 +167,7 @@ export default function FppPanel({
     } catch (e) {
       if (mounted.current)
         setConnectError(
-          e instanceof ApiError ? userMessage(e.code, e.message) : "The connection failed.",
+          e instanceof ApiError ? userMessage(e.code, e.message) : "The connection failed. Check the address and try Connect again.",
         );
     }
   };
@@ -209,11 +209,11 @@ export default function FppPanel({
         setSent(name);
         await reloadProject();
       } else if (final.state === "failed") {
-        setSendError(failureMessage(final, "Sending to FPP failed."));
+        setSendError(failureMessage(final, "Sending to FPP failed. Check the connection to the Pi, then try again."));
       }
     } catch (e) {
       if (mounted.current)
-        setSendError(e instanceof ApiError ? userMessage(e.code, e.message) : "Sending failed.");
+        setSendError(e instanceof ApiError ? userMessage(e.code, e.message) : "Sending failed. Check the connection to the Pi, then press Send to FPP again.");
     } finally {
       if (mounted.current) setSending(false);
     }
@@ -237,7 +237,7 @@ export default function FppPanel({
       if (rendered.state !== "succeeded") {
         setAlignJob(null);
         if (rendered.state === "failed")
-          setAlignError(failureMessage(rendered, "Rendering the alignment check failed."));
+          setAlignError(failureMessage(rendered, "Rendering the alignment check failed. Try it again."));
         return;
       }
       const rid = typeof rendered.result?.render_id === "string" ? rendered.result.render_id : "";
@@ -251,12 +251,12 @@ export default function FppPanel({
         setAlignDone(true);
         await reloadProject();
       } else if (sentJob.state === "failed") {
-        setAlignError(failureMessage(sentJob, "Sending the alignment check failed."));
+        setAlignError(failureMessage(sentJob, "Sending the alignment check failed. Check the connection to the Pi, then try again."));
       }
     } catch (e) {
       if (mounted.current)
         setAlignError(
-          e instanceof ApiError ? userMessage(e.code, e.message) : "The alignment check failed.",
+          e instanceof ApiError ? userMessage(e.code, e.message) : "The alignment check failed. Try it again.",
         );
     } finally {
       if (mounted.current) setAligning(false);
@@ -286,14 +286,14 @@ export default function FppPanel({
         const rid = typeof final.result?.render_id === "string" ? final.result.render_id : "";
         if (rid && onRendered) await onRendered(rid);
       } else if (final.state === "failed") {
-        setSeqError(failureMessage(final, "Rendering without audio failed."));
+        setSeqError(failureMessage(final, "Rendering without audio failed. Try again."));
       }
     } catch (e) {
       if (mounted.current)
         setSeqError(
           e instanceof ApiError
             ? userMessage(e.code, e.message)
-            : "Rendering without audio failed.",
+            : "Rendering without audio failed. Try again.",
         );
     } finally {
       if (mounted.current) setSeqRendering(false);

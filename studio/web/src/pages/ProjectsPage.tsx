@@ -27,7 +27,7 @@ export default function ProjectsPage() {
     try {
       setProjects(await listProjects());
     } catch (e) {
-      setError(fail(e, "Could not load the projects."));
+      setError(fail(e, "Could not load the projects. Check that FacadeKit is running, then reload this page."));
     }
   }, []);
 
@@ -41,7 +41,7 @@ export default function ProjectsPage() {
       await deleteProject(p.id);
       await refresh();
     } catch (e) {
-      setError(fail(e, "Could not delete the project."));
+      setError(fail(e, "Could not delete the project. Try again."));
     }
   };
 
@@ -49,7 +49,7 @@ export default function ProjectsPage() {
     ev.preventDefault();
     const trimmed = name.trim();
     if (!trimmed) {
-      setError("Please give the project a name.");
+      setError("Type a name for the project, then press New project.");
       return;
     }
     let width: number;
@@ -63,7 +63,7 @@ export default function ProjectsPage() {
       height = h ?? 0;
     }
     if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1) {
-      setError("Enter the projector width and height as whole numbers.");
+      setError("Enter the projector width and height as whole numbers, for example 1920 and 1080.");
       return;
     }
     setBusy(true);
@@ -72,7 +72,7 @@ export default function ProjectsPage() {
       const project = await createProject(trimmed, { width, height, fps: FPS });
       navigate(`/p/${project.id}/setup`);
     } catch (e) {
-      setError(fail(e, "Could not create the project."));
+      setError(fail(e, "Could not create the project. Check that FacadeKit is running, then try again."));
       setBusy(false);
     }
   };

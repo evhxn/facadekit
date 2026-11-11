@@ -118,7 +118,7 @@ export default function StepScan({ project, cameraId, piHost = null }: Props) {
       setJob(final);
       if (final.state !== "succeeded") {
         setPhase("failed");
-        if (final.state === "cancelled") setError("The scan was cancelled.");
+        if (final.state === "cancelled") setError("The scan was cancelled. Press Scan again when you are ready.");
         else if (final.error) setError(userMessage(final.error.code, final.error.message));
         else setError(userMessage("SCAN_FAILED", "The scan did not work."));
         return;
@@ -138,7 +138,7 @@ export default function StepScan({ project, cameraId, piHost = null }: Props) {
       setError(
         e instanceof ApiError
           ? userMessage(e.code, e.message)
-          : "The scan result could not be loaded.",
+          : "The scan result could not be loaded. Press Scan again.",
       );
       setPhase("failed");
     }
