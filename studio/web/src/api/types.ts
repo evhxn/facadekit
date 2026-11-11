@@ -96,6 +96,31 @@ export interface CalibSettings {
   average_frames: number;
   min_conf?: number;
 }
+export interface CameraRoi {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  frame_width: number;
+  frame_height: number;
+  bin: 1 | 2;
+}
+export type CameraVerdict = "good" | "marginal" | "too_coarse";
+export interface CameraCheck {
+  verdict: CameraVerdict;
+  reasons: string[];
+  camera_width: number;
+  camera_height: number;
+  lit_box: CameraRoi | null;
+  suggested_roi: CameraRoi | null;
+  px_per_proj_px: number;
+  proj_px_per_cam_px: number;
+  stripe_modulation: Record<string, number>;
+  snr: number;
+  median_contrast: number;
+  controls: Record<string, boolean>;
+  suggest_1080p: boolean;
+}
 export interface CalibQuality {
   coverage: number;
   planarity: number;

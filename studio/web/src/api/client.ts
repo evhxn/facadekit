@@ -1,6 +1,7 @@
 import type {
   Calibration,
   CalibSettings,
+  CameraRoi,
   CameraInfo,
   FppProbe,
   FppStatus,
@@ -93,14 +94,21 @@ export function uploadAsset(
         try {
           resolve(JSON.parse(xhr.responseText) as { asset: Asset; project: Project });
         } catch {
-          reject(new ApiError("HTTP_ERROR", "FacadeKit sent an answer it could not read. Reload the page and try again.", xhr.status));
+          reject(
+            new ApiError(
+              "HTTP_ERROR",
+              "FacadeKit sent an answer it could not read. Reload the page and try again.",
+              xhr.status,
+            ),
+          );
         }
       } else {
         reject(errorFromBody(xhr.status, xhr.responseText));
       }
     };
     xhr.onerror = () => reject(new ApiError("NETWORK", "Network error", 0));
-    xhr.onabort = () => reject(new ApiError("NETWORK", "The upload was stopped. Import the file again.", 0));
+    xhr.onabort = () =>
+      reject(new ApiError("NETWORK", "The upload was stopped. Import the file again.", 0));
     const form = new FormData();
     form.append("file", file);
     xhr.send(form);
@@ -117,8 +125,20 @@ export const getLearning = () => request<LearningSummary>("GET", "/learning/scan
 export const forgetLearning = () => request<void>("DELETE", "/learning/scans");
 
 export const listCameras = () => request<CameraInfo[]>("GET", "/devices/cameras");
-export const cameraSnapshotUrl = (cid: string) =>
-  `${BASE}/devices/cameras/${enc(cid)}/snapshot.jpg`;
+export const cameraSnapshotUrl = (
+  cid: string,
+  crop?: { x: number; y: number; w: number; h: number },
+) =>
+  `${BASE}/devices/cameras/${enc(cid)}/snapshot.jpg` +
+  (crop
+    ? `?crop=${[crop.x, crop.y, crop.w, crop.h].map((n) => Math.max(0, Math.round(n))).join(",")}`
+    : "");
+/** Start the camera check job; its result is {check: CameraCheck}. */
+export const startCameraCheck = (pid: string, cameraId: string, roi: CameraRoi | null = null) =>
+  request<{ job_id: string }>("POST", `/projects/${enc(pid)}/camera-check`, {
+    camera_id: cameraId,
+    roi,
+  });
 export const setCameraControls = (
   cid: string,
   controls: Record<string, number | string | boolean>,
