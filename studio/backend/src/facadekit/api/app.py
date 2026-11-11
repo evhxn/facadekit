@@ -20,6 +20,7 @@ from facadekit.api import (
     routes_devices,
     routes_fpp,
     routes_jobs,
+    routes_learning,
     routes_projector,
     routes_projects,
     routes_render,
@@ -27,6 +28,7 @@ from facadekit.api import (
 from facadekit.api import ws as ws_module
 from facadekit.api.deps import AppState
 from facadekit.api.routes_devices import CameraManager
+from facadekit.calib.learn import ScanMemory
 from facadekit.config import projects_dir
 from facadekit.errors import BAD_REQUEST, NOT_FOUND, FkError, http_status
 from facadekit.jobs.runner import JobRunner
@@ -75,6 +77,7 @@ def create_app(
         sim=sim,
         sim_scene=sim_scene,
         sim_display=sim_display,
+        scan_memory=ScanMemory(root.parent / "learning" / "scans.jsonl"),
     )
 
     @asynccontextmanager
@@ -127,6 +130,7 @@ def create_app(
     api.include_router(routes_assets.router)
     api.include_router(routes_devices.router)
     api.include_router(routes_calibration.router)
+    api.include_router(routes_learning.router)
     api.include_router(routes_jobs.router)
     api.include_router(routes_render.router)
     api.include_router(routes_fpp.router)

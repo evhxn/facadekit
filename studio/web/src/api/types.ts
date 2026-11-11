@@ -94,6 +94,7 @@ export interface CalibSettings {
   settle_ms: number;
   discard_frames: number;
   average_frames: number;
+  min_conf?: number;
 }
 export interface CalibQuality {
   coverage: number;
@@ -114,6 +115,8 @@ export interface Calibration {
   quality: CalibQuality | null;
   h_c2p: number[][] | null;
   warnings: string[];
+  /** Scan strategy picked by scan memory; null or missing when the caller fixed the settings. */
+  strategy?: string | null;
 }
 export type JobState = "queued" | "running" | "succeeded" | "failed" | "cancelled";
 export interface Job {

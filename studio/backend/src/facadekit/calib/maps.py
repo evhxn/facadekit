@@ -25,9 +25,17 @@ class ProjectorMaps:
     planarity: float  # RANSAC inlier fraction of h_c2p (0 if h_c2p is None)
 
 
-def build_maps(decoded: DecodeResult, spec: PatternSpec, grid_step: int = 8) -> ProjectorMaps:
-    if grid_step % (1 << spec.skip_lsb) != 0:
-        raise ValueError(f"grid_step {grid_step} must be a multiple of {1 << spec.skip_lsb}")
+def build_maps(
+    decoded: DecodeResult, spec: PatternSpec, grid_step: int | None = None
+) -> ProjectorMaps:
+    # Decoded positions are the centres of blocks of 2**skip_lsb projector pixels. The grid
+    # must be at least two blocks wide: at exactly one block every centre falls halfway
+    # between two nodes and rounding leaves three nodes in four empty.
+    block = 1 << spec.skip_lsb
+    if grid_step is None:
+        grid_step = max(8, 2 * block)
+    if grid_step % (2 * block) != 0:
+        raise ValueError(f"grid_step {grid_step} must be a multiple of {2 * block}")
     w_px, h_px = spec.width, spec.height
     g = grid_step
     vs, us = np.nonzero(decoded.valid)

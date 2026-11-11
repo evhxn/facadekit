@@ -12,6 +12,7 @@ class CalibSettings(BaseModel):
     settle_ms: int = 300
     discard_frames: int = 5
     average_frames: int = 3
+    min_conf: float = Field(default=0.10, gt=0.0, lt=1.0)  # decode confidence threshold
 
 
 class CalibQuality(BaseModel):
@@ -38,3 +39,4 @@ class Calibration(BaseModel):
     quality: CalibQuality | None
     h_c2p: list[list[float]] | None
     warnings: list[str] = Field(default_factory=list)
+    strategy: str | None = None  # scan strategy chosen by scan memory (calib/learn.py)

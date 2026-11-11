@@ -135,3 +135,51 @@ def test_snapshot_busy_while_acquired(sim_client: TestClient) -> None:
     finally:
         cameras.release("sim")
     assert sim_client.get(f"{API}/devices/cameras/sim/snapshot.jpg").status_code == 200
+
+
+def test_scan_memory_routes(sim_client: TestClient, tmp_path: Path) -> None:
+    pid = _project(sim_client)["id"]
+    summary = sim_client.get(f"{API}/learning/scans").json()
+    assert summary["enabled"] is True and summary["scans"] == 0
+    assert [s["id"] for s in summary["strategies"]][0] == "standard"
+
+    # No strategy field given: scan memory chooses and logs the scan.
+    body = {"mode": "scan", "camera_id": "sim", "settings": {"discard_frames": 0}}
+    job = _wait(
+        sim_client,
+        sim_client.post(f"{API}/projects/{pid}/calibrations", json=body).json()["job_id"],
+    )
+    assert job["state"] == "succeeded", job
+    cid = job["result"]["calibration_id"]
+    cal = sim_client.get(f"{API}/projects/{pid}/calibrations/{cid}").json()
+    assert cal["strategy"] == "standard"
+    assert (tmp_path / "learning" / "scans.jsonl").is_file()
+    assert sim_client.get(f"{API}/learning/scans").json()["scans"] == 1
+
+    url = f"{API}/projects/{pid}/calibrations/{cid}/feedback"
+    assert sim_client.post(url, json={"verdict": "bad"}).json() == {"recorded": True}
+    standard = sim_client.get(f"{API}/learning/scans").json()["strategies"][0]
+    assert (standard["tries"], standard["mistakes"], standard["mean_reward"]) == (1, 1, 0.0)
+    assert sim_client.post(url, json={"verdict": "meh"}).status_code == 422
+    missing = f"{API}/projects/{pid}/calibrations/cal_ffffffff/feedback"
+    assert sim_client.post(missing, json={"verdict": "good"}).status_code == 404
+
+    # A caller that fixes a strategy field, or says learn=false, is left alone and not logged.
+    for extra in ({"settings": FAST}, {"settings": {"discard_frames": 0}, "learn": False}):
+        body = {"mode": "scan", "camera_id": "sim", **extra}
+        job = _wait(
+            sim_client,
+            sim_client.post(f"{API}/projects/{pid}/calibrations", json=body).json()["job_id"],
+        )
+        assert job["state"] == "succeeded", job
+        other = job["result"]["calibration_id"]
+        assert (
+            sim_client.get(f"{API}/projects/{pid}/calibrations/{other}").json()["strategy"] is None
+        )
+        assert sim_client.post(
+            f"{API}/projects/{pid}/calibrations/{other}/feedback", json={"verdict": "good"}
+        ).json() == {"recorded": False}
+    assert sim_client.get(f"{API}/learning/scans").json()["scans"] == 1
+
+    assert sim_client.delete(f"{API}/learning/scans").status_code == 204
+    assert sim_client.get(f"{API}/learning/scans").json()["scans"] == 0

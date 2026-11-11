@@ -20,6 +20,7 @@ vi.mock("../api/client", async (orig) => ({
   setCameraControls: vi.fn(),
   startCalibration: vi.fn(),
   getCalibration: vi.fn(),
+  sendScanFeedback: vi.fn(() => Promise.resolve({ recorded: true })),
   projViewUrl: vi.fn(() => "/projview.png"),
   measuredMaskUrl: vi.fn(() => "/mask.png"),
   cancelJob: vi.fn(),
@@ -245,6 +246,23 @@ describe("Step 3 - scan", () => {
     expect(screen.getByAltText("Projector view of the house").getAttribute("src")).toBe(
       "/projview.png",
     );
+  });
+
+  it("sends scan feedback and names a learned strategy", async () => {
+    m.startCalibration.mockResolvedValue({ job_id: "j1" });
+    ev.waitForJob.mockResolvedValue(job({}));
+    m.getProject.mockResolvedValue({ ...project, calibration_id: "c1" });
+    m.getCalibration.mockResolvedValue({ ...calibration(), strategy: "soft_focus" });
+    renderScan();
+    fireEvent.click(screen.getByRole("button", { name: "Start scan" }));
+    expect(await screen.findByText(/used wider stripes for a soft/)).toBeTruthy();
+    const cid = calibration().id;
+    fireEvent.click(screen.getByRole("button", { name: "Picture looks wrong, try another way" }));
+    expect(m.sendScanFeedback).toHaveBeenCalledWith("p1", cid, "bad");
+    expect(m.startCalibration).toHaveBeenCalledTimes(2);
+    expect(await screen.findByText(/used wider stripes for a soft/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Continue to surfaces" }));
+    expect(m.sendScanFeedback).toHaveBeenLastCalledWith("p1", cid, "good");
   });
 
   it("explains red areas for LOW_COVERAGE", async () => {

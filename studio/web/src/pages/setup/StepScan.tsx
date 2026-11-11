@@ -6,6 +6,7 @@ import {
   getCalibration,
   measuredMaskUrl,
   projViewUrl,
+  sendScanFeedback,
   startCalibration,
 } from "../../api/client";
 import { userMessage } from "../../api/errors";
@@ -59,6 +60,13 @@ function TintedView({ photoUrl, maskUrl }: { photoUrl: string; maskUrl?: string 
     </div>
   );
 }
+
+/** Plain-language names for the strategies scan memory can pick (backend calib/learn.py). */
+const STRATEGY_NOTES: Record<string, string> = {
+  low_light: "extra exposures for a faint picture",
+  soft_focus: "wider stripes for a soft or out-of-focus picture",
+  low_light_soft: "wider stripes and extra exposures",
+};
 
 type Phase = "idle" | "running" | "failed" | "done";
 
@@ -143,6 +151,10 @@ export default function StepScan({ project, cameraId, piHost = null }: Props) {
     const warnings = calibration.warnings;
     const low = warnings.includes("LOW_COVERAGE");
     const coverage = calibration.quality ? Math.round(calibration.quality.coverage * 100) : null;
+    const strategyNote = calibration.strategy ? STRATEGY_NOTES[calibration.strategy] : undefined;
+    // Feedback is best effort: the wizard works the same when it cannot be stored.
+    const feedback = (verdict: "good" | "bad") =>
+      void sendScanFeedback(pid, calibration.id, verdict).catch(() => {});
     return (
       <section>
         <TintedView
@@ -150,6 +162,11 @@ export default function StepScan({ project, cameraId, piHost = null }: Props) {
           maskUrl={low ? measuredMaskUrl(pid, calibration.id) : undefined}
         />
         {coverage !== null ? <p>Measured {coverage}% of the projection.</p> : null}
+        {strategyNote ? (
+          <p className={styles.note}>
+            Earlier scans with this camera had trouble, so this one used {strategyNote}.
+          </p>
+        ) : null}
         {low ? (
           <p>The camera could not see the red areas. Surfaces there may need manual alignment.</p>
         ) : null}
@@ -162,13 +179,32 @@ export default function StepScan({ project, cameraId, piHost = null }: Props) {
           </p>
         ) : null}
         <div className={styles.row}>
-          <button type="button" onClick={() => navigate(`/p/${pid}/surfaces`)} className="primary">
+          <button
+            type="button"
+            onClick={() => {
+              feedback("good");
+              navigate(`/p/${pid}/surfaces`);
+            }}
+            className="primary"
+          >
             Continue to surfaces
           </button>
           <button type="button" onClick={() => void run("scan")}>
             Scan again
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              feedback("bad");
+              void run("scan");
+            }}
+          >
+            Picture looks wrong, try another way
+          </button>
         </div>
+        <p className={styles.note}>
+          FacadeKit remembers which scans worked on this computer and adapts the next one.
+        </p>
       </section>
     );
   }

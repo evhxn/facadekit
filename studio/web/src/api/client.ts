@@ -149,6 +149,13 @@ export const startCalibration = (
     settings?: CalibSettings;
   },
 ) => request<{ job_id: string }>("POST", `/projects/${enc(pid)}/calibrations`, body);
+/** Tell scan memory whether a finished scan looked right; it steers the next scan. */
+export const sendScanFeedback = (pid: string, cid: string, verdict: "good" | "bad") =>
+  request<{ recorded: boolean }>(
+    "POST",
+    `/projects/${enc(pid)}/calibrations/${enc(cid)}/feedback`,
+    { verdict },
+  );
 export const getCalibration = (pid: string, cid: string) =>
   request<Calibration>("GET", `/projects/${enc(pid)}/calibrations/${enc(cid)}`);
 export const projViewUrl = (pid: string, cid: string) =>

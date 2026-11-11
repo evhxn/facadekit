@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict
 
 from facadekit.api.deps import AppState, get_state
+from facadekit.calib.learn import ScanAdvisor, learning_enabled
 from facadekit.calib.patterns import PatternSpec, pattern_sequence
 from facadekit.calib.pipeline import (
     create_manual_calibration,
@@ -59,6 +60,19 @@ class CalibrationRequest(BaseModel):
     camera_id: str | None = None
     host: str | None = None
     settings: CalibSettings | None = None
+    learn: bool = True  # let scan memory pick the strategy (mode "scan" only)
+
+
+_STRATEGY_FIELDS = {"skip_lsb", "average_frames", "min_conf"}
+
+
+def _advisor(state: AppState, body: CalibrationRequest) -> ScanAdvisor | None:
+    """Scan memory picks the strategy unless the caller fixed one of its fields."""
+    if not body.learn or state.scan_memory is None or not learning_enabled():
+        return None
+    if body.settings is not None and body.settings.model_fields_set & _STRATEGY_FIELDS:
+        return None
+    return ScanAdvisor(state.scan_memory)
 
 
 def _check_resolution(display_size: tuple[int, int], project_size: tuple[int, int]) -> None:
@@ -119,6 +133,7 @@ def start_calibration(pid: str, body: CalibrationRequest, state: State) -> dict[
         display = WsDisplay(state.projector)
     _check_resolution(display.size, project_size)
     sleep: Callable[[float], None] = (lambda _s: None) if state.sim else time.sleep
+    advisor = _advisor(state, body)
 
     def scan_job(progress: Progress, cancel: Cancel) -> dict[str, Any]:
         camera = state.cameras.acquire(camera_id)
@@ -132,6 +147,7 @@ def start_calibration(pid: str, body: CalibrationRequest, state: State) -> dict[
                 progress=progress,
                 cancel=cancel,
                 sleep=sleep,
+                advisor=advisor,
             )
         finally:
             state.cameras.release(camera_id)

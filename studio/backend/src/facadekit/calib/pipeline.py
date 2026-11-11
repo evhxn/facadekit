@@ -12,6 +12,7 @@ import numpy as np
 
 from facadekit.calib.capture import CaptureSet, precheck, run_capture
 from facadekit.calib.decode import decode
+from facadekit.calib.learn import ScanAdvisor, Strategy
 from facadekit.calib.maps import build_maps, make_proj_view
 from facadekit.calib.patterns import PatternSpec
 from facadekit.calib.tuning import measure_latency
@@ -70,7 +71,14 @@ def run_calibration(
     cancel: Cancel | None = None,
     sleep: Callable[[float], None] = time.sleep,
     clock: Callable[[], float] = time.monotonic,
+    advisor: ScanAdvisor | None = None,
 ) -> Calibration:
+    """Scan and write a calibration.
+
+    With an `advisor`, the scan strategy (skip_lsb, average_frames, min_conf) is chosen from
+    earlier scans once the lighting has been measured, and the outcome is reported back.
+    """
+
     def report(fraction: float, message: str) -> None:
         if progress is not None:
             progress(fraction, message)
@@ -95,15 +103,35 @@ def run_calibration(
         pre = precheck(display, camera, spec, settings=tuned, sleep=sleep)
         report(0.05, "Checking setup")
         _check_cancel(cancel)
+        strategy: Strategy | None = None
+        if advisor is not None:
+            strategy = advisor.choose(camera_id, pre)
+            settings = strategy.apply(settings)
+            spec = PatternSpec(*display.size, skip_lsb=settings.skip_lsb)
         capture = run_capture(
             display, camera, spec, settings, progress=capture_progress, cancel=cancel, sleep=sleep
         )
     finally:
         camera.close()
 
-    return run_calibration_from_capture(
-        project_dir, capture, camera_id, settings, progress=progress, cancel=cancel, pre=pre
-    )
+    try:
+        cal = run_calibration_from_capture(
+            project_dir,
+            capture,
+            camera_id,
+            settings,
+            progress=progress,
+            cancel=cancel,
+            pre=pre,
+            strategy=strategy.id if strategy is not None else None,
+        )
+    except FkError as exc:
+        if advisor is not None and strategy is not None and exc.code == "SCAN_FAILED":
+            advisor.failed(camera_id, pre, strategy, exc.code)
+        raise
+    if advisor is not None and strategy is not None:
+        advisor.succeeded(camera_id, pre, strategy, cal)
+    return cal
 
 
 def _contrast_stats(capture: CaptureSet) -> dict[str, float]:
@@ -124,6 +152,7 @@ def run_calibration_from_capture(
     progress: Progress | None = None,
     cancel: Cancel | None = None,
     pre: dict[str, float] | None = None,
+    strategy: str | None = None,
 ) -> Calibration:
     """Decode a finished capture, build the maps and write the calibration files."""
     spec = capture.spec
@@ -143,7 +172,7 @@ def run_calibration_from_capture(
 
     _check_cancel(cancel)
     report(0.80, "Decoding")
-    decoded = decode(capture)
+    decoded = decode(capture, min_conf=settings.min_conf)
     _check_cancel(cancel)
     report(0.90, "Building map")
     maps = build_maps(decoded, spec)
@@ -179,6 +208,7 @@ def run_calibration_from_capture(
         ),
         h_c2p=maps.h_c2p.tolist() if maps.h_c2p is not None else None,
         warnings=warnings,
+        strategy=strategy,
     )
     report(0.97, "Saving")
     _commit(
