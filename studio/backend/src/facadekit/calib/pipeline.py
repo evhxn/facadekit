@@ -27,8 +27,10 @@ from facadekit.calib.quality import (
     px_per_proj_px_from_h,
     verdict,
 )
+from facadekit.calib.roi import crop_too_tight, maps_to_full
 from facadekit.calib.tuning import measure_latency
 from facadekit.devices.base import Camera, ProjectorDisplay
+from facadekit.devices.cropped import CroppedCamera
 from facadekit.errors import FkError
 from facadekit.ids import new_id
 from facadekit.models.calibration import CalibQuality, Calibration, CalibSettings
@@ -99,6 +101,8 @@ def run_calibration(
         report(0.05 + 0.75 * fraction, message)
 
     spec = PatternSpec(*display.size, skip_lsb=settings.skip_lsb)
+    if settings.roi is not None:  # tuning, exposure, precheck and capture all see the crop
+        camera = CroppedCamera(camera, settings.roi)
     camera.open()
     try:
         tuned: CalibSettings | None = None
@@ -112,7 +116,14 @@ def run_calibration(
         else:
             report(0.0, "Checking setup")
         _check_cancel(cancel)
-        pre = precheck(display, camera, spec, settings=tuned, sleep=sleep)
+        pre = precheck(
+            display,
+            camera,
+            spec,
+            settings=tuned,
+            sleep=sleep,
+            crop_check=settings.roi is not None,
+        )
         report(0.05, "Checking setup")
         _check_cancel(cancel)
         strategy: Strategy | None = None
@@ -146,13 +157,16 @@ def run_calibration(
     return cal
 
 
-def _contrast_stats(capture: CaptureSet) -> dict[str, float]:
+def _contrast_stats(capture: CaptureSet, crop_check: bool = False) -> dict[str, float]:
     """Quality numbers from the black (first) and white (second) pattern images."""
     contrast = capture.images[1] - capture.images[0]
     blob = lit_blob(contrast)
     if blob is None or not projection_found(blob):
         raise no_projection_error()
-    return lit_stats(contrast, capture.images[1], blob, capture.spec.width, capture.spec.height)
+    stats = lit_stats(contrast, capture.images[1], blob, capture.spec.width, capture.spec.height)
+    if crop_check:
+        stats["crop_tight"] = 1.0 if crop_too_tight(blob.mask) else 0.0
+    return stats
 
 
 def run_calibration_from_capture(
@@ -175,7 +189,7 @@ def run_calibration_from_capture(
     and are not reported.
     """
     if pre is None:  # a recorded (Pi-driven) capture had no separate precheck
-        pre = _contrast_stats(capture)
+        pre = _contrast_stats(capture, crop_check=settings.roi is not None)
     used = get_strategy(strategy) if advisor is not None and strategy is not None else None
     try:
         cal = _decode_capture(
@@ -202,6 +216,11 @@ def _decode_capture(
 ) -> Calibration:
     spec = capture.spec
     camera_h, camera_w = capture.images.shape[1:]
+    roi = settings.roi
+    if roi is not None:
+        if (camera_h, camera_w) != (roi.h // roi.bin, roi.w // roi.bin):
+            raise FkError("INTERNAL", "The capture does not match the crop.")
+        camera_w, camera_h = roi.frame_width, roi.frame_height
 
     def report(fraction: float, message: str) -> None:
         if progress is not None:
@@ -217,7 +236,9 @@ def _decode_capture(
         pct = round(maps.coverage * 100)
         raise FkError("SCAN_FAILED", f"Only {pct}% of the projection was measured.")
     _check_cancel(cancel)
-    proj_view = make_proj_view(capture.white_bgr, maps)
+    proj_view = make_proj_view(capture.white_bgr, maps)  # crop photo with crop-coordinate maps
+    if roi is not None:
+        maps = maps_to_full(maps, roi)
 
     warnings: list[str] = []
     if maps.coverage < 0.85:
@@ -226,12 +247,17 @@ def _decode_capture(
         warnings.append("NON_PLANAR")
     if capture.controls_applied.get("auto_exposure") is False:
         warnings.append("CAMERA_CONTROLS_UNAVAILABLE")
+    if roi is not None and pre.get("crop_tight") == 1.0:
+        warnings.append("CROP_TOO_TIGHT")
 
     if maps.h_c2p is not None:
         scale: float | None = px_per_proj_px_from_h(maps.h_c2p, spec.width, spec.height)
     else:
         scale = pre.get("px_per_proj_px")
     snr = pre.get("snr")
+    lit_fraction = pre["lit_fraction"]
+    if roi is not None:  # relative to the whole camera picture, not the crop
+        lit_fraction = pre["lit_px"] * roi.bin**2 / (roi.frame_width * roi.frame_height)
     quality_verdict = (
         verdict(scale, snr if snr is not None else float("inf"))[0] if scale is not None else None
     )
@@ -250,7 +276,7 @@ def _decode_capture(
             coverage=maps.coverage,
             planarity=maps.planarity,
             median_contrast=pre["median_contrast"],
-            lit_fraction=pre["lit_fraction"],
+            lit_fraction=lit_fraction,
             px_per_proj_px=scale,
             snr=snr,
             verdict=quality_verdict,

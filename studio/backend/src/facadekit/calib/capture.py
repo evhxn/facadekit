@@ -16,6 +16,7 @@ from facadekit.calib.quality import (
     projection_found,
     px_per_proj_px,
 )
+from facadekit.calib.roi import crop_too_tight
 from facadekit.calib.tuning import auto_exposure
 from facadekit.devices.base import Camera, ProjectorDisplay
 from facadekit.errors import FkError
@@ -87,6 +88,7 @@ def precheck(
     *,
     settings: CalibSettings | None = None,
     sleep: Callable[[float], None] = time.sleep,
+    crop_check: bool = False,
 ) -> dict[str, float]:
     w, h = display.size
     if (w, h) != (spec.width, spec.height):
@@ -106,6 +108,8 @@ def precheck(
     if blob is None or not projection_found(blob):
         raise no_projection_error()
     stats = lit_stats(contrast, white, blob, spec.width, spec.height)
+    if crop_check:  # cropped scan: is the crop cutting into the lit area?
+        stats["crop_tight"] = 1.0 if crop_too_tight(blob.mask) else 0.0
     median_contrast = stats["median_contrast"]
     if median_contrast < 20:
         raise FkError(
