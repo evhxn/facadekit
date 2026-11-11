@@ -14,6 +14,7 @@ import { waitForJob } from "../../api/events";
 import type { CalibSettings, Calibration, Job, Project } from "../../api/types";
 import ErrorBanner from "../../components/ErrorBanner";
 import JobProgress from "../../components/JobProgress";
+import LearningPanel from "./LearningPanel";
 import { useProjectStore } from "../../state/projectStore";
 import styles from "../SetupPage.module.css";
 
@@ -229,35 +230,38 @@ export default function StepScan({ project, cameraId, piHost = null }: Props) {
               The projector will show stripes while the camera watches. This takes a few minutes.
             </p>
           )}
-          <details hidden={piHost !== null}>
+          <details>
             <summary>Advanced</summary>
-            <p className={styles.note}>
-              By default the scan measures how long the camera takes to see the projector and
-              chooses exposure automatically.
-            </p>
-            <label>
-              <input
-                type="checkbox"
-                checked={fixedWait}
-                onChange={(e) => setFixedWait(e.target.checked)}
-              />{" "}
-              Use a fixed wait instead
-            </label>
-            {fixedWait ? (
+            <div hidden={piHost !== null}>
+              <p className={styles.note}>
+                By default the scan measures how long the camera takes to see the projector and
+                chooses exposure automatically.
+              </p>
               <label>
-                {" "}
                 <input
-                  type="number"
-                  min={300}
-                  max={1500}
-                  step={50}
-                  value={waitMs}
-                  onChange={(e) => setWaitMs(Number(e.target.value))}
-                  aria-label="Wait after each image (ms)"
+                  type="checkbox"
+                  checked={fixedWait}
+                  onChange={(e) => setFixedWait(e.target.checked)}
                 />{" "}
-                ms
+                Use a fixed wait instead
               </label>
-            ) : null}
+              {fixedWait ? (
+                <label>
+                  {" "}
+                  <input
+                    type="number"
+                    min={300}
+                    max={1500}
+                    step={50}
+                    value={waitMs}
+                    onChange={(e) => setWaitMs(Number(e.target.value))}
+                    aria-label="Wait after each image (ms)"
+                  />{" "}
+                  ms
+                </label>
+              ) : null}
+            </div>
+            <LearningPanel />
           </details>
           {phase === "failed" && error ? (
             <ErrorBanner

@@ -185,3 +185,17 @@ export function newId(prefix: string): string {
   for (const b of bytes) hex += b.toString(16).padStart(2, "0");
   return `${prefix}_${hex}`;
 }
+
+export interface LearningStrategy {
+  id: string;
+  label: string;
+  tries: number;
+  mistakes: number;
+  mean_reward: number;
+}
+
+export interface LearningSummary {
+  enabled: boolean;
+  scans: number;
+  strategies: LearningStrategy[];
+}

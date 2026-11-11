@@ -6,6 +6,7 @@ import type {
   FppStatus,
   Health,
   Job,
+  LearningSummary,
   Project,
   ProjectorSpec,
   Pt,
@@ -111,6 +112,9 @@ export const assetThumbUrl = (pid: string, aid: string) =>
   `${BASE}/projects/${enc(pid)}/assets/${enc(aid)}/thumb`;
 export const deleteAsset = (pid: string, aid: string) =>
   request<Project>("DELETE", `/projects/${enc(pid)}/assets/${enc(aid)}`);
+
+export const getLearning = () => request<LearningSummary>("GET", "/learning/scans");
+export const forgetLearning = () => request<void>("DELETE", "/learning/scans");
 
 export const listCameras = () => request<CameraInfo[]>("GET", "/devices/cameras");
 export const cameraSnapshotUrl = (cid: string) =>
