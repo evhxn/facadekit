@@ -99,5 +99,11 @@ def client(tmp_path: Path) -> Iterator[TestClient]:
     """TestClient around create_app(data_dir=tmp_path), used as a context manager."""
     from facadekit.api.app import create_app
 
-    with TestClient(create_app(data_dir=tmp_path)) as test_client:
+    with TestClient(create_app(data_dir=tmp_path, testing=True)) as test_client:
         yield test_client
+
+
+@pytest.fixture(autouse=True)
+def _allow_testserver_host(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Apps built directly with create_app(...) must accept the TestClient's Host header."""
+    monkeypatch.setenv("FACADEKIT_ALLOWED_HOSTS", "testserver")

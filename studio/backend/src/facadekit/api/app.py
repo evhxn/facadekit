@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Res
 
 from facadekit import __version__
 from facadekit.api import (
+    origin_guard,
     remote_auth,
     routes_ai,
     routes_assets,
@@ -50,6 +51,7 @@ def create_app(
     lan: bool = False,
     pairing_code: str | None = None,
     client_addr_override: Callable[[], str] | None = None,
+    testing: bool = False,
 ) -> FastAPI:
     root = data_dir / "projects" if data_dir is not None else projects_dir()
     events = ws_module.EventHub()
@@ -95,6 +97,8 @@ def create_app(
         on_pair=lambda host: print(f"Device paired: {host}", flush=True),
     )
     app.add_middleware(remote_auth.RemoteAccessMiddleware, auth=app.state.remote)
+    guard_hosts = origin_guard.allowed_hostnames(lan=lan, extra=("testserver",) if testing else ())
+    app.add_middleware(origin_guard.OriginGuardMiddleware, hostnames=guard_hosts)
 
     @app.exception_handler(FkError)
     async def _fk_error(_request: Request, exc: Exception) -> JSONResponse:
