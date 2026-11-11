@@ -8,6 +8,7 @@ import pytest
 from facadekit.errors import FkError
 from facadekit.media.ffmpeg import ffmpeg_info
 from facadekit.media.probe import probe
+from facadekit.media.reader import VideoReader
 from facadekit.render.encoder import Encoder
 from facadekit.render.presets import PRESETS, get_preset, output_size
 
@@ -103,3 +104,41 @@ def test_abort_removes_output(tmp_path: Path) -> None:
     _frames(enc, 5)
     enc.abort()
     assert not out.exists()
+
+
+def _encode_solid(out: Path, bgr: tuple[int, int, int]) -> np.ndarray:
+    enc = Encoder(
+        out, width=64, height=64, fps=30, preset=get_preset("pi3-1080p30"),
+        audio_path=None, duration_ms=340,
+    )  # fmt: skip
+    frame = np.full((64, 64, 3), bgr, dtype=np.uint8)
+    for _ in range(10):
+        enc.write(frame)
+    enc.close()
+    with VideoReader(out, fps=30, width=64, height=64) as reader:
+        decoded = None
+        for i in range(6):
+            got = reader.read()
+            assert got is not None, f"video ended before frame {i}"
+            decoded = got
+    assert decoded is not None
+    return decoded
+
+
+def test_output_tagged_bt709(tmp_path: Path) -> None:
+    out = tmp_path / "g.mp4"
+    _encode_solid(out, (0, 0, 255))
+    info = ffmpeg_info(out)
+    assert "bt709" in info
+
+
+@pytest.mark.parametrize(
+    ("bgr", "tol"),
+    [((0, 0, 255), 12), ((0, 255, 0), 12), ((128, 128, 128), 6)],
+    ids=["red", "green", "gray"],
+)
+def test_colour_round_trip(tmp_path: Path, bgr: tuple[int, int, int], tol: int) -> None:
+    decoded = _encode_solid(tmp_path / "h.mp4", bgr)
+    centre = decoded[32, 32].astype(int)
+    for got, want in zip(centre, bgr, strict=True):
+        assert abs(int(got) - want) <= tol, f"centre {centre.tolist()} vs {list(bgr)}"
