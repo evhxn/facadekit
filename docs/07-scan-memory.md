@@ -22,6 +22,7 @@ With an empty log the wizard behaves exactly as before: the "standard" strategy 
 | `low_light` | 2 | 6 | 0.06 | Faint or noisy picture | (2, 1) |
 | `soft_focus` | 3 | 3 | 0.10 | Camera or projector out of focus: 8 px blocks instead of 4 px | (2, 1) |
 | `low_light_soft` | 3 | 6 | 0.06 | Both | (1.5, 1) |
+| `very_soft` | 4 | 3 | 0.10 | Badly out of focus: 16 px blocks | (1.5, 1) |
 
 `CalibSettings.min_conf` is new (default 0.10, the value `decode` always used). `Calibration.strategy` records which strategy was used (`null` when scan memory was not involved).
 
@@ -36,9 +37,11 @@ Evidence from other contexts counts less: same lighting but another camera ×0.5
 - Failed scan (`SCAN_FAILED`) or user verdict "bad": 0, and it counts double (`MISTAKE_WEIGHT = 2`).
 - Otherwise `clip((coverage − 0.5) / 0.45, 0, 1) − 0.01 × (average_frames − 1)`, plus 0.1 when the user confirmed it.
 
+A failed scan also counts against the strategies with the same or finer blocks (`skip_lsb` ≤ the failed one) at `SIBLING_SHARE = 0.5` of its weight: stripes the camera cannot resolve stay unresolved with more frames or a lower threshold. Not applied in the `low` lighting bucket, where noise is the likelier cause and averaging helps.
+
 Each record adds `weight × reward` to `a` and `weight × (1 − reward)` to `b` of its strategy. The policy picks the highest `a / (a + b)`; ties go to the earlier row of the table. There is no random exploration: the optimistic priors make each untried strategy get its turn after failures, and the same history always gives the same choice.
 
-Worked example, out-of-focus camera (simulator, `SimScene(blur_sigma=4.0)`; this is the test `test_out_of_focus_camera_is_learned`): `standard` fails, `low_light` fails, `soft_focus` measures 71 %, and after one more mediocre result `low_light_soft` is tried and measures 99 %.
+Worked example, out-of-focus camera (simulator, `SimScene(blur_sigma=4.0)`; test `test_out_of_focus_camera_is_learned`): `standard` fails, then `soft_focus` is tried and works.
 
 Not logged: cancelled scans, and failures before a strategy is chosen (`TOO_BRIGHT`, `CAMERA_NO_PROJECTION`, wrong resolution, camera errors). Those are not the strategy's fault.
 
@@ -78,6 +81,26 @@ run_calibration(..., advisor: ScanAdvisor | None = None)
 | `DELETE /api/v1/learning/scans` | Forget everything (204) |
 
 Storage: `<data dir>/learning/scans.jsonl`, one JSON object per line, trimmed to the newest 500 on rewrite. Nothing is uploaded.
+
+## Tuning results (2026-11-11)
+
+Harness: `studio/backend/src/facadekit/sim/learn_eval.py` (`uv run python -m facadekit.sim.learn_eval --n 18 --cache <file>`). It builds 18 synthetic scenes (blur 0.5-5 px, noise 1-12, ambient 0.02-0.3, gain 0.35-1, gamma 1.8-2.6, door position shifted), scans each with every strategy, then replays the real policy 8 times per scene on the stored outcomes. Scenes with `seed % 3 == 0` (6) are held out and were not looked at while choosing changes; the other 12 are tuning scenes. Regret = reward of the best strategy minus the reward of the one chosen, summed over 8 scans of the same camera, averaged over scenes. "Gap" = same measure on the 8th scan.
+
+| | Before (4 strategies) | After |
+|---|---|---|
+| Tuning regret | 0.783 | 0.490 |
+| Held-out regret | 1.318 | 1.143 |
+| Held-out final-scan gap | 0.021 | 0.000 |
+| First scan ok (tuning / held-out) | 7/12, 1/6 | unchanged (needs a blur estimate before the scan) |
+| Easy scenes (blur ≤ 1.5): strategy | `standard` | `standard`, unchanged |
+
+Corner error (map vs ground truth, px) for scenes `standard` can scan stays 0.3-1.1 px. Sim e2e: 1.40 px before and after (limit 1.5).
+
+Kept: (1) failure sharing to same-or-finer strategies, which removes the wasted `low_light` scan for blurred cameras (the two wasted scans became one); (2) `very_soft` (skip_lsb 4): blur 5 px scenes had only a 58-66 % coverage option, now 100 % at 1-1.3 px.
+
+Tried and rejected: `min_conf` 0.3 or 0.5 (every scan fails: confidence of blurred stripes is low); `skip_lsb=2, min_conf=0.3` (same); sharing failures without the same-or-finer rule (standard got retried a third time); very_soft prior 1.2 (standard was retried before it).
+
+Not solved: coverage is 100 % even when the corner error is 9-18 px (scenes 1005, 1007, 1008 with `soft_focus`), so the reward cannot see that kind of inaccuracy; only the user's "looks wrong" does. Dim scenes where only more averaging helps did not occur in the synthetic set, so the `low` bucket exemption is untested against real data.
 
 ## Bug fixed on the way
 
