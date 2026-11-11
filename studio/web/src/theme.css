@@ -148,6 +148,14 @@ input[type="radio"] {
   accent-color: var(--accent);
   vertical-align: middle;
 }
+/* A checkbox plus its label text is one tap target, at least --target tall. */
+label:has(> input[type="checkbox"]),
+label:has(> input[type="radio"]) {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--target);
+}
 input[type="range"] {
   accent-color: var(--accent);
   min-height: var(--target);

@@ -205,7 +205,7 @@ export function useMagicSelect(magic: MagicProps | undefined): MagicState {
 /** Toolbar controls for the Magic select tool. */
 export function MagicControls({ ms }: { ms: MagicState }) {
   // Shown only once we know MobileSAM is unavailable; no failure wording.
-  const simpleOnly = ms.mobileSam === false && <span>Simple selector</span>;
+  const simpleOnly = ms.mobileSam === false && <span title="Smart selection is not available, so a simpler tool picks the object.">Simple selector</span>;
   if (!ms.active) {
     return (
       <>

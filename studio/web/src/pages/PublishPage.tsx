@@ -69,7 +69,7 @@ export default function PublishPage() {
         onRendered={(rid) => refresh(rid)}
       />
       <nav className={styles.nav}>
-        <Link to={`/p/${project.id}/arrange`}>Back</Link>
+        <Link to={`/p/${project.id}/arrange`} className={styles.back}>Back</Link>
       </nav>
     </div>
   );
