@@ -230,6 +230,16 @@ class ScanAdvisor:
     def choose(self, camera_id: str, pre: dict[str, float]) -> Strategy:
         return choose(self.memory.records(), camera_id, contrast_bucket(pre["median_contrast"]))
 
+    def remembered_strategy(self, camera_id: str) -> Strategy | None:
+        """For Pi-driven scans, which render the pattern video before the lighting is measured:
+        the best strategy for the lighting bucket of the newest scan with this camera. None when
+        the camera has no history (the caller then uses the fixed defaults)."""
+        records = self.memory.records()
+        for rec in reversed(records):
+            if rec.camera_id == camera_id:
+                return choose(records, camera_id, rec.bucket)
+        return None
+
     def _record(
         self, camera_id: str, pre: dict[str, float], strategy: Strategy, **fields: object
     ) -> None:

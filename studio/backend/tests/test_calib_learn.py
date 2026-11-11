@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from facadekit.calib.capture import run_capture
+from facadekit.calib.capture import CaptureSet, run_capture
 from facadekit.calib.decode import DecodeResult, decode
 from facadekit.calib.learn import (
     STRATEGIES,
@@ -20,7 +20,7 @@ from facadekit.calib.learn import (
 )
 from facadekit.calib.maps import build_maps
 from facadekit.calib.patterns import PatternSpec
-from facadekit.calib.pipeline import run_calibration
+from facadekit.calib.pipeline import run_calibration, run_calibration_from_capture
 from facadekit.errors import FkError
 from facadekit.models.calibration import CalibSettings
 from facadekit.sim.devices import SimCamera, SimDisplay
@@ -222,3 +222,75 @@ def test_coarse_stripes_fill_the_whole_map() -> None:
 def decode_stub() -> DecodeResult:
     z = np.zeros((4, 4), np.float32)
     return DecodeResult(np.zeros((4, 4, 2), np.float32), np.ones((4, 4), bool), z, 1.0, 1.0)
+
+
+def _pi_capture(scene: SimScene, skip_lsb: int) -> tuple[CaptureSet, CalibSettings]:
+    """A finished capture like a Pi-driven scan produces, from the simulator."""
+    display = SimDisplay(scene)
+    cam = SimCamera(scene, display)
+    cam.open()
+    settings = CalibSettings(discard_frames=0, average_frames=1, skip_lsb=skip_lsb)
+    spec = PatternSpec(*scene.proj_size, skip_lsb=skip_lsb)
+    return run_capture(display, cam, spec, settings, sleep=lambda _s: None), settings
+
+
+def test_remembered_strategy_follows_the_newest_scan_of_that_camera(tmp_path: Path) -> None:
+    advisor = ScanAdvisor(ScanMemory(tmp_path / "scans.jsonl"))
+    assert advisor.remembered_strategy("cam") is None  # no history: caller keeps the defaults
+    advisor.memory.append(_rec("standard", camera_id="other"))
+    assert advisor.remembered_strategy("cam") is None
+    # Dim scan failed with standard: the remembered bucket is "low", so low_light is next.
+    advisor.memory.append(_rec("standard", ok=False, bucket="low", median_contrast=20.0))
+    picked = advisor.remembered_strategy("cam")
+    assert picked is not None and picked.id == "low_light"
+    # A later bright scan of the same camera moves the remembered bucket to "high".
+    advisor.memory.append(_rec("soft_focus"))
+    again = advisor.remembered_strategy("cam")
+    assert again is not None and again.id == choose(advisor.memory.records(), "cam", "high").id
+
+
+def test_pi_scan_outcome_is_logged_with_the_measured_lighting(tmp_path: Path) -> None:
+    advisor = ScanAdvisor(ScanMemory(tmp_path / "scans.jsonl"))
+    capture, settings = _pi_capture(default_scene(), 2)
+    cal = run_calibration_from_capture(
+        tmp_path, capture, "sim", settings, strategy="standard", advisor=advisor
+    )
+    (rec,) = advisor.memory.records()
+    assert cal.strategy == "standard" and rec.calibration_id == cal.id
+    assert rec.ok and rec.strategy == "standard" and rec.bucket == "high"
+    assert rec.median_contrast == cal.quality.median_contrast  # type: ignore[union-attr]
+    # Without an advisor nothing is logged, as before.
+    run_calibration_from_capture(tmp_path, capture, "sim", settings)
+    assert len(advisor.memory.records()) == 1
+
+
+def test_pi_scan_failure_teaches_the_next_pi_scan(tmp_path: Path) -> None:
+    advisor = ScanAdvisor(ScanMemory(tmp_path / "scans.jsonl"))
+    capture, settings = _pi_capture(SimScene(blur_sigma=4.0), 2)
+    with pytest.raises(FkError) as exc:
+        run_calibration_from_capture(
+            tmp_path, capture, "sim", settings, strategy="standard", advisor=advisor
+        )
+    assert exc.value.code == "SCAN_FAILED"
+    (rec,) = advisor.memory.records()
+    assert not rec.ok and rec.strategy == "standard"
+    nxt = advisor.remembered_strategy("sim")
+    assert nxt is not None and nxt.id == "soft_focus"
+    capture, settings = _pi_capture(SimScene(blur_sigma=4.0), nxt.skip_lsb)
+    cal = run_calibration_from_capture(
+        tmp_path, capture, "sim", nxt.apply(settings), strategy=nxt.id, advisor=advisor
+    )
+    assert cal.strategy == "soft_focus"
+    assert [r.ok for r in advisor.memory.records()] == [False, True]
+
+
+def test_pi_failure_before_decoding_is_not_logged(tmp_path: Path) -> None:
+    advisor = ScanAdvisor(ScanMemory(tmp_path / "scans.jsonl"))
+    capture, settings = _pi_capture(default_scene(), 2)
+    capture.images[:] = 0.0  # the camera saw nothing
+    with pytest.raises(FkError) as exc:
+        run_calibration_from_capture(
+            tmp_path, capture, "sim", settings, strategy="standard", advisor=advisor
+        )
+    assert exc.value.code == "CAMERA_NO_PROJECTION"
+    assert advisor.memory.records() == []

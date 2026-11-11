@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict
 
 from facadekit.api.deps import AppState, get_state
-from facadekit.calib.learn import ScanAdvisor, learning_enabled
+from facadekit.calib.learn import STRATEGIES, ScanAdvisor, learning_enabled
 from facadekit.calib.patterns import PatternSpec, pattern_sequence
 from facadekit.calib.pipeline import (
     create_manual_calibration,
@@ -60,7 +60,7 @@ class CalibrationRequest(BaseModel):
     camera_id: str | None = None
     host: str | None = None
     settings: CalibSettings | None = None
-    learn: bool = True  # let scan memory pick the strategy (mode "scan" only)
+    learn: bool = True  # let scan memory pick the strategy (modes "scan" and "scan_pi")
 
 
 _STRATEGY_FIELDS = {"skip_lsb", "average_frames", "min_conf"}
@@ -120,7 +120,11 @@ def start_calibration(pid: str, body: CalibrationRequest, state: State) -> dict[
     if body.mode == "scan_pi":
         if not body.host:
             raise FkError(BAD_REQUEST, "host: required for mode 'scan_pi'")
-        return {"job_id": _submit_pi_scan(state, pid, project, body.host, camera_id, settings)}
+        return {
+            "job_id": _submit_pi_scan(
+                state, pid, project, body.host, camera_id, settings, _advisor(state, body)
+            )
+        }
 
     display: ProjectorDisplay
     if state.sim:
@@ -157,14 +161,31 @@ def start_calibration(pid: str, body: CalibrationRequest, state: State) -> dict[
 
 
 def _submit_pi_scan(
-    state: AppState, pid: str, project: Project, host: str, camera_id: str, settings: CalibSettings
+    state: AppState,
+    pid: str,
+    project: Project,
+    host: str,
+    camera_id: str,
+    settings: CalibSettings,
+    advisor: ScanAdvisor | None,
 ) -> str:
     """Scan with the projector on the Pi: upload a pattern video, play it, record the camera."""
     project_dir = state.store.project_dir(pid)
-    spec = PatternSpec(project.projector.width, project.projector.height, settings.skip_lsb)
-    n_patterns = len(pattern_sequence(spec))
 
     def pi_job(progress: Progress, cancel: Cancel) -> dict[str, Any]:
+        # The video is rendered before the lighting is measured, so the strategy comes from the
+        # lighting remembered for this camera; without history it equals the fixed defaults.
+        scan_settings = settings
+        strategy_id: str | None = None
+        if advisor is not None:
+            strategy = advisor.remembered_strategy(camera_id) or STRATEGIES[0]
+            scan_settings = strategy.apply(settings)
+            strategy_id = strategy.id
+        spec = PatternSpec(
+            project.projector.width, project.projector.height, scan_settings.skip_lsb
+        )
+        n_patterns = len(pattern_sequence(spec))
+
         def stage(lo: float, hi: float) -> Progress:
             return lambda f, m: progress(lo + (hi - lo) * f, m)
 
@@ -208,7 +229,14 @@ def _submit_pi_scan(
             fpp.close()
             state.cameras.release(camera_id)
         cal = run_calibration_from_capture(
-            project_dir, capture, camera_id, settings, progress=stage(0.8, 1.0), cancel=cancel
+            project_dir,
+            capture,
+            camera_id,
+            scan_settings,
+            progress=stage(0.8, 1.0),
+            cancel=cancel,
+            strategy=strategy_id,
+            advisor=advisor,
         )
         return _finish(state, pid, cal.id)
 

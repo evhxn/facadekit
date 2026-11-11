@@ -12,7 +12,7 @@ import numpy as np
 
 from facadekit.calib.capture import CaptureSet, precheck, run_capture
 from facadekit.calib.decode import decode
-from facadekit.calib.learn import ScanAdvisor, Strategy
+from facadekit.calib.learn import ScanAdvisor, Strategy, get_strategy
 from facadekit.calib.maps import build_maps, make_proj_view
 from facadekit.calib.patterns import PatternSpec
 from facadekit.calib.tuning import measure_latency
@@ -153,10 +153,15 @@ def run_calibration_from_capture(
     cancel: Cancel | None = None,
     pre: dict[str, float] | None = None,
     strategy: str | None = None,
+    advisor: ScanAdvisor | None = None,
 ) -> Calibration:
-    """Decode a finished capture, build the maps and write the calibration files."""
-    spec = capture.spec
-    camera_h, camera_w = capture.images.shape[1:]
+    """Decode a finished capture, build the maps and write the calibration files.
+
+    With an `advisor` and a known `strategy` id (Pi-driven scans, whose strategy was chosen
+    before the lighting could be measured), the outcome is reported to scan memory with the
+    lighting measured from the capture. Failures before decoding are not the strategy's fault
+    and are not reported.
+    """
     if pre is None:  # a recorded (Pi-driven) capture had no separate precheck
         pre = _contrast_stats(capture)
         if pre["lit_fraction"] < 0.05:
@@ -165,6 +170,32 @@ def run_calibration_from_capture(
                 "The camera does not see the projected light. Check that the camera faces the "
                 "projection and that the projector is on.",
             )
+    used = get_strategy(strategy) if advisor is not None and strategy is not None else None
+    try:
+        cal = _decode_capture(
+            project_dir, capture, camera_id, settings, progress, cancel, pre, strategy
+        )
+    except FkError as exc:
+        if advisor is not None and used is not None and exc.code == "SCAN_FAILED":
+            advisor.failed(camera_id, pre, used, exc.code)
+        raise
+    if advisor is not None and used is not None:
+        advisor.succeeded(camera_id, pre, used, cal)
+    return cal
+
+
+def _decode_capture(
+    project_dir: Path,
+    capture: CaptureSet,
+    camera_id: str,
+    settings: CalibSettings,
+    progress: Progress | None,
+    cancel: Cancel | None,
+    pre: dict[str, float],
+    strategy: str | None,
+) -> Calibration:
+    spec = capture.spec
+    camera_h, camera_w = capture.images.shape[1:]
 
     def report(fraction: float, message: str) -> None:
         if progress is not None:

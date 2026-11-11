@@ -75,7 +75,7 @@ run_calibration(..., advisor: ScanAdvisor | None = None)
 
 | Route | Purpose |
 |---|---|
-| `POST /api/v1/projects/{pid}/calibrations` | New body field `learn: bool = true`. Scan memory is used for `mode: "scan"` unless `learn` is false, `FACADEKIT_LEARN=0`, or `settings` explicitly sets `skip_lsb`, `average_frames` or `min_conf`. |
+| `POST /api/v1/projects/{pid}/calibrations` | New body field `learn: bool = true`. Scan memory is used for `mode: "scan"` and `"scan_pi"` unless `learn` is false, `FACADEKIT_LEARN=0`, or `settings` explicitly sets `skip_lsb`, `average_frames` or `min_conf`. |
 | `POST /api/v1/projects/{pid}/calibrations/{cid}/feedback` | Body `{"verdict": "good" \| "bad"}` → `{"recorded": bool}` |
 | `GET /api/v1/learning/scans` | `{"enabled", "scans", "strategies": [{"id", "label", "tries", "mistakes", "mean_reward"}]}` |
 | `DELETE /api/v1/learning/scans` | Forget everything (204) |
@@ -110,7 +110,7 @@ Not solved: coverage is 100 % even when the corner error is 9-18 px (scenes 1005
 
 - Tested only in the simulator. Whether these four strategies are the right ones for real webcams and real walls is unknown until field scans (spike S-5).
 - Coverage is a proxy for accuracy. A scan can cover everything and still be slightly off; only the user's "looks wrong" catches that.
-- Pi-driven scans (`mode: "scan_pi"`) are not learned yet: the pattern video is rendered before the lighting is measured.
+- Pi-driven scans learn from the lighting of the previous scan only (see below): the first Pi scan of a camera, and the first after the lighting changed bucket, still use a strategy chosen for the old lighting.
 - Learning is per computer. Sharing results between users would need consent and a server, and is out of scope.
 
 ## Learning from alignment corrections (2026-11-11)
@@ -130,8 +130,18 @@ Code: `calib/learn_align.py`, routes in `api/routes_learning.py`, hook in `POST 
 
 Limit: the 40 px floor is a guess for 1080p projectors; tune it with field data. The wizard does not show `warning` yet.
 
+## Pi-driven scans (2026-11-11)
+
+Code: `ScanAdvisor.remembered_strategy`, `run_calibration_from_capture(..., strategy, advisor)`, `_submit_pi_scan` in `api/routes_calibration.py`.
+
+A Pi scan renders the pattern video (which depends on `skip_lsb`) before the camera sees anything, so the lighting cannot be measured first. Rule: the bucket is the one stored on the newest scan-log record with the same `camera_id` (laptop or Pi); `choose(records, camera_id, that bucket)` picks the strategy, which sets `skip_lsb`, `average_frames` and `min_conf`. With no record for the camera, the "standard" strategy is used, i.e. the fixed defaults, exactly as before.
+
+After the capture, the contrast is measured from the recorded black and white images, the bucket is derived from it as for laptop scans, and the result is logged under the strategy that was used (`succeeded`/`failed`, same reward, same `POST .../feedback`). So a Pi scan done in different light than the remembered one is logged in its real bucket and corrects the next guess. Only `SCAN_FAILED` from decoding or map building counts against the strategy. Not logged: a lost marker or recording problem, `CAMERA_NO_PROJECTION`, cancellation, and render/upload errors, as these are not the strategy's fault.
+
+Same opt-outs as laptop scans: `learn: false`, `FACADEKIT_LEARN=0`, or explicit `skip_lsb`, `average_frames` or `min_conf` in `settings`. No new endpoint fields (the existing `learn` flag now also covers `scan_pi`).
+
 ## Next steps (not built)
 
 1. ~~Learn from alignment corrections~~ (built, see below).
-2. Add `scan_pi` using a bucket remembered from the previous scan with that camera.
+2. ~~Add `scan_pi` using a bucket remembered from the previous scan with that camera~~ (built, see below).
 3. A "What FacadeKit has learned" panel in the wizard's Advanced section, using `GET /learning/scans`, with a Forget button.
