@@ -187,7 +187,7 @@ export default function StepRealign({ project, cameraId }: Props) {
           </div>
           <p>Surfaces moved by up to {Math.round(preview.max_shift_px)} px.</p>
           <div className={styles.row}>
-            <button type="button" disabled={busy} onClick={() => void apply()}>
+            <button type="button" disabled={busy} onClick={() => void apply()} className="primary">
               Apply
             </button>
             <button type="button" disabled={busy} onClick={() => void keep()}>

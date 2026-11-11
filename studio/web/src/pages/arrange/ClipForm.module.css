@@ -13,7 +13,7 @@
   font-size: 13px;
 }
 .form small {
-  opacity: 0.7;
+  color: var(--muted);
 }
 .row {
   display: flex;
@@ -30,7 +30,7 @@
   gap: 6px !important;
 }
 .message {
-  color: #b00;
+  color: var(--danger);
   margin: 0;
 }
 .source {

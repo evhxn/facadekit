@@ -2,19 +2,27 @@
   max-width: 48rem;
   margin: 0 auto;
   padding: 1rem;
+  font-size: 1.0625rem; /* instructions >= 16px */
 }
 .nav {
   display: flex;
   justify-content: space-between;
-  margin-top: 1.5rem;
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
 }
 .steps {
-  color: #666;
-  margin: 0 0 1rem;
+  display: inline-block;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  color: var(--accent);
+  font-weight: 600;
+  margin: 0 0 var(--space-4);
 }
 .note {
-  color: #666;
-  font-size: 0.9rem;
+  color: var(--muted);
+  font-size: 1rem;
 }
 .live {
   display: block;

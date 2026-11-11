@@ -13,7 +13,7 @@
   flex-wrap: wrap;
 }
 .hint {
-  opacity: 0.8;
+  color: var(--muted);
   font-size: 0.9em;
 }
 .readout {

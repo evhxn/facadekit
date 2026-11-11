@@ -1,16 +1,18 @@
 .banner {
-  background: #fdecea;
-  border: 1px solid #e57373;
-  border-radius: 6px;
-  color: #7f1d1d;
-  padding: 0.75rem 1rem;
-  margin: 1rem 0;
+  background: var(--danger-bg);
+  border: 1px solid var(--danger);
+  border-left-width: 6px;
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: var(--space-3) var(--space-4);
+  margin: var(--space-4) 0;
 }
 .message {
   margin: 0;
 }
 .actions {
   display: flex;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
 }

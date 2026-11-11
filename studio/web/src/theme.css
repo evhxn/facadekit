@@ -1,0 +1,207 @@
+/* FacadeKit theme: dark by default (outdoor night use); light only when the system asks. */
+:root {
+  color-scheme: dark;
+  --bg: #12161c;
+  --surface: #1b212b;
+  --surface-2: #252d3a;
+  --border: #3a4556;
+  --text: #e8ecf2;
+  --muted: #a9b3c1;
+  --accent: #6cb4ff;
+  --on-accent: #06121f;
+  --danger: #ff8a8a;
+  --danger-bg: #3a1a1d;
+  --danger-solid: #b3261e;
+  --on-danger: #ffffff;
+  --warn: #f2c261;
+  --warn-bg: #36290f;
+  --info: #8cc4ff;
+  --info-bg: #14283f;
+  --ok: #7fd48f;
+  --focus: #ffd166;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --radius: 8px;
+  --target: 36px;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --surface-2: #e9edf2;
+    --border: #aab4c2;
+    --text: #141a22;
+    --muted: #4a5565;
+    --accent: #0b5cc2;
+    --on-accent: #ffffff;
+    --danger: #a3180f;
+    --danger-bg: #fdecea;
+    --danger-solid: #b3261e;
+    --on-danger: #ffffff;
+    --warn: #7a4b00;
+    --warn-bg: #fff4d6;
+    --info: #0b4a99;
+    --info-bg: #e6f0fd;
+    --ok: #1a6b2a;
+    --focus: #0b5cc2;
+  }
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+h1 {
+  font-size: 1.6rem;
+  margin: var(--space-4) 0 var(--space-3);
+}
+h2 {
+  font-size: 1.25rem;
+  margin: 0 0 var(--space-3);
+}
+h3 {
+  font-size: 1.05rem;
+}
+a {
+  color: var(--accent);
+}
+small {
+  color: var(--muted);
+}
+
+/* Focus ring everywhere */
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Buttons: secondary by default; add .primary or .danger */
+button {
+  font: inherit;
+  min-height: var(--target);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+}
+button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+button.primary:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+button.danger {
+  background: transparent;
+  border-color: var(--danger);
+  color: var(--danger);
+}
+button.danger:hover:not(:disabled) {
+  background: var(--danger-solid);
+  border-color: var(--danger-solid);
+  color: var(--on-danger);
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Inputs, selects, textareas */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+select,
+textarea {
+  max-width: 100%;
+  font: inherit;
+  min-height: var(--target);
+  box-sizing: border-box;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+input:disabled,
+select:disabled {
+  opacity: 0.6;
+}
+input[type="checkbox"],
+input[type="radio"] {
+  width: 20px;
+  height: 20px;
+  margin: 0 var(--space-1);
+  accent-color: var(--accent);
+  vertical-align: middle;
+}
+input[type="range"] {
+  accent-color: var(--accent);
+  min-height: var(--target);
+  cursor: pointer;
+}
+::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
+/* Progress bar */
+progress {
+  appearance: none;
+  height: 12px;
+  border: 0;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--surface-2);
+  accent-color: var(--accent);
+}
+progress::-webkit-progress-bar {
+  background: var(--surface-2);
+}
+progress::-webkit-progress-value {
+  background: var(--accent);
+}
+progress::-moz-progress-bar {
+  background: var(--accent);
+}
+
+/* Cards and banners (shared helpers) */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+}
+.banner {
+  border: 1px solid;
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4);
+}
+.banner.error {
+  background: var(--danger-bg);
+  border-color: var(--danger);
+  color: var(--text);
+}
+.banner.warning {
+  background: var(--warn-bg);
+  border-color: var(--warn);
+  color: var(--text);
+}
+.banner.info {
+  background: var(--info-bg);
+  border-color: var(--info);
+  color: var(--text);
+}

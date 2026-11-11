@@ -162,7 +162,7 @@ export default function StepScan({ project, cameraId, piHost = null }: Props) {
           </p>
         ) : null}
         <div className={styles.row}>
-          <button type="button" onClick={() => navigate(`/p/${pid}/surfaces`)}>
+          <button type="button" onClick={() => navigate(`/p/${pid}/surfaces`)} className="primary">
             Continue to surfaces
           </button>
           <button type="button" onClick={() => void run("scan")}>
@@ -228,7 +228,7 @@ export default function StepScan({ project, cameraId, piHost = null }: Props) {
               message={error}
               actions={
                 <>
-                  <button type="button" onClick={() => void run("scan")}>
+                  <button type="button" onClick={() => void run("scan")} className="primary">
                     Retry
                   </button>
                   <button type="button" onClick={() => void run("manual")}>
@@ -239,7 +239,7 @@ export default function StepScan({ project, cameraId, piHost = null }: Props) {
             />
           ) : (
             <div className={styles.row}>
-              <button type="button" onClick={() => void run("scan")}>
+              <button type="button" onClick={() => void run("scan")} className="primary">
                 Start scan
               </button>
               <button type="button" onClick={() => void run("manual")}>

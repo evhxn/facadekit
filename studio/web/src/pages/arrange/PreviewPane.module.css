@@ -41,6 +41,6 @@
   gap: 6px;
 }
 .note {
-  color: #c60;
+  color: var(--warn);
   margin: 0;
 }

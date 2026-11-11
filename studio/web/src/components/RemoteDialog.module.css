@@ -1,15 +1,16 @@
 .backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(0, 0, 0, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 100;
 }
 .dialog {
-  background: #fff;
-  color: #111;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
   padding: 20px;
   border-radius: 8px;
   max-width: 420px;
