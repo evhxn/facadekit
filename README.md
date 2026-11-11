@@ -10,16 +10,27 @@ FacadeKit is free and open source under the GPL-3.0-or-later licence. It runs on
 - Any HDMI projector.
 - A USB webcam.
 - A Raspberry Pi (version 3 or newer) running FPP version 10 or newer, on the same network as your computer.
-- Python 3.11 or newer.
 - Chrome, Edge or Firefox.
 
 ## Install
 
+There is no packaged release yet. For now, install from source.
+
+You need `git`, [`uv`](https://docs.astral.sh/uv/) (it can install Python 3.11 or newer for you), Node 20 or newer, and [`pnpm`](https://pnpm.io/installation).
+
 ```
-pipx install facadekit
+git clone https://github.com/evhxn/facadekit
+cd facadekit
+make setup
+make build-web
+cd studio/backend && uv run facadekit serve
 ```
 
-You can also run it without installing, with `uvx facadekit serve`.
+The last command starts FacadeKit and opens it in your browser. From the repository root, `make run` does the same, and `make run-sim` starts simulator mode.
+
+`pipx install facadekit` does not work yet; downloadable apps will come with the first release.
+
+From a source install, run commands as `uv run facadekit …` inside `studio/backend`.
 
 ## Quick start
 

@@ -4,6 +4,8 @@ This guide takes you from a new install to a video playing on your house from FP
 
 Before you begin, install FacadeKit by following the [install steps in the README](../../README.md#install). Terms in **bold** are explained in the [glossary](glossary.md).
 
+From a source install, run commands as `uv run facadekit …` inside `studio/backend`. Where this guide says `facadekit serve`, you can also run `make run` from the repository root.
+
 ## 1. Put the projector in its final position
 
 Set the projector where it will stay for the season. Turn off keystone and digital zoom in the projector's settings. Let it warm up for 2 minutes.
@@ -26,8 +28,6 @@ You should see: your new project open in FacadeKit.
 
 Go to **Setup**. Open the **projector window**. Drag it onto the projector's screen, then click it to go fullscreen.
 
-`![screenshot: projector window with the grid on the house](img/step-04-grid.png)`
-
 You should see: a grid of lines on the house.
 
 ## 5. Place the webcam
@@ -46,8 +46,6 @@ You should see: the scan finish without an error message. If you see an error, s
 
 Go to **Surfaces**. Click the four corners of the garage door in this order: top-left, top-right, bottom-right, bottom-left. Use the arrow keys to nudge a corner while you watch the outline on the real door.
 
-`![screenshot: four corners marked on the garage door](img/step-07-corners.png)`
-
 You should see: an outline that matches the edges of the garage door.
 
 If the scan fails, click **Skip scan** instead. You can then place surfaces by eye, using the live outlines. If the scan keeps failing, see [Something moved during the scan](troubleshooting.md#something-moved-during-the-scan).
@@ -56,8 +54,6 @@ If the scan fails, click **Skip scan** instead. You can then place surfaces by e
 
 Go to **Arrange**. Import a video. Add a clip to the surface. Press **Play** to preview the show on the house.
 
-`![screenshot: clip placed on the surface in Arrange](img/step-08-arrange.png)`
-
 You should see: the video playing on the garage door in the preview. Videos with a black background look best with blend mode **Add** or **Screen**.
 
 Only use videos you have the right to use. FacadeKit never uploads your media anywhere except to your own FPP.
@@ -65,8 +61,6 @@ Only use videos you have the right to use. FacadeKit never uploads your media an
 ## 9. Send the show to FPP
 
 Go to **Publish**. Click **Render show**. Enter your FPP address, for example `fpp.local`, and click **Send to FPP**.
-
-`![screenshot: Publish page after Send to FPP](img/step-09-publish.png)`
 
 You should see: the show sent to your Raspberry Pi without an error. If you see "Could not reach FPP", see [troubleshooting](troubleshooting.md#could-not-reach-fpp).
 
