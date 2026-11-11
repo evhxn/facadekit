@@ -29,6 +29,23 @@ export function maskForResult(outer: Pt[], quad: Quad): Mask | null {
   return { outer, holes: [] };
 }
 
+/**
+ * Ask the backend whether the MobileSAM engine can run. Any failure counts as "no":
+ * the simple selector is always available and needs no note to the user.
+ */
+async function loadMobileSam(): Promise<boolean> {
+  try {
+    const res = await fetch("/api/v1/ai/capabilities", {
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) return false;
+    const body = (await res.json()) as { segment_engines?: unknown };
+    return Array.isArray(body.segment_engines) && body.segment_engines.includes("mobilesam");
+  } catch {
+    return false;
+  }
+}
+
 export interface MagicState {
   active: boolean;
   points: SegmentPoint[];
@@ -36,6 +53,8 @@ export interface MagicState {
   busy: boolean;
   error: string;
   note: string;
+  /** null until the capabilities request has answered. */
+  mobileSam: boolean | null;
   disabledReason?: string;
   start: () => void;
   cancel: () => void;
@@ -51,8 +70,19 @@ export function useMagicSelect(magic: MagicProps | undefined): MagicState {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
+  const [mobileSam, setMobileSam] = useState<boolean | null>(null);
   const counter = useRef(0);
   const pid = magic?.projectId ?? "";
+
+  useEffect(() => {
+    let alive = true;
+    void loadMobileSam().then((ok) => {
+      if (alive) setMobileSam(ok);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const run = useCallback(
     async (pts: SegmentPoint[]) => {
@@ -61,7 +91,9 @@ export function useMagicSelect(magic: MagicProps | undefined): MagicState {
       setError("");
       let fellBack = false;
       try {
-        const res = await segment(pid, pts).catch((e: unknown) => {
+        // Without MobileSAM there is nothing to download, so ask for GrabCut directly.
+        const prefer = mobileSam === true ? undefined : "grabcut";
+        const res = await segment(pid, pts, prefer).catch((e: unknown) => {
           if (!(e instanceof ApiError && e.code === "MODEL_DOWNLOAD_FAILED")) throw e;
           fellBack = true;
           return segment(pid, pts, "grabcut");
@@ -84,7 +116,7 @@ export function useMagicSelect(magic: MagicProps | undefined): MagicState {
         if (id === counter.current) setBusy(false);
       }
     },
-    [pid],
+    [pid, mobileSam],
   );
 
   const reset = () => {
@@ -160,6 +192,7 @@ export function useMagicSelect(magic: MagicProps | undefined): MagicState {
     busy,
     error,
     note,
+    mobileSam,
     disabledReason: magic?.disabledReason,
     start,
     cancel,
@@ -171,16 +204,21 @@ export function useMagicSelect(magic: MagicProps | undefined): MagicState {
 
 /** Toolbar controls for the Magic select tool. */
 export function MagicControls({ ms }: { ms: MagicState }) {
+  // Shown only once we know MobileSAM is unavailable; no failure wording.
+  const simpleOnly = ms.mobileSam === false && <span>Simple selector</span>;
   if (!ms.active) {
     return (
-      <button
-        type="button"
-        onClick={ms.start}
-        disabled={!!ms.disabledReason}
-        title={ms.disabledReason ?? "Click an object to select it"}
-      >
-        Magic select
-      </button>
+      <>
+        <button
+          type="button"
+          onClick={ms.start}
+          disabled={!!ms.disabledReason}
+          title={ms.disabledReason ?? "Click an object to select it"}
+        >
+          Magic select
+        </button>
+        {simpleOnly}
+      </>
     );
   }
   return (
@@ -194,6 +232,7 @@ export function MagicControls({ ms }: { ms: MagicState }) {
       <button type="button" onClick={ms.cancel}>
         Cancel
       </button>
+      {simpleOnly}
       {ms.busy && (
         <span role="status">
           Working… First use downloads a small model, this can take a minute.

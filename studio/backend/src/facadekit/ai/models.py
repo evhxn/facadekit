@@ -59,6 +59,14 @@ def registry() -> dict[str, dict[str, Any]]:
     return entries
 
 
+def is_published(name: str) -> bool:
+    """True when registry entry ``name`` exists and has a real checksum (not a placeholder)."""
+    entry = registry().get(name)
+    if entry is None:
+        return False
+    return not str(entry.get("sha256", "")).upper().startswith(PLACEHOLDER_PREFIX.upper())
+
+
 def ensure_model(name: str, progress: Callable[[float, str], None] | None = None) -> Path:
     """Return the local path of model ``name``, downloading and verifying it if needed.
 

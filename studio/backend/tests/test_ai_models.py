@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 from collections.abc import Callable
 from pathlib import Path
@@ -8,11 +9,13 @@ from typing import Any
 
 import httpx
 import pytest
+from fastapi.testclient import TestClient
 
 from facadekit.ai import models
 from facadekit.ai.models import ensure_model, registry
 from facadekit.errors import MODEL_DOWNLOAD_FAILED, NOT_FOUND, FkError
 
+API = "/api/v1"
 PAYLOAD = b"fake onnx model bytes\n" * 2000
 
 
@@ -229,4 +232,87 @@ def test_bundled_registry_lists_mobilesam_models(monkeypatch: pytest.MonkeyPatch
     assert {"mobilesam_encoder", "mobilesam_decoder"} <= set(entries)
     for name in ("mobilesam_encoder", "mobilesam_decoder"):
         assert entries[name]["sha256"].startswith("TO_BE_FILLED")
-        assert str(entries[name]["url"]).startswith("https://")
+        assert str(entries[name]["url"]).startswith("https://github.com/evhxn/facadekit/")
+
+
+def test_bundled_models_are_not_published(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("FACADEKIT_MODEL_REGISTRY", raising=False)
+
+    assert models.is_published("mobilesam_encoder") is False
+    assert models.is_published("mobilesam_decoder") is False
+    assert models.is_published("no_such_model") is False
+
+
+def test_is_published_true_for_real_checksum(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, source: Path
+) -> None:
+    _use_registry(tmp_path, monkeypatch, {"demo": _entry(source.as_uri(), _sha(PAYLOAD))})
+
+    assert models.is_published("demo") is True
+    assert models.is_published("missing") is False
+
+
+# --- GET /api/v1/ai/capabilities -------------------------------------------------
+
+_real_find_spec = importlib.util.find_spec
+
+
+def _fake_modules(monkeypatch: pytest.MonkeyPatch, *, onnxruntime: bool, librosa: bool) -> None:
+    def find_spec(name: str, package: str | None = None) -> Any:
+        if name == "onnxruntime":
+            return object() if onnxruntime else None
+        if name == "librosa":
+            return object() if librosa else None
+        return _real_find_spec(name, package)
+
+    monkeypatch.setattr(importlib.util, "find_spec", find_spec)
+
+
+def test_capabilities_with_placeholder_registry_is_grabcut_only(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("FACADEKIT_MODEL_REGISTRY", raising=False)
+    _fake_modules(monkeypatch, onnxruntime=True, librosa=True)
+
+    body = client.get(f"{API}/ai/capabilities").json()
+
+    assert body == {"segment_engines": ["grabcut"], "beats": True}
+
+
+def test_capabilities_lists_mobilesam_when_published_and_onnxruntime_present(
+    client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, source: Path
+) -> None:
+    entry = _entry(source.as_uri(), _sha(PAYLOAD))
+    _use_registry(tmp_path, monkeypatch, {"mobilesam_encoder": entry, "mobilesam_decoder": entry})
+    _fake_modules(monkeypatch, onnxruntime=True, librosa=False)
+
+    body = client.get(f"{API}/ai/capabilities").json()
+
+    assert body == {"segment_engines": ["mobilesam", "grabcut"], "beats": False}
+
+
+def test_capabilities_hides_mobilesam_without_onnxruntime(
+    client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, source: Path
+) -> None:
+    entry = _entry(source.as_uri(), _sha(PAYLOAD))
+    _use_registry(tmp_path, monkeypatch, {"mobilesam_encoder": entry, "mobilesam_decoder": entry})
+    _fake_modules(monkeypatch, onnxruntime=False, librosa=False)
+
+    body = client.get(f"{API}/ai/capabilities").json()
+
+    assert body["segment_engines"] == ["grabcut"]
+
+
+def test_capabilities_needs_both_models_published(
+    client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, source: Path
+) -> None:
+    entry = _entry(source.as_uri(), _sha(PAYLOAD))
+    placeholder = _entry(source.as_uri(), "TO_BE_FILLED_BY_SPIKE_S6")
+    _use_registry(
+        tmp_path, monkeypatch, {"mobilesam_encoder": entry, "mobilesam_decoder": placeholder}
+    )
+    _fake_modules(monkeypatch, onnxruntime=True, librosa=False)
+
+    body = client.get(f"{API}/ai/capabilities").json()
+
+    assert body["segment_engines"] == ["grabcut"]

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import threading
 from typing import Annotated, Any, Literal
 
@@ -8,6 +9,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from facadekit.ai.beats import analyze_beats
+from facadekit.ai.models import is_published
 from facadekit.ai.segment import MobileSamSegmenter, get_segmenter
 from facadekit.api.deps import AppState, get_state
 from facadekit.errors import BAD_REQUEST, NOT_FOUND, REVISION_CONFLICT, FkError
@@ -15,6 +17,22 @@ from facadekit.errors import BAD_REQUEST, NOT_FOUND, REVISION_CONFLICT, FkError
 router = APIRouter()
 
 State = Annotated[AppState, Depends(get_state)]
+
+
+def _importable(module: str) -> bool:
+    # find_spec only locates the module; it does not import heavy dependencies.
+    return importlib.util.find_spec(module) is not None
+
+
+@router.get("/ai/capabilities")
+def ai_capabilities() -> dict[str, Any]:
+    mobilesam_ready = (
+        is_published("mobilesam_encoder")
+        and is_published("mobilesam_decoder")
+        and _importable("onnxruntime")
+    )
+    engines = ["mobilesam", "grabcut"] if mobilesam_ready else ["grabcut"]
+    return {"segment_engines": engines, "beats": _importable("librosa")}
 
 
 @router.post("/projects/{pid}/assets/{aid}/analyze", status_code=202)
