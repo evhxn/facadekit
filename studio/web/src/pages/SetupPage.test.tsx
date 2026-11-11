@@ -341,6 +341,7 @@ describe("Quick re-align", () => {
     reproj_error_px: 0.5,
     max_shift_px: 17.6,
     project: calibrated,
+    warning: null,
   };
 
   it("shows the shift and applies", async () => {
@@ -360,6 +361,29 @@ describe("Quick re-align", () => {
       new_calibration_id: "c2",
       apply: true,
     });
+  });
+
+  it("shows no warning banner when the server sends none", async () => {
+    setupRealign(() => Promise.resolve(preview));
+    renderSetup();
+    fireEvent.click(await screen.findByRole("button", { name: /Projector moved/ }));
+    await screen.findByText(/moved by up to 18 px/);
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("shows the warning with what to do next, and keeps Apply available", async () => {
+    setupRealign(() =>
+      Promise.resolve({
+        ...preview,
+        warning: "Surfaces moved by up to 90 px, much more than your usual re-align (6 px).",
+      }),
+    );
+    renderSetup();
+    fireEvent.click(await screen.findByRole("button", { name: /Projector moved/ }));
+    const banner = await screen.findByRole("status");
+    expect(banner.textContent).toMatch(/much more than your usual re-align/);
+    expect(banner.textContent).toMatch(/place surfaces by hand/);
+    expect(screen.getByRole("button", { name: "Apply" })).toBeTruthy();
   });
 
   it("hides Apply when the scans cannot be lined up", async () => {

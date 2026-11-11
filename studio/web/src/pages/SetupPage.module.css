@@ -55,3 +55,19 @@
   margin: 0.75rem 0;
   flex-wrap: wrap;
 }
+
+.warning {
+  background: var(--warn-bg);
+  border: 1px solid var(--warn);
+  border-left-width: 6px;
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: var(--space-3) var(--space-4);
+  margin: var(--space-4) 0;
+}
+.warning p {
+  margin: 0;
+}
+.warning p + p {
+  margin-top: var(--space-2);
+}

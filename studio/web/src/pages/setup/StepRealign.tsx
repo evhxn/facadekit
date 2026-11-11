@@ -186,6 +186,16 @@ export default function StepRealign({ project, cameraId }: Props) {
             </svg>
           </div>
           <p>Surfaces moved by up to {Math.round(preview.max_shift_px)} px.</p>
+          {preview.warning ? (
+            <div className={styles.warning} role="status">
+              <p>{preview.warning}</p>
+              <p>
+                Compare the red dashed outlines (old) with the green ones (new). If the green
+                outlines do not sit on the house, choose &quot;Keep new scan but place surfaces by
+                hand&quot;. If they look right, press Apply.
+              </p>
+            </div>
+          ) : null}
           <div className={styles.row}>
             <button type="button" disabled={busy} onClick={() => void apply()} className="primary">
               Apply

@@ -211,6 +211,8 @@ export interface RealignResponse {
   reproj_error_px: number;
   max_shift_px: number;
   project: Project | null;
+  /** Set when the shift is far above this user's usual re-align. */
+  warning: string | null;
 }
 export const realign = (
   pid: string,
