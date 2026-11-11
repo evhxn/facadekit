@@ -2,7 +2,7 @@
 
 Planning repo for **FacadeKit** (working name): a free, open-source projection-mapping system for holiday decorators that auto-calibrates with a webcam and delivers pre-warped video to Falcon Player (FPP). This repo contains the plan only. Smaller models build from `tasks/`.
 
-Last updated: 2026-11-09.
+Last updated: 2026-11-10.
 
 ## 1. Status
 
@@ -15,9 +15,9 @@ Last updated: 2026-11-09.
 | 4 Build plan | `docs/04-repo-structure.md`, `docs/05-interfaces.md`, `tasks/T-001…T-038` (MVP), `tasks/T-101…T-117` (v1), `tasks/INDEX.md` | done |
 | 5 Project plan | `docs/06-project.md` | done |
 
-All phases are complete. Nothing is committed to git yet (the repo is initialised with no commits). No code has been written, by design.
+All phases are complete. All MVP tickets (T-001 to T-038) and v1 tickets (T-101 to T-117) are implemented; the code lives in `studio/backend` (Python) and `studio/web` (React/TypeScript), and the build history is in git. The first review of the built MVP + v1 is `tasks/REVIEW-01.md`, which lists fix tickets R-001 to R-009. The release workflow (`.github/workflows/release.yml`) has not been run yet; see `packaging/README.md`.
 
-Not done, on purpose: v2 tickets (they depend on field data); no ticket was test-driven against real code, so expect a few contract gaps to surface in `tasks/BLOCKERS.md` once builders start.
+Not done, on purpose: v2 tickets (they depend on field data). Hardware spikes S-1, S-2, S-8 and the rest of `docs/03-roadmap.md` §5 have not been run, so everything FPP-facing is tested only against the fake server.
 
 ## 2. Key decisions (details in `docs/02-architecture.md` §9)
 
@@ -50,9 +50,9 @@ Owner answered Q1–Q4 (`docs/01-landscape.md` §0). Unasked assumptions A-1 to 
 
 ## 5. Exact next step
 
-1. Owner: run spikes S-8, S-2, S-1 as described in `docs/03-roadmap.md` §5 and save reports under `spikes/`.
-2. Builders: start wave 1 of `tasks/INDEX.md` (T-001 and T-002 in parallel), then follow the waves. Give each builder session exactly one ticket file.
-3. When the MVP exit criteria in `docs/03-roadmap.md` §1 are met, start the v1 table in `tasks/INDEX.md`.
+1. Fix tickets R-001 to R-008 in `tasks/REVIEW-01.md` (R-001 to R-004 first, in parallel). R-009 is this housekeeping pass.
+2. Owner: run hardware spikes S-8, S-2, S-1 as described in `docs/03-roadmap.md` §5 and save reports under `spikes/`.
+3. Owner: field test on a real house (`docs/03-roadmap.md` §1), then write the v2 tickets.
 
 ## 6. Files
 

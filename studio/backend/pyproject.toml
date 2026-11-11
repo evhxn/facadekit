@@ -26,7 +26,12 @@ ai = ["librosa", "onnxruntime"]
 facadekit = "facadekit.cli:main"
 
 [dependency-groups]
-dev = ["pytest", "ruff", "mypy"]
+dev = [
+    "pytest",
+    "ruff",
+    "mypy",
+    "httpx2>=2.16.0",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/facadekit"]
