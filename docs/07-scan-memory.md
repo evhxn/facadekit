@@ -94,13 +94,82 @@ Harness: `studio/backend/src/facadekit/sim/learn_eval.py` (`uv run python -m fac
 | First scan ok (tuning / held-out) | 7/12, 1/6 | unchanged (needs a blur estimate before the scan) |
 | Easy scenes (blur ≤ 1.5): strategy | `standard` | `standard`, unchanged |
 
-Corner error (map vs ground truth, px) for scenes `standard` can scan stays 0.3-1.1 px. Sim e2e: 1.40 px before and after (limit 1.5).
+Corner error (map vs ground truth, px) for scenes `standard` can scan stays 0.3-1.1 px. Sim e2e: 1.40 px before and after (limit 1.5). (Both improved later by the albedo-edge fix, see the next section: 0.1-0.6 px and 0.74 px; the regret numbers did not change.)
 
 Kept: (1) failure sharing to same-or-finer strategies, which removes the wasted `low_light` scan for blurred cameras (the two wasted scans became one); (2) `very_soft` (skip_lsb 4): blur 5 px scenes had only a 58-66 % coverage option, now 100 % at 1-1.3 px.
 
 Tried and rejected: `min_conf` 0.3 or 0.5 (every scan fails: confidence of blurred stripes is low); `skip_lsb=2, min_conf=0.3` (same); sharing failures without the same-or-finer rule (standard got retried a third time); very_soft prior 1.2 (standard was retried before it).
 
 Not solved: coverage is 100 % even when the corner error is 9-18 px (scenes 1005, 1007, 1008 with `soft_focus`), so the reward cannot see that kind of inaccuracy; only the user's "looks wrong" does. Dim scenes where only more averaging helps did not occur in the synthetic set, so the `low` bucket exemption is untested against real data.
+
+## Albedo-edge bias in the projector map (2026-11-11)
+
+Code: `calib/maps.py` (`albedo_edge_weight`, `_block_measurements`, `_local_fit`, `build_maps`). Tests: `tests/test_calib_albedo_edge.py`. Decode itself is unchanged.
+
+### Symptom
+
+`facadekit sim e2e` measured a door-quad error of about 1.50 px averaged over scene seeds 0-5 (limit 1.5 px). With a noise-free photo the door detector is within 0.47 px on the true map but 1.49 px on the scanned map, all four corners pulled inward. 99.8 % of projector pixels are measured, so hole filling was not the cause. The scanned-minus-true map error was a dipole across every door edge: +0.27 to +0.31 camera px (outward) just inside the edge, -0.10 to -0.16 just outside, zero by 24 projector px.
+
+### Mechanism (confirmed)
+
+The camera image of a stripe is `PSF * (albedo x stripe)`. Decode compares pattern and inverse per pixel, i.e. takes the zero crossing of `PSF * (albedo x (2 stripe - 1))`. Where the albedo changes within the blur radius, the brighter side dominates and the crossing moves into the darker side. For a Gaussian PSF and a locally linear albedo the shift is `-sigma^2 * grad log(blurred albedo)` (first order; checked numerically in 1D, exact peak shift for a 0.12 -> 0.78 step is 1.1 camera px at sigma 1). The pixels just outside a bright door therefore decode as door pixels and vice versa, and `build_maps` averaged these pixels into its nodes.
+
+Experiments (noise-free scans, default scene geometry; decode x-bias averaged along the door's left edge, in projector px; map dipole = largest bin of the edge-normal map error, camera px):
+
+| Scan | decode bias next to the frame | map dipole (before) | door (clean photo, scanned map) |
+|---|---|---|---|
+| blur 1 (default) | -0.64 / +1.09 | +0.31 / -0.16 | 1.49 px |
+| blur 0 | -0.11 / +0.11 | +0.06 / -0.05 | 0.75 px |
+| blur 1, flat albedo | -0.06 / -0.05 | +0.04 / -0.07 (not at edges) | 0.75 px |
+| blur 0.5 | -0.17 / +0.27 | | 0.84 px |
+| blur 1.5 | -1.06 / +1.76 | | 2.53 px |
+
+The bias scales with the blur and disappears without blur or without albedo edges. With noise (sigma 2) the profile is the same.
+
+### Fix
+
+1. **Weight by albedo edges.** `w = 1 / (1 + (|grad log(white - black)| / 0.05)^2)` per camera pixel (3x3 Sobel). The white frame is smooth light, so the log-gradient of white minus black is the log-gradient of the blurred albedo, which is what drives the bias. It needs no estimate of the blur, the camera gamma or exposure (log is scale-free), and also flags shadow and occlusion edges, where decoding is biased for the same reason.
+2. **One measurement per decoded block.** All pixels of a block decode to the same projector coordinate, so the block's camera centroid is the measurement and its weight is the sum of its pixel weights. Weighting pixels unevenly inside a block (tried first) moves the centroid away from the edge and produced the opposite dipole (-0.13 / +0.08).
+3. **Weighted local affine fit per node.** Each node is the intercept of a weighted least-squares fit `centroid = c + J (p - node)` over the blocks of the 5x5 surrounding nodes (Gaussian, sigma 1 node). The slopes `J` get a weak ridge prior towards the global homography's (strength 1 against data weights of hundreds), which only matters where data is sparse. Nodes are never snapped to the plane: with strong barrel distortion (plane fit off by up to 3 px) the map error is 0.03 px mean (0.11 px with the old method); test `test_follows_lens_distortion_not_the_plane_fit`. Holes beyond the fit radius are filled as before.
+
+`measured` and `coverage` are computed exactly as before, so scan-memory rewards are unchanged.
+
+### Results
+
+Sim e2e door-quad error (max corner error, px), scene seeds 0-5, with the T-202 precheck in place:
+
+| | 0 | 1 | 2 | 3 | 4 | 5 | max | mean |
+|---|---|---|---|---|---|---|---|---|
+| before | 1.510 | 1.494 | 1.479 | 1.536 | 1.481 | 1.488 | 1.536 | 1.498 |
+| after | 0.725 | 0.749 | 0.775 | 0.767 | 0.698 | 0.729 | 0.775 | 0.740 |
+| map at door corners (b), before | 0.32 | 0.71 | 0.31 | 0.60 | 0.44 | 0.55 | | |
+| map at door corners (b), after | 0.08 | 0.10 | 0.12 | 0.07 | 0.10 | 0.10 | | |
+
+Coverage 99.8 % on every seed, before and after (printed as 100 %). The remaining ~0.5 px is mostly the door detector's own inward bias (0.47 px with the true map and a noise-free photo).
+
+Map error, default scene with noise: mean 0.17 -> 0.09 camera px, p99 0.41 -> 0.28; edge dipole within +-0.04 (was +0.31 / -0.16). Synthetic panel scene (`PanelScene` in the tests, bright panel in a dark frame on a grey wall): dipole peak-to-peak 0.46 -> 0.07 camera px (6.7x); flat wall 0.10 -> 0.05.
+
+Scan memory harness (`learn_eval --n 18`), before -> after: tuning regret 0.490 -> 0.490, held-out regret 1.143 -> 1.143, final-scan gap 0.000 -> 0.000, first scan ok 7/12 and 1/6 unchanged, every coverage cell identical. No re-tuning. Corner errors fell where the scan is sound, e.g. 1000 `soft_focus` 1.5 -> 0.3 px, 1004 `standard` 0.6 -> 0.2, 1012 `standard` 1.0 -> 0.6, 1013 `low_light_soft` 1.8 -> 0.8, 1002 `low_light_soft` 4.0 -> 0.8, 1011 `standard` 0.8 -> 0.2. The 6-26 px outliers (1005, 1007, 1008, 1012, 1017 with coarse strategies) are unchanged: they are wrong decoded bits, a different problem (see "Not solved" above).
+
+Runtime on the sim scan (1280x720 camera, 1080p projector, best of 9): `build_maps` 28.4 -> 31.8 ms (+12 %), decode + build_maps 67 -> 71 ms (+5 %); the capture itself takes seconds.
+
+### Rejected ideas
+
+- **Ratio decoding** (`(pattern - inverse) / (white - black)`): dividing by a positive number does not move a zero crossing, so the decoded bits are identical.
+- **First-order shift correction** (move each pixel by `k grad log(contrast)`, `k = sigma^2`): with k = 1 it removed the dipole on the default scene (door 0.63-0.77 px), but k must track the camera's blur (k = 4 was needed at blur 2) and its gamma. Estimating k by regressing residuals on `grad log(contrast)` gave 1.2 at skip_lsb 2 and 2.7 at skip_lsb 3 for the same camera (block quantisation leaks into the regression), so it is not reliable enough for real cameras.
+- **Per-pixel weights** (no block pooling): over-corrects, see Fix 2.
+- **Narrower fit** (3x3 nodes, sigma 2/3 node): panel-scene dipole 0.12 px peak-to-peak against 0.07 px for 5x5, so 5x5 is kept. The weight scale matters little: 0.02-0.08 changes the dipole by about 0.01 px.
+- **Snapping nodes to the plane fit**: hides lens distortion and non-planar walls.
+- **A gradient-based sub-pixel door-edge fit** (earlier attempt, T-202): fixed two corners, worsened others; the bias was in the map, not the detector.
+
+Not pursued: sub-block refinement from the finest modulated bit (its zero crossing has the same albedo bias), modulation-depth weights (low-modulation pixels are already dropped by `min_conf`).
+
+### Risks on real hardware
+
+- The weight trusts that the projector's white frame is smooth. Projector vignetting is smooth (log-gradient far below 0.05 per camera px). A sharp camera that resolves the projector's pixel grid or a DLP screen-door pattern lowers weights everywhere about equally, which does not bias the fit.
+- Walls that are textured everywhere (rough brick, stucco) lower most weights. The fit then behaves like the old unweighted average; random albedo gives biases of both signs that mostly cancel. Regular strong patterns (mortar lines every few cm) leave a small residual.
+- The fit spans +-2 nodes (16 projector px at `skip_lsb` 2, 64 px at `very_soft`). A depth step (door recess) with a large camera-projector baseline is smoothed over that width. The old 3x3 median and cell averaging smoothed over a similar span.
+- The 0.05 scale was chosen on the simulator. It is not critical there (0.02-0.08 equal), but has not been checked against real webcam noise; a very noisy dim scan raises `|grad log contrast|` from noise alone and so lowers all weights, which again only reduces to the old behaviour.
 
 ## Bug fixed on the way
 
