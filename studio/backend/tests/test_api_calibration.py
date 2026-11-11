@@ -183,3 +183,96 @@ def test_scan_memory_routes(sim_client: TestClient, tmp_path: Path) -> None:
 
     assert sim_client.delete(f"{API}/learning/scans").status_code == 204
     assert sim_client.get(f"{API}/learning/scans").json()["scans"] == 0
+
+
+def test_scan_feedback_survives_damaged_log(sim_client: TestClient, tmp_path: Path) -> None:
+    pid = _project(sim_client)["id"]
+    body = {"mode": "scan", "camera_id": "sim", "settings": {"discard_frames": 0}}
+    job = _wait(
+        sim_client,
+        sim_client.post(f"{API}/projects/{pid}/calibrations", json=body).json()["job_id"],
+    )
+    cid = job["result"]["calibration_id"]
+    log = tmp_path / "learning" / "scans.jsonl"
+    log.write_bytes(log.read_bytes() + b"\xff\xfe\xc3\x28 damaged\n")
+    url = f"{API}/projects/{pid}/calibrations/{cid}/feedback"
+    assert sim_client.post(url, json={"verdict": "good"}).json() == {"recorded": True}
+    assert sim_client.get(f"{API}/learning/scans").json()["scans"] == 1
+    again = _wait(
+        sim_client,
+        sim_client.post(f"{API}/projects/{pid}/calibrations", json=body).json()["job_id"],
+    )
+    assert again["state"] == "succeeded", again
+    assert sim_client.get(f"{API}/learning/scans").json()["scans"] == 2
+    assert sorted(p.name for p in log.parent.iterdir()) == [log.name]
+
+
+def _fake_pi(monkeypatch: pytest.MonkeyPatch) -> list[int]:
+    """Replace the Pi/FPP side of a Pi-driven scan with the simulator; returns skip_lsb per scan."""
+    from facadekit.api import routes_calibration as rc
+    from facadekit.calib.capture import run_capture
+    from facadekit.calib.patterns import PatternSpec
+    from facadekit.models.calibration import CalibSettings
+    from facadekit.sim.devices import SimCamera, SimDisplay
+    from facadekit.sim.scene import SimScene
+
+    used: list[int] = []
+
+    class _Fpp:
+        def __init__(self, _host: str) -> None: ...
+        def start_playlist(self, _name: str) -> None: ...
+        def stop(self) -> None: ...
+        def close(self) -> None: ...
+
+    def fake_record(camera: Any, spec: PatternSpec, _start: Any, **_kw: Any) -> Any:
+        used.append(spec.skip_lsb)
+        scene = SimScene(blur_sigma=4.0)
+        display = SimDisplay(scene)
+        cam = SimCamera(scene, display)
+        cam.open()
+        fast = CalibSettings(discard_frames=0, average_frames=1, skip_lsb=spec.skip_lsb)
+        return run_capture(display, cam, spec, fast, sleep=lambda _s: None)
+
+    monkeypatch.setattr(rc, "render_pattern_video", lambda _spec, _out: [])
+    monkeypatch.setattr(rc, "publish_render", lambda *_a, **_k: None)
+    monkeypatch.setattr(rc, "FppClient", _Fpp)
+    monkeypatch.setattr(rc, "record_and_capture", fake_record)
+    return used
+
+
+def test_scan_pi_learns_from_the_previous_scan(
+    sim_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    used = _fake_pi(monkeypatch)
+    pid = _project(sim_client)["id"]
+    base = {"mode": "scan_pi", "camera_id": "sim", "host": "pi.local"}
+
+    def run(**extra: Any) -> dict[str, Any]:
+        resp = sim_client.post(f"{API}/projects/{pid}/calibrations", json={**base, **extra})
+        job = _wait(sim_client, resp.json()["job_id"])
+        assert isinstance(job, dict)
+        return job
+
+    # First scan: no remembered lighting, so the fixed defaults. The blurred camera fails.
+    assert run()["state"] == "failed"
+    assert used == [2]
+    summary = sim_client.get(f"{API}/learning/scans").json()
+    assert summary["scans"] == 1 and summary["strategies"][0]["mistakes"] == 1
+    # Second scan: the remembered bucket picks another strategy (coarser blocks) and it works.
+    job = run()
+    assert job["state"] == "succeeded", job
+    assert used == [2, 3]
+    cid = job["result"]["calibration_id"]
+    assert sim_client.get(f"{API}/projects/{pid}/calibrations/{cid}").json()["strategy"] == (
+        "soft_focus"
+    )
+    # Same feedback route as laptop scans.
+    url = f"{API}/projects/{pid}/calibrations/{cid}/feedback"
+    assert sim_client.post(url, json={"verdict": "good"}).json() == {"recorded": True}
+    # Opt-outs leave the scan alone and unlogged: defaults are used again.
+    assert run(learn=False)["state"] == "failed"
+    assert run(settings=FAST)["state"] == "failed"
+    monkeypatch.setenv("FACADEKIT_LEARN", "0")
+    assert run()["state"] == "failed"
+    assert used == [2, 3, 2, 2, 2]
+    assert sim_client.get(f"{API}/learning/scans").json()["scans"] == 2

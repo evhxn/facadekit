@@ -1,19 +1,52 @@
-import { useEffect, useRef, useState } from "react";
-import { cameraSnapshotUrl, listCameras, projectorShow, setCameraControls } from "../../api/client";
-import type { CameraInfo } from "../../api/types";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  ApiError,
+  cameraSnapshotUrl,
+  listCameras,
+  projectorShow,
+  setCameraControls,
+  startCameraCheck,
+} from "../../api/client";
+import { userMessage } from "../../api/errors";
+import { waitForJob } from "../../api/events";
+import type { CameraCheck, CameraInfo, CameraRoi } from "../../api/types";
+import ErrorBanner from "../../components/ErrorBanner";
 import styles from "../SetupPage.module.css";
+import CameraCheckCard from "./CameraCheckCard";
+import { COPY, isPictureSizeMessage } from "./cameraCopy";
+import CropBox from "./CropBox";
 
 const REFRESH_MS = 350;
 const DEBOUNCE_MS = 200;
 
 interface Props {
+  projectId: string;
   cameraId: string | null;
   onCameraChange: (id: string | null) => void;
+  /** Crop shared with the scan step; null = the whole picture. */
+  roi: CameraRoi | null;
+  onRoiChange: (roi: CameraRoi | null) => void;
+  /** True while the crop was taken over from the last scan. */
+  roiFromLastScan: boolean;
+  check: CameraCheck | null;
+  onCheckChange: (check: CameraCheck | null) => void;
+  /** Go on to the scan step. */
+  onNext: () => void;
+  onUsePhone: () => void;
 }
 
-function LiveView({ cameraId }: { cameraId: string }) {
+interface LiveProps {
+  cameraId: string;
+  /** The camera is busy (camera check): stop asking for pictures. */
+  paused: boolean;
+  onFrame: (width: number, height: number) => void;
+}
+
+function LiveView({ cameraId, paused, onFrame }: LiveProps) {
   const [src, setSrc] = useState(() => `${cameraSnapshotUrl(cameraId)}?t=${Date.now()}`);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
 
   useEffect(() => {
     setSrc(`${cameraSnapshotUrl(cameraId)}?t=${Date.now()}`);
@@ -22,11 +55,18 @@ function LiveView({ cameraId }: { cameraId: string }) {
     };
   }, [cameraId]);
 
+  // Start again when the camera is free.
+  useEffect(() => {
+    if (!paused) setSrc(`${cameraSnapshotUrl(cameraId)}?t=${Date.now()}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paused]);
+
   // Next request starts only after the previous image finished (or failed) loading.
   const scheduleNext = () => {
     if (timer.current !== null) clearTimeout(timer.current);
+    if (pausedRef.current) return;
     timer.current = setTimeout(() => {
-      setSrc(`${cameraSnapshotUrl(cameraId)}?t=${Date.now()}`);
+      if (!pausedRef.current) setSrc(`${cameraSnapshotUrl(cameraId)}?t=${Date.now()}`);
     }, REFRESH_MS);
   };
 
@@ -35,18 +75,108 @@ function LiveView({ cameraId }: { cameraId: string }) {
       className={styles.live}
       src={src}
       alt="Live camera view"
-      onLoad={scheduleNext}
+      onLoad={(e) => {
+        const img = e.currentTarget;
+        if (img.naturalWidth > 0) onFrame(img.naturalWidth, img.naturalHeight);
+        scheduleNext();
+      }}
       onError={scheduleNext}
     />
   );
 }
 
-export default function StepCamera({ cameraId, onCameraChange }: Props) {
+/** Zoomed view of the cropped area. Loaded once; the live view keeps the camera busy otherwise. */
+function CropPreview({ cameraId, roi }: { cameraId: string; roi: CameraRoi }) {
+  const [stamp] = useState(() => Date.now());
+  const url = cameraSnapshotUrl(cameraId, roi);
+  return (
+    <img
+      className={styles.cropPreview}
+      src={`${url}${url.includes("?") ? "&" : "?"}t=${stamp}`}
+      alt={COPY.cropPreviewAlt}
+    />
+  );
+}
+
+export default function StepCamera({
+  projectId,
+  cameraId,
+  onCameraChange,
+  roi,
+  onRoiChange,
+  roiFromLastScan,
+  check,
+  onCheckChange,
+  onNext,
+  onUsePhone,
+}: Props) {
   const [cameras, setCameras] = useState<CameraInfo[] | null>(null);
   const [mode, setMode] = useState<"grid" | "white">("grid");
   const [exposure, setExposure] = useState(0.5);
   const [exposureUnavailable, setExposureUnavailable] = useState(false);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [checkError, setCheckError] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [frame, setFrame] = useState<{ width: number; height: number } | null>(null);
+  const mounted = useRef(true);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  // A crop belongs to one camera picture: forget the old size when the camera changes.
+  useEffect(() => {
+    setFrame(null);
+    setEditing(false);
+    setCheckError(null);
+  }, [cameraId]);
+
+  const shownFrame = useMemo(
+    () => frame ?? (check ? { width: check.camera_width, height: check.camera_height } : { width: 1280, height: 720 }),
+    [frame, check],
+  );
+  const editRoi = roi ?? check?.suggested_roi ?? null;
+  const wholePicture = useMemo<CameraRoi>(
+    () => ({ x: 0, y: 0, w: shownFrame.width, h: shownFrame.height, frame_width: shownFrame.width, frame_height: shownFrame.height, bin: 1 }),
+    [shownFrame],
+  );
+
+  const runCheck = async () => {
+    if (!cameraId || checking) return;
+    setCheckError(null);
+    setEditing(false);
+    setChecking(true);
+    try {
+      const { job_id } = await startCameraCheck(projectId, cameraId, roi);
+      const final = await waitForJob(job_id);
+      if (!mounted.current) return;
+      const result = final.result?.check as CameraCheck | undefined;
+      if (final.state === "succeeded" && result) {
+        onCheckChange(result);
+      } else {
+        onCheckChange(null);
+        const message = final.error
+          ? userMessage(final.error.code, final.error.message)
+          : COPY.checkFailed;
+        if (isPictureSizeMessage(message)) onRoiChange(null);
+        setCheckError(message);
+      }
+    } catch (e) {
+      if (!mounted.current) return;
+      onCheckChange(null);
+      const message = e instanceof ApiError ? userMessage(e.code, e.message) : COPY.checkFailed;
+      if (isPictureSizeMessage(message)) onRoiChange(null);
+      setCheckError(message);
+    } finally {
+      if (mounted.current) setChecking(false);
+      // The check leaves the projector on stripes; put the wizard's picture back.
+      void Promise.resolve(projectorShow({ mode })).catch(() => {});
+    }
+  };
 
   const refresh = () => {
     listCameras()
@@ -113,7 +243,80 @@ export default function StepCamera({ cameraId, onCameraChange }: Props) {
           {mode === "grid" ? "Show white" : "Show grid"}
         </button>
       </div>
-      {cameraId ? <LiveView cameraId={cameraId} /> : null}
+      {cameraId ? (
+        <CropBox
+          frame={shownFrame}
+          initial={editRoi ?? wholePicture}
+          suggested={check?.suggested_roi ?? null}
+          active={editing && editRoi !== null}
+          onUse={(next) => {
+            onRoiChange(next);
+            setEditing(false);
+          }}
+          onWhole={() => {
+            onRoiChange(null);
+            setEditing(false);
+          }}
+        >
+          <LiveView
+            cameraId={cameraId}
+            paused={checking}
+            onFrame={(width, height) =>
+              setFrame((old) => (old?.width === width && old.height === height ? old : { width, height }))
+            }
+          />
+        </CropBox>
+      ) : null}
+      {cameraId && !editing && roi ? (
+        <div>
+          {roiFromLastScan ? <p className={styles.note}>{COPY.cropFromLastScan}</p> : null}
+          <p>{COPY.cropActive}</p>
+          <CropPreview key={`${roi.x},${roi.y},${roi.w},${roi.h}`} cameraId={cameraId} roi={roi} />
+          <div className={styles.row}>
+            <button type="button" onClick={() => setEditing(true)}>
+              {COPY.cropEdit}
+            </button>
+            <button type="button" onClick={() => onRoiChange(null)}>
+              {COPY.cropWhole}
+            </button>
+          </div>
+        </div>
+      ) : null}
+      {cameraId ? (
+        <div className={styles.row}>
+          <button
+            type="button"
+            className={check ? undefined : "primary"}
+            disabled={checking}
+            onClick={() => void runCheck()}
+          >
+            {COPY.checkButton}
+          </button>
+        </div>
+      ) : null}
+      {checking ? <p role="status">{COPY.checking}</p> : null}
+      {checkError ? (
+        <ErrorBanner
+          message={checkError}
+          actions={
+            <button type="button" className="primary" onClick={() => void runCheck()}>
+              {COPY.buttons.recheck}
+            </button>
+          }
+        />
+      ) : null}
+      {check && !checking ? (
+        <CameraCheckCard
+          check={check}
+          onCrop={() => {
+            if (check.suggested_roi) onRoiChange(check.suggested_roi);
+            setEditing(true);
+          }}
+          onUsePhone={onUsePhone}
+          onNext={onNext}
+          onRecheck={() => void runCheck()}
+        />
+      ) : null}
       {cameraId ? (
         <div className={styles.row}>
           <label>

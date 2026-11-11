@@ -55,3 +55,145 @@
   margin: 0.75rem 0;
   flex-wrap: wrap;
 }
+
+.warning {
+  background: var(--warn-bg);
+  border: 1px solid var(--warn);
+  border-left-width: 6px;
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: var(--space-3) var(--space-4);
+  margin: var(--space-4) 0;
+}
+.warning p {
+  margin: 0;
+}
+.warning p + p {
+  margin-top: var(--space-2);
+}
+
+/* Camera check card */
+.checkCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left-width: 6px;
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4);
+  margin: var(--space-4) 0;
+}
+.checkCard[data-verdict="good"] {
+  border-left-color: var(--ok);
+}
+.checkCard[data-verdict="marginal"] {
+  border-left-color: var(--warn);
+}
+.checkCard[data-verdict="too_coarse"] {
+  border-left-color: var(--danger);
+}
+.checkCard p {
+  margin: 0 0 var(--space-2);
+}
+.checkHeadline {
+  font-weight: 600;
+}
+
+/* Crop box over the live view */
+.cropArea {
+  position: relative;
+  max-width: 40rem;
+  touch-action: pan-y;
+}
+.cropBox {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px dashed var(--warn);
+  box-shadow: 0 0 0 1px #000;
+}
+.cropEdge {
+  position: absolute;
+  touch-action: none;
+}
+.edge_top,
+.edge_bottom {
+  left: var(--target);
+  right: var(--target);
+  height: var(--target);
+  cursor: ns-resize;
+}
+.edge_top {
+  top: calc(var(--target) / -2);
+}
+.edge_bottom {
+  bottom: calc(var(--target) / -2);
+}
+.edge_left,
+.edge_right {
+  top: var(--target);
+  bottom: var(--target);
+  width: var(--target);
+  cursor: ew-resize;
+}
+.edge_left {
+  left: calc(var(--target) / -2);
+}
+.edge_right {
+  right: calc(var(--target) / -2);
+}
+/* The hit area is 36 px; the visible dot is smaller. */
+.cropHandle {
+  position: absolute;
+  width: var(--target);
+  height: var(--target);
+  min-height: var(--target);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  touch-action: none;
+}
+.cropHandle::after {
+  content: "";
+  position: absolute;
+  inset: 10px;
+  border-radius: 50%;
+  background: var(--warn);
+  border: 2px solid #000;
+}
+.cropHandle:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 0;
+}
+.handle_tl {
+  left: calc(var(--target) / -2);
+  top: calc(var(--target) / -2);
+  cursor: nwse-resize;
+}
+.handle_tr {
+  right: calc(var(--target) / -2);
+  top: calc(var(--target) / -2);
+  cursor: nesw-resize;
+}
+.handle_bl {
+  left: calc(var(--target) / -2);
+  bottom: calc(var(--target) / -2);
+  cursor: nesw-resize;
+}
+.handle_br {
+  right: calc(var(--target) / -2);
+  bottom: calc(var(--target) / -2);
+  cursor: nwse-resize;
+}
+.cropPreview {
+  display: block;
+  max-width: min(100%, 20rem);
+  height: auto;
+  background: #111;
+  border: 1px solid var(--border);
+}
+.linkButton {
+  background: transparent;
+  border: 0;
+  color: var(--accent);
+  text-decoration: underline;
+  padding: 0 var(--space-2);
+}

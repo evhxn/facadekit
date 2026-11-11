@@ -29,11 +29,12 @@ from facadekit.api import ws as ws_module
 from facadekit.api.deps import AppState
 from facadekit.api.routes_devices import CameraManager
 from facadekit.calib.learn import ScanMemory
+from facadekit.calib.learn_align import AlignMemory
 from facadekit.config import projects_dir
 from facadekit.errors import BAD_REQUEST, NOT_FOUND, FkError, http_status
 from facadekit.jobs.runner import JobRunner
 from facadekit.sim.devices import SimCamera, SimDisplay
-from facadekit.sim.scene import default_scene
+from facadekit.sim.scene import SimScene, default_scene
 from facadekit.store.project_store import ProjectStore
 
 WEBDIST = Path(__file__).resolve().parent.parent / "webdist"
@@ -54,6 +55,7 @@ def create_app(
     pairing_code: str | None = None,
     client_addr_override: Callable[[], str] | None = None,
     testing: bool = False,
+    sim_scene: SimScene | None = None,
 ) -> FastAPI:
     root = data_dir / "projects" if data_dir is not None else projects_dir()
     events = ws_module.EventHub()
@@ -61,7 +63,7 @@ def create_app(
     jobs = JobRunner(
         on_update=lambda job: events.publish({"type": "job", "job": job.model_dump(mode="json")})
     )
-    sim_scene = default_scene() if sim else None
+    sim_scene = (sim_scene or default_scene()) if sim else None  # test hook: choose the scene
     sim_display = SimDisplay(sim_scene) if sim_scene is not None else None
     sim_camera_factory = (
         (lambda: SimCamera(sim_scene, sim_display))
@@ -78,6 +80,7 @@ def create_app(
         sim_scene=sim_scene,
         sim_display=sim_display,
         scan_memory=ScanMemory(root.parent / "learning" / "scans.jsonl"),
+        align_memory=AlignMemory(root.parent / "learning" / "realign.jsonl"),
     )
 
     @asynccontextmanager

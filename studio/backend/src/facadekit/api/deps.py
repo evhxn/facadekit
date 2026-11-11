@@ -7,6 +7,7 @@ from fastapi import Request
 
 from facadekit.api.ws import EventHub, ProjectorHub
 from facadekit.calib.learn import ScanMemory
+from facadekit.calib.learn_align import AlignMemory
 from facadekit.jobs.runner import JobRunner
 from facadekit.store.project_store import ProjectStore
 
@@ -27,6 +28,7 @@ class AppState:
     sim_scene: SimScene | None = None
     sim_display: SimDisplay | None = None
     scan_memory: ScanMemory | None = None  # scan strategy learning; None = not available
+    align_memory: AlignMemory | None = None  # re-align history; None = not available
     segmenters: dict[tuple[str, str, str], Any] = field(default_factory=dict)
 
 

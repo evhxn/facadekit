@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, ConfigDict
 
 from facadekit.api.deps import AppState, get_state
+from facadekit.config import camera_size
 from facadekit.devices.base import Camera
 from facadekit.devices.camera_opencv import CameraInfo, OpenCvCamera, list_cameras
 from facadekit.errors import BAD_REQUEST, INTERNAL, NOT_FOUND, FkError
@@ -58,7 +59,7 @@ class CameraManager:
             if camera_id == SIM_CAMERA_ID:
                 return self._sim_factory()
         elif camera_id.isdecimal() and camera_id.isascii():
-            return OpenCvCamera(int(camera_id))
+            return OpenCvCamera(int(camera_id), *camera_size())
         raise FkError(NOT_FOUND, f"camera {camera_id!r} not found")
 
     def validate(self, camera_id: str) -> None:
@@ -146,17 +147,39 @@ def _busy_response(exc: CameraBusyError) -> JSONResponse:
     )
 
 
+def _parse_crop(crop: str) -> tuple[int, int, int, int]:
+    parts = crop.split(",")
+    if len(parts) != 4 or not all(p.isascii() and p.isdecimal() for p in parts):
+        raise FkError(BAD_REQUEST, "crop: expected x,y,w,h as four non-negative integers")
+    x, y, w, h = (int(p) for p in parts)
+    return x, y, w, h
+
+
+def _apply_crop(frame: np.ndarray, box: tuple[int, int, int, int]) -> np.ndarray:
+    """Clamp the crop to the frame and slice (before JPEG encoding)."""
+    x, y, w, h = box
+    fh, fw = frame.shape[:2]
+    x0, y0 = min(x, fw), min(y, fh)
+    x1, y1 = min(x + w, fw), min(y + h, fh)
+    if x1 <= x0 or y1 <= y0:
+        raise FkError(BAD_REQUEST, "crop: lies outside the camera picture")
+    return np.ascontiguousarray(frame[y0:y1, x0:x1])
+
+
 @router.get("/devices/cameras")
 def get_cameras(state: State) -> list[CameraInfo]:
     return state.cameras.list()
 
 
 @router.get("/devices/cameras/{cid}/snapshot.jpg")
-def camera_snapshot(cid: str, state: State) -> Response:
+def camera_snapshot(cid: str, state: State, crop: str | None = None) -> Response:
+    box = _parse_crop(crop) if crop is not None else None
     try:
         frame = state.cameras.snapshot(cid)
     except CameraBusyError as exc:
         return _busy_response(exc)
+    if box is not None:
+        frame = _apply_crop(frame, box)
     ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
     if not ok:
         raise FkError(INTERNAL, "snapshot could not be encoded as JPEG")

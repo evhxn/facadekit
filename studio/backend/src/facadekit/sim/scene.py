@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from typing import Any
 
 import cv2
 import numpy as np
@@ -136,3 +137,80 @@ class SimScene:
 
 def default_scene() -> SimScene:
     return SimScene()
+
+
+def _scale_pt(p: Point, f: float) -> Point:
+    return (float(p[0] * f), float(p[1] * f))
+
+
+def scale_world(scene: SimScene, f: float) -> SimScene:
+    """Scene with a world plane `f` times larger. h_p2c is unchanged; h_w2c changes.
+
+    `replace` re-runs __init__, so the cached albedo (init=False) is rebuilt at the new size.
+    """
+    a, b, c, d = (_scale_pt(p, f) for p in scene.proj_corners_world)
+    return replace(
+        scene,
+        world_size=(int(round(scene.world_size[0] * f)), int(round(scene.world_size[1] * f))),
+        proj_corners_world=(a, b, c, d),
+        features_world={
+            k: (float(v[0] * f), float(v[1] * f), float(v[2] * f), float(v[3] * f))
+            for k, v in scene.features_world.items()
+        },
+        occluders_world=[
+            (float(v[0] * f), float(v[1] * f), float(v[2] * f), float(v[3] * f))
+            for v in scene.occluders_world
+        ],
+    )
+
+
+def far_scene(
+    k: float,
+    *,
+    cam_size: tuple[int, int] = (1280, 720),
+    centre: tuple[float, float] = (0.6, 0.45),
+    world_scale: float = 1.0,
+    **overrides: Any,
+) -> SimScene:
+    """The default layout scaled by `k * cam_w / 1280` about `centre` (fractions of the frame),
+    so the projection is small and off-centre in the camera picture."""
+    base = default_scene()
+    m = np.mean(np.asarray(base.world_corners_cam, dtype=np.float64), axis=0)
+    cx, cy = centre[0] * cam_size[0], centre[1] * cam_size[1]
+    g = k * cam_size[0] / 1280
+    corners = tuple(
+        (float(cx + g * (p[0] - m[0])), float(cy + g * (p[1] - m[1])))
+        for p in base.world_corners_cam
+    )
+    scene = replace(base, cam_size=cam_size, world_corners_cam=corners)  # type: ignore[arg-type]
+    if world_scale != 1:
+        scene = scale_world(scene, world_scale)
+    return replace(scene, **overrides) if overrides else scene
+
+
+def true_px_per_proj_px(scene: SimScene) -> float:
+    """Camera px per projector px (linear): sqrt(|det J|) of h_p2c at the projector centre."""
+    w, h = scene.proj_size
+    hm = scene.h_p2c
+    step = 0.5
+
+    def at(x: float, y: float) -> np.ndarray:
+        v = hm @ np.array([x, y, 1.0])
+        return np.asarray(v[:2] / v[2])
+
+    cx, cy = w / 2, h / 2
+    dx = (at(cx + step, cy) - at(cx - step, cy)) / (2 * step)
+    dy = (at(cx, cy + step) - at(cx, cy - step)) / (2 * step)
+    return float(np.sqrt(abs(dx[0] * dy[1] - dx[1] * dy[0])))
+
+
+def scene_far_marginal() -> SimScene:
+    return far_scene(0.58)
+
+
+def scene_far_too_coarse() -> SimScene:
+    return far_scene(0.28)
+
+
+def scene_phone() -> SimScene:
+    return far_scene(0.7, cam_size=(2560, 1440), world_scale=2.0, blur_sigma=1.2, noise_sigma=1.5)

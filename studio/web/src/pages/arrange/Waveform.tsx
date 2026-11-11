@@ -145,7 +145,7 @@ export default function Waveform({ url, pxPerMs, contentWidth, top, scrollerRef 
             opacity: 0.6,
           }}
         >
-          {current?.failed ? "Waveform unavailable" : "Loading waveform…"}
+          {current?.failed ? "Waveform unavailable. Import the audio again." : "Loading waveform…"}
         </span>
       )}
     </div>

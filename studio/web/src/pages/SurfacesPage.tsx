@@ -54,7 +54,7 @@ export default function SurfacesPage() {
 
   useEffect(() => {
     if (projectId && useProjectStore.getState().project?.id !== projectId) {
-      load(projectId).catch(() => setLoadError("Could not load the project."));
+      load(projectId).catch(() => setLoadError("Could not load the project. Go back to Projects and open it again."));
     }
   }, [projectId, load]);
 
@@ -157,7 +157,7 @@ export default function SurfacesPage() {
   if (!project.calibration_id) {
     return (
       <p>
-        No calibration yet. Go to <Link to={setupLink}>Setup</Link> to scan the house first.
+        No calibration yet. Go to <Link to={setupLink} className={styles.linkTarget}>Setup</Link> to scan the house first.
       </p>
     );
   }
@@ -281,10 +281,10 @@ export default function SurfacesPage() {
         {remoteOpen && <RemoteDialog projectId={project.id} onClose={() => setRemoteOpen(false)} />}
         {notConnected && (
           <p className={styles.note}>
-            Projector window is not open. <Link to={setupLink}>Open Setup</Link>
+            Projector window is not open. <Link to={setupLink} className={styles.linkTarget}>Open Setup</Link>
           </p>
         )}
-        <h2>Surfaces</h2>
+        <h2 className={styles.panelHeading}>Surfaces</h2>
         <SurfaceList
           surfaces={project.surfaces}
           selectedId={selectedId}

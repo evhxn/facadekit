@@ -8,6 +8,15 @@ import cv2
 import numpy as np
 
 from facadekit.calib.patterns import PatternFrame, PatternSpec, pattern_sequence, render_pattern
+from facadekit.calib.quality import (
+    LitBlob,
+    lit_blob,
+    lit_threshold,
+    noise_sigma,
+    projection_found,
+    px_per_proj_px,
+)
+from facadekit.calib.roi import crop_too_tight
 from facadekit.calib.tuning import auto_exposure
 from facadekit.devices.base import Camera, ProjectorDisplay
 from facadekit.errors import FkError
@@ -45,6 +54,33 @@ def _shoot(
     return gray, bgr
 
 
+def no_projection_error() -> FkError:
+    return FkError(
+        "CAMERA_NO_PROJECTION",
+        "The camera does not see the projected light. Check that the camera faces the "
+        "projection and that the projector is on.",
+    )
+
+
+def lit_stats(
+    contrast: np.ndarray, white: np.ndarray, blob: LitBlob, proj_w: int, proj_h: int
+) -> dict[str, float]:
+    """Measurements shared by the live precheck and recorded captures."""
+    lit = contrast > lit_threshold(contrast)
+    x0, y0, x1, y1 = blob.box
+    return {
+        "lit_fraction": float(lit.mean()),
+        "median_contrast": float(np.median(contrast[lit])),
+        "lit_px": float(blob.area_px),
+        "px_per_proj_px": px_per_proj_px(blob.hull_area_px, proj_w, proj_h),
+        "p99_white": float(np.percentile(white, 99)),
+        "lit_x0": float(x0),
+        "lit_y0": float(y0),
+        "lit_x1": float(x1),
+        "lit_y1": float(y1),
+    }
+
+
 def precheck(
     display: ProjectorDisplay,
     camera: Camera,
@@ -52,6 +88,7 @@ def precheck(
     *,
     settings: CalibSettings | None = None,
     sleep: Callable[[float], None] = time.sleep,
+    crop_check: bool = False,
 ) -> dict[str, float]:
     w, h = display.size
     if (w, h) != (spec.width, spec.height):
@@ -67,23 +104,25 @@ def precheck(
         display, camera, np.full((spec.height, spec.width), 255, np.uint8), settings, sleep
     )
     contrast = white - black
-    thr = max(12.0, 0.15 * float(np.percentile(contrast, 95)))
-    lit = contrast > thr
-    lit_fraction = float(lit.mean())
-    if lit_fraction < 0.05:
-        raise FkError(
-            "CAMERA_NO_PROJECTION",
-            "The camera does not see the projected light. Check that the camera faces the "
-            "projection and that the projector is on.",
-        )
-    median_contrast = float(np.median(contrast[lit]))
+    blob = lit_blob(contrast)
+    if blob is None or not projection_found(blob):
+        raise no_projection_error()
+    stats = lit_stats(contrast, white, blob, spec.width, spec.height)
+    if crop_check:  # cropped scan: is the crop cutting into the lit area?
+        stats["crop_tight"] = 1.0 if crop_too_tight(blob.mask) else 0.0
+    median_contrast = stats["median_contrast"]
     if median_contrast < 20:
         raise FkError(
             "TOO_BRIGHT",
             "The projection is too faint compared with the ambient light. Dim the room "
             "or increase the projector brightness.",
         )
-    return {"lit_fraction": lit_fraction, "median_contrast": median_contrast}
+    # Two more single frames of the still-white scene give the sensor noise.
+    frame_a = cv2.cvtColor(camera.read(), cv2.COLOR_BGR2GRAY).astype(np.float32)
+    frame_b = cv2.cvtColor(camera.read(), cv2.COLOR_BGR2GRAY).astype(np.float32)
+    snr = median_contrast / max(noise_sigma(frame_a, frame_b, blob.mask), 0.1)
+    stats["snr"] = snr
+    return stats
 
 
 def run_capture(

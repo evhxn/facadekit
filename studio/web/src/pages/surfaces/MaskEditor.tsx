@@ -70,7 +70,7 @@ export default function MaskEditor({ surface, onChange }: Props) {
             Drag points, click an edge to add one, Delete removes the selected point (at least 3
             stay).
           </small>
-          {!maskIsSimple(mask) && <p role="alert">The outline crosses itself.</p>}
+          {!maskIsSimple(mask) && <p role="alert">The outline crosses itself. Drag its points apart until the lines no longer cross.</p>}
           <ul>
             {mask.holes.map((_, k) => (
               <li key={k}>

@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { ApiError, cancelJob, projViewUrl, realign, startCalibration } from "../../api/client";
+import { ApiError, cancelJob, getCalibration, projViewUrl, realign, startCalibration } from "../../api/client";
 import type { RealignResponse } from "../../api/client";
 import { userMessage } from "../../api/errors";
 import { waitForJob } from "../../api/events";
-import type { Job, Project } from "../../api/types";
+import type { Calibration, Job, Project } from "../../api/types";
 import ErrorBanner from "../../components/ErrorBanner";
 import JobProgress from "../../components/JobProgress";
 import { useProjectStore } from "../../state/projectStore";
@@ -46,9 +46,19 @@ export default function StepRealign({ project, cameraId }: Props) {
     setPhase("scanning");
     setJob(null);
     try {
-      const body = cameraId
-        ? { mode: "scan" as const, camera_id: cameraId }
-        : { mode: "scan" as const };
+      // Scan with the same crop as the scan being compared against, so both see the same picture.
+      let earlier: Calibration | null = null;
+      try {
+        earlier = await getCalibration(pid, oldId);
+      } catch {
+        // Without the old settings the scan still works; the maps are stored for the whole picture.
+      }
+      const sameCamera = !cameraId || !earlier?.camera_id || earlier.camera_id === cameraId;
+      const roi = sameCamera ? earlier?.settings?.roi : null;
+      const body: Parameters<typeof startCalibration>[1] = cameraId
+        ? { mode: "scan", camera_id: cameraId }
+        : { mode: "scan" };
+      if (roi) body.settings = { roi };
       const { job_id } = await startCalibration(pid, body);
       const final = await waitForJob(job_id, (j) => mounted.current && setJob(j));
       if (!mounted.current) return;
@@ -56,7 +66,7 @@ export default function StepRealign({ project, cameraId }: Props) {
         setError(
           final.error
             ? userMessage(final.error.code, final.error.message)
-            : "The scan did not work.",
+            : "The scan did not work. Try again, or keep the old scan and place surfaces by hand.",
         );
         setPhase("failed");
         return;
@@ -75,13 +85,13 @@ export default function StepRealign({ project, cameraId }: Props) {
         setPhase("preview");
       } catch (e) {
         if (!mounted.current) return;
-        setError(e instanceof ApiError ? userMessage(e.code, e.message) : "Re-align failed.");
+        setError(e instanceof ApiError ? userMessage(e.code, e.message) : "Re-align failed. Keep the new scan and place the surfaces by hand.");
         setPhase("failed");
         await useProjectStore.getState().load(pid);
       }
     } catch (e) {
       if (!mounted.current) return;
-      setError(e instanceof ApiError ? userMessage(e.code, e.message) : "The scan failed.");
+      setError(e instanceof ApiError ? userMessage(e.code, e.message) : "The scan failed. Check that the camera and projector window are open, then try again.");
       setPhase("failed");
     }
   };
@@ -99,7 +109,7 @@ export default function StepRealign({ project, cameraId }: Props) {
       if (mounted.current) setPhase("applied");
     } catch (e) {
       if (mounted.current) {
-        setError(e instanceof ApiError ? userMessage(e.code, e.message) : "Could not apply.");
+        setError(e instanceof ApiError ? userMessage(e.code, e.message) : "Could not apply the change. Try Apply again, or place the surfaces by hand.");
         setPhase("failed");
       }
     } finally {
@@ -186,6 +196,16 @@ export default function StepRealign({ project, cameraId }: Props) {
             </svg>
           </div>
           <p>Surfaces moved by up to {Math.round(preview.max_shift_px)} px.</p>
+          {preview.warning ? (
+            <div className={styles.warning} role="status">
+              <p>{preview.warning}</p>
+              <p>
+                Compare the red dashed outlines (old) with the green ones (new). If the green
+                outlines do not sit on the house, choose &quot;Keep new scan but place surfaces by
+                hand&quot;. If they look right, press Apply.
+              </p>
+            </div>
+          ) : null}
           <div className={styles.row}>
             <button type="button" disabled={busy} onClick={() => void apply()} className="primary">
               Apply

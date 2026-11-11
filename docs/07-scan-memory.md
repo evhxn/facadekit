@@ -22,6 +22,7 @@ With an empty log the wizard behaves exactly as before: the "standard" strategy 
 | `low_light` | 2 | 6 | 0.06 | Faint or noisy picture | (2, 1) |
 | `soft_focus` | 3 | 3 | 0.10 | Camera or projector out of focus: 8 px blocks instead of 4 px | (2, 1) |
 | `low_light_soft` | 3 | 6 | 0.06 | Both | (1.5, 1) |
+| `very_soft` | 4 | 3 | 0.10 | Badly out of focus: 16 px blocks | (1.5, 1) |
 
 `CalibSettings.min_conf` is new (default 0.10, the value `decode` always used). `Calibration.strategy` records which strategy was used (`null` when scan memory was not involved).
 
@@ -31,14 +32,18 @@ With an empty log the wizard behaves exactly as before: the "standard" strategy 
 
 Evidence from other contexts counts less: same lighting but another camera ×0.5, same camera but other lighting ×0.25, neither ×0.
 
+Picture scale (T-205): the record also stores `scale`, `"fine"` when `finest_readable_skip(px_per_proj_px) <= 2` and `"coarse"` otherwise (`null` when unknown, and in every record written before T-205). When the caller passes a scale and a record has a different one, that record's weight is multiplied by `DIFFERENT_SCALE = 0.5` on top of the camera/lighting factor (so the sibling share of a failure gets it too). Records without `scale`, and calls without `scale`, count exactly as before, and an empty log is unchanged. Moving the camera closer after a "too small" warning therefore halves what was learned at the old distance. `remembered_strategy` (Pi and phone scans) passes no scale, because the scale is unknown before the recording. `learn_eval` passes no scale either, so its numbers do not depend on this factor.
+
 ## Reward
 
 - Failed scan (`SCAN_FAILED`) or user verdict "bad": 0, and it counts double (`MISTAKE_WEIGHT = 2`).
 - Otherwise `clip((coverage − 0.5) / 0.45, 0, 1) − 0.01 × (average_frames − 1)`, plus 0.1 when the user confirmed it.
 
+A failed scan also counts against the strategies with the same or finer blocks (`skip_lsb` ≤ the failed one) at `SIBLING_SHARE = 0.5` of its weight: stripes the camera cannot resolve stay unresolved with more frames or a lower threshold. Not applied in the `low` lighting bucket, where noise is the likelier cause and averaging helps.
+
 Each record adds `weight × reward` to `a` and `weight × (1 − reward)` to `b` of its strategy. The policy picks the highest `a / (a + b)`; ties go to the earlier row of the table. There is no random exploration: the optimistic priors make each untried strategy get its turn after failures, and the same history always gives the same choice.
 
-Worked example, out-of-focus camera (simulator, `SimScene(blur_sigma=4.0)`; this is the test `test_out_of_focus_camera_is_learned`): `standard` fails, `low_light` fails, `soft_focus` measures 71 %, and after one more mediocre result `low_light_soft` is tried and measures 99 %.
+Worked example, out-of-focus camera (simulator, `SimScene(blur_sigma=4.0)`; test `test_out_of_focus_camera_is_learned`): `standard` fails, then `soft_focus` is tried and works.
 
 Not logged: cancelled scans, and failures before a strategy is chosen (`TOO_BRIGHT`, `CAMERA_NO_PROJECTION`, wrong resolution, camera errors). Those are not the strategy's fault.
 
@@ -58,10 +63,11 @@ Not logged: cancelled scans, and failures before a strategy is chosen (`TOO_BRIG
 # calib/learn.py
 STRATEGIES: tuple[Strategy, ...]; get_strategy(id) -> Strategy | None
 contrast_bucket(median_contrast) -> "low" | "medium" | "high"
-class ScanRecord(BaseModel)          # one line of scans.jsonl
+class ScanRecord(BaseModel)          # one line of scans.jsonl; `scale` optional (T-205)
 reward(record) -> float
-posterior(records, camera_id, bucket) -> dict[str, tuple[float, float]]
-choose(records, camera_id, bucket) -> Strategy
+posterior(records, camera_id, bucket, scale=None) -> dict[str, tuple[float, float]]
+choose(records, camera_id, bucket, scale=None) -> Strategy
+scale_class(px_per_proj_px) -> "fine" | "coarse" | None;  DIFFERENT_SCALE = 0.5
 class ScanMemory(path): records(), append(record), set_verdict(calibration_id, verdict) -> bool, clear()
 class ScanAdvisor(memory): choose(camera_id, pre) -> Strategy; succeeded(...); failed(...)
 learning_enabled() -> bool           # env FACADEKIT_LEARN=0 turns it off
@@ -72,12 +78,105 @@ run_calibration(..., advisor: ScanAdvisor | None = None)
 
 | Route | Purpose |
 |---|---|
-| `POST /api/v1/projects/{pid}/calibrations` | New body field `learn: bool = true`. Scan memory is used for `mode: "scan"` unless `learn` is false, `FACADEKIT_LEARN=0`, or `settings` explicitly sets `skip_lsb`, `average_frames` or `min_conf`. |
+| `POST /api/v1/projects/{pid}/calibrations` | New body field `learn: bool = true`. Scan memory is used for `mode: "scan"` and `"scan_pi"` unless `learn` is false, `FACADEKIT_LEARN=0`, or `settings` explicitly sets `skip_lsb`, `average_frames` or `min_conf`. |
 | `POST /api/v1/projects/{pid}/calibrations/{cid}/feedback` | Body `{"verdict": "good" \| "bad"}` → `{"recorded": bool}` |
 | `GET /api/v1/learning/scans` | `{"enabled", "scans", "strategies": [{"id", "label", "tries", "mistakes", "mean_reward"}]}` |
 | `DELETE /api/v1/learning/scans` | Forget everything (204) |
 
 Storage: `<data dir>/learning/scans.jsonl`, one JSON object per line, trimmed to the newest 500 on rewrite. Nothing is uploaded.
+
+## Tuning results (2026-11-11)
+
+Harness: `studio/backend/src/facadekit/sim/learn_eval.py` (`uv run python -m facadekit.sim.learn_eval --n 18 --cache <file>`). It builds 18 synthetic scenes (blur 0.5-5 px, noise 1-12, ambient 0.02-0.3, gain 0.35-1, gamma 1.8-2.6, door position shifted), scans each with every strategy, then replays the real policy 8 times per scene on the stored outcomes. Scenes with `seed % 3 == 0` (6) are held out and were not looked at while choosing changes; the other 12 are tuning scenes. Regret = reward of the best strategy minus the reward of the one chosen, summed over 8 scans of the same camera, averaged over scenes. "Gap" = same measure on the 8th scan.
+
+| | Before (4 strategies) | After |
+|---|---|---|
+| Tuning regret | 0.783 | 0.490 |
+| Held-out regret | 1.318 | 1.143 |
+| Held-out final-scan gap | 0.021 | 0.000 |
+| First scan ok (tuning / held-out) | 7/12, 1/6 | unchanged (needs a blur estimate before the scan) |
+| Easy scenes (blur ≤ 1.5): strategy | `standard` | `standard`, unchanged |
+
+Corner error (map vs ground truth, px) for scenes `standard` can scan stays 0.3-1.1 px. Sim e2e: 1.40 px before and after (limit 1.5). (Both improved later by the albedo-edge fix, see the next section: 0.1-0.6 px and 0.74 px; the regret numbers did not change.)
+
+Kept: (1) failure sharing to same-or-finer strategies, which removes the wasted `low_light` scan for blurred cameras (the two wasted scans became one); (2) `very_soft` (skip_lsb 4): blur 5 px scenes had only a 58-66 % coverage option, now 100 % at 1-1.3 px.
+
+Tried and rejected: `min_conf` 0.3 or 0.5 (every scan fails: confidence of blurred stripes is low); `skip_lsb=2, min_conf=0.3` (same); sharing failures without the same-or-finer rule (standard got retried a third time); very_soft prior 1.2 (standard was retried before it).
+
+Not solved: coverage is 100 % even when the corner error is 9-18 px (scenes 1005, 1007, 1008 with `soft_focus`), so the reward cannot see that kind of inaccuracy; only the user's "looks wrong" does. Dim scenes where only more averaging helps did not occur in the synthetic set, so the `low` bucket exemption is untested against real data.
+
+## Albedo-edge bias in the projector map (2026-11-11)
+
+Code: `calib/maps.py` (`albedo_edge_weight`, `_block_measurements`, `_local_fit`, `build_maps`). Tests: `tests/test_calib_albedo_edge.py`. Decode itself is unchanged.
+
+### Symptom
+
+`facadekit sim e2e` measured a door-quad error of about 1.50 px averaged over scene seeds 0-5 (limit 1.5 px). With a noise-free photo the door detector is within 0.47 px on the true map but 1.49 px on the scanned map, all four corners pulled inward. 99.8 % of projector pixels are measured, so hole filling was not the cause. The scanned-minus-true map error was a dipole across every door edge: +0.27 to +0.31 camera px (outward) just inside the edge, -0.10 to -0.16 just outside, zero by 24 projector px.
+
+### Mechanism (confirmed)
+
+The camera image of a stripe is `PSF * (albedo x stripe)`. Decode compares pattern and inverse per pixel, i.e. takes the zero crossing of `PSF * (albedo x (2 stripe - 1))`. Where the albedo changes within the blur radius, the brighter side dominates and the crossing moves into the darker side. For a Gaussian PSF and a locally linear albedo the shift is `-sigma^2 * grad log(blurred albedo)` (first order; checked numerically in 1D, exact peak shift for a 0.12 -> 0.78 step is 1.1 camera px at sigma 1). The pixels just outside a bright door therefore decode as door pixels and vice versa, and `build_maps` averaged these pixels into its nodes.
+
+Experiments (noise-free scans, default scene geometry; decode x-bias averaged along the door's left edge, in projector px; map dipole = largest bin of the edge-normal map error, camera px):
+
+| Scan | decode bias next to the frame | map dipole (before) | door (clean photo, scanned map) |
+|---|---|---|---|
+| blur 1 (default) | -0.64 / +1.09 | +0.31 / -0.16 | 1.49 px |
+| blur 0 | -0.11 / +0.11 | +0.06 / -0.05 | 0.75 px |
+| blur 1, flat albedo | -0.06 / -0.05 | +0.04 / -0.07 (not at edges) | 0.75 px |
+| blur 0.5 | -0.17 / +0.27 | | 0.84 px |
+| blur 1.5 | -1.06 / +1.76 | | 2.53 px |
+
+The bias scales with the blur and disappears without blur or without albedo edges. With noise (sigma 2) the profile is the same.
+
+### Fix
+
+1. **Weight by albedo edges.** `w = 1 / (1 + (|grad log(white - black)| / 0.05)^2)` per camera pixel (3x3 Sobel). The white frame is smooth light, so the log-gradient of white minus black is the log-gradient of the blurred albedo, which is what drives the bias. It needs no estimate of the blur, the camera gamma or exposure (log is scale-free), and also flags shadow and occlusion edges, where decoding is biased for the same reason.
+2. **One measurement per decoded block.** All pixels of a block decode to the same projector coordinate, so the block's camera centroid is the measurement and its weight is the sum of its pixel weights. Weighting pixels unevenly inside a block (tried first) moves the centroid away from the edge and produced the opposite dipole (-0.13 / +0.08).
+3. **Weighted local affine fit per node.** Each node is the intercept of a weighted least-squares fit `centroid = c + J (p - node)` over the blocks of the 5x5 surrounding nodes (Gaussian, sigma 1 node). The slopes `J` get a weak ridge prior towards the global homography's (strength 1 against data weights of hundreds), which only matters where data is sparse. Nodes are never snapped to the plane: with strong barrel distortion (plane fit off by up to 3 px) the map error is 0.03 px mean (0.11 px with the old method); test `test_follows_lens_distortion_not_the_plane_fit`. Holes beyond the fit radius are filled as before.
+
+`measured` and `coverage` are computed exactly as before, so scan-memory rewards are unchanged.
+
+### Results
+
+Sim e2e door-quad error (max corner error, px), scene seeds 0-5, with the T-202 precheck in place:
+
+| | 0 | 1 | 2 | 3 | 4 | 5 | max | mean |
+|---|---|---|---|---|---|---|---|---|
+| before | 1.510 | 1.494 | 1.479 | 1.536 | 1.481 | 1.488 | 1.536 | 1.498 |
+| after | 0.725 | 0.749 | 0.775 | 0.767 | 0.698 | 0.729 | 0.775 | 0.740 |
+| map at door corners (b), before | 0.32 | 0.71 | 0.31 | 0.60 | 0.44 | 0.55 | | |
+| map at door corners (b), after | 0.08 | 0.10 | 0.12 | 0.07 | 0.10 | 0.10 | | |
+
+Coverage 99.8 % on every seed, before and after (printed as 100 %). The remaining ~0.5 px is mostly the door detector's own inward bias (0.47 px with the true map and a noise-free photo).
+
+Map error, default scene with noise: mean 0.17 -> 0.09 camera px, p99 0.41 -> 0.28; edge dipole within +-0.04 (was +0.31 / -0.16). Synthetic panel scene (`PanelScene` in the tests, bright panel in a dark frame on a grey wall): dipole peak-to-peak 0.46 -> 0.07 camera px (6.7x); flat wall 0.10 -> 0.05.
+
+Scan memory harness (`learn_eval --n 18`), before -> after: tuning regret 0.490 -> 0.490, held-out regret 1.143 -> 1.143, final-scan gap 0.000 -> 0.000, first scan ok 7/12 and 1/6 unchanged, every coverage cell identical. No re-tuning. Corner errors fell where the scan is sound, e.g. 1000 `soft_focus` 1.5 -> 0.3 px, 1004 `standard` 0.6 -> 0.2, 1012 `standard` 1.0 -> 0.6, 1013 `low_light_soft` 1.8 -> 0.8, 1002 `low_light_soft` 4.0 -> 0.8, 1011 `standard` 0.8 -> 0.2. The 6-26 px outliers (1005, 1007, 1008, 1012, 1017 with coarse strategies) are unchanged: they are wrong decoded bits, a different problem (see "Not solved" above).
+
+Runtime on the sim scan (1280x720 camera, 1080p projector, best of 9): `build_maps` 28.4 -> 31.8 ms (+12 %), decode + build_maps 67 -> 71 ms (+5 %); the capture itself takes seconds.
+
+### Rejected ideas
+
+- **Ratio decoding** (`(pattern - inverse) / (white - black)`): dividing by a positive number does not move a zero crossing, so the decoded bits are identical.
+- **First-order shift correction** (move each pixel by `k grad log(contrast)`, `k = sigma^2`): with k = 1 it removed the dipole on the default scene (door 0.63-0.77 px), but k must track the camera's blur (k = 4 was needed at blur 2) and its gamma. Estimating k by regressing residuals on `grad log(contrast)` gave 1.2 at skip_lsb 2 and 2.7 at skip_lsb 3 for the same camera (block quantisation leaks into the regression), so it is not reliable enough for real cameras.
+- **Per-pixel weights** (no block pooling): over-corrects, see Fix 2.
+- **Narrower fit** (3x3 nodes, sigma 2/3 node): panel-scene dipole 0.12 px peak-to-peak against 0.07 px for 5x5, so 5x5 is kept. The weight scale matters little: 0.02-0.08 changes the dipole by about 0.01 px.
+- **Snapping nodes to the plane fit**: hides lens distortion and non-planar walls.
+- **A gradient-based sub-pixel door-edge fit** (earlier attempt, T-202): fixed two corners, worsened others; the bias was in the map, not the detector.
+
+Not pursued: sub-block refinement from the finest modulated bit (its zero crossing has the same albedo bias), modulation-depth weights (low-modulation pixels are already dropped by `min_conf`).
+
+### Risks on real hardware
+
+- The weight trusts that the projector's white frame is smooth. Projector vignetting is smooth (log-gradient far below 0.05 per camera px). A sharp camera that resolves the projector's pixel grid or a DLP screen-door pattern lowers weights everywhere about equally, which does not bias the fit.
+- Walls that are textured everywhere (rough brick, stucco) lower most weights. The fit then behaves like the old unweighted average; random albedo gives biases of both signs that mostly cancel. Regular strong patterns (mortar lines every few cm) leave a small residual.
+- The fit spans +-2 nodes (16 projector px at `skip_lsb` 2, 64 px at `very_soft`). A depth step (door recess) with a large camera-projector baseline is smoothed over that width. The old 3x3 median and cell averaging smoothed over a similar span.
+- The 0.05 scale was chosen on the simulator. It is not critical there (0.02-0.08 equal), but has not been checked against real webcam noise; a very noisy dim scan raises `|grad log contrast|` from noise alone and so lowers all weights, which again only reduces to the old behaviour.
+
+## Picture scale as context (T-205)
+
+`learn_eval --n 18`, before -> after adding `scale`: tuning regret 0.490 -> 0.490, held-out regret 1.143 -> 1.143, final-scan gap 0.000 -> 0.000, first scan ok 7/12 and 1/6 unchanged, every outcome cell identical. This is by construction: the harness calls `choose` without a scale, which behaves exactly as before. The factor is covered by unit tests (`test_calib_learn.py`), not by the harness.
 
 ## Bug fixed on the way
 
@@ -87,11 +186,42 @@ Storage: `<data dir>/learning/scans.jsonl`, one JSON object per line, trimmed to
 
 - Tested only in the simulator. Whether these four strategies are the right ones for real webcams and real walls is unknown until field scans (spike S-5).
 - Coverage is a proxy for accuracy. A scan can cover everything and still be slightly off; only the user's "looks wrong" catches that.
-- Pi-driven scans (`mode: "scan_pi"`) are not learned yet: the pattern video is rendered before the lighting is measured.
+- Pi-driven scans learn from the lighting of the previous scan only (see below): the first Pi scan of a camera, and the first after the lighting changed bucket, still use a strategy chosen for the old lighting.
 - Learning is per computer. Sharing results between users would need consent and a server, and is out of scope.
+
+## Learning from alignment corrections (2026-11-11)
+
+Code: `calib/learn_align.py`, routes in `api/routes_learning.py`, hook in `POST /projects/{pid}/realign`.
+
+**Signal.** The backend never sees the user dragging corners after Quick re-align (the editor saves whole projects), so the signal is what re-align measures itself: `max_shift_px`, the largest distance any surface corner moved when the estimated drift was applied. `reproj_error_px` and `inliers` are stored too but drive nothing. Only applied re-aligns (`apply: true`) are logged; previews are not.
+
+**Log.** `<data dir>/learning/realign.jsonl`, one JSON object per line (`id, at, project_id, max_shift_px, reproj_error_px, inliers`), newest 500 kept, nothing uploaded. `FACADEKIT_LEARN=0` stops both writing and warning.
+
+**Use.** Warning threshold = `clamp(2 x median(max_shift_px of the last 20), 40 px, 160 px)`. Bounds: never below 40 px (`WARN_DEFAULT_SHIFT_PX`), never above 4 x that (`WARN_CAP_SHIFT_PX`). Fewer than 5 records (`MIN_SAMPLES`), including an empty log: no threshold and no warning, exactly the old behaviour. When a re-align (preview or apply) exceeds the threshold, `RealignResponse.warning` carries a message; otherwise it is `null`. `MAX_REPROJ_ERROR_PX` (4 px) is not touched: it stays a hard refusal and is never loosened or tightened by the log.
+
+| Route | Purpose |
+|---|---|
+| `GET /api/v1/learning/realign` | `{"enabled", "corrections", "median_shift_px", "warn_threshold_px"}` |
+| `DELETE /api/v1/learning/realign` | Forget the re-align history (204) |
+
+Limit: the 40 px floor is a guess for 1080p projectors; tune it with field data. The wizard does not show `warning` yet.
+
+## Pi-driven scans (2026-11-11)
+
+Code: `ScanAdvisor.remembered_strategy`, `run_calibration_from_capture(..., strategy, advisor)`, `_submit_pi_scan` in `api/routes_calibration.py`.
+
+A Pi scan renders the pattern video (which depends on `skip_lsb`) before the camera sees anything, so the lighting cannot be measured first. Rule: the bucket is the one stored on the newest scan-log record with the same `camera_id` (laptop or Pi); `choose(records, camera_id, that bucket)` picks the strategy, which sets `skip_lsb`, `average_frames` and `min_conf`. With no record for the camera, the "standard" strategy is used, i.e. the fixed defaults, exactly as before.
+
+After the capture, the contrast is measured from the recorded black and white images, the bucket is derived from it as for laptop scans, and the result is logged under the strategy that was used (`succeeded`/`failed`, same reward, same `POST .../feedback`). So a Pi scan done in different light than the remembered one is logged in its real bucket and corrects the next guess. Only `SCAN_FAILED` from decoding or map building counts against the strategy. Not logged: a lost marker or recording problem, `CAMERA_NO_PROJECTION`, cancellation, and render/upload errors, as these are not the strategy's fault.
+
+Same opt-outs as laptop scans: `learn: false`, `FACADEKIT_LEARN=0`, or explicit `skip_lsb`, `average_frames` or `min_conf` in `settings`. No new endpoint fields (the existing `learn` flag now also covers `scan_pi`).
+
+## Damaged logs and several writers
+
+Code: `calib/jsonl_store.py`, shared by `ScanMemory` and `AlignMemory`. The log is read as bytes and decoded with replacement, so invalid UTF-8 never raises: undecodable or invalid lines are skipped and the valid ones load. Rewrites go through a unique temp file in the same directory and `os.replace`; the temp file is removed on error. Appends and rewrites take a lock file (`<log>.lock`, exclusive create, standard library only, same on Windows, macOS and Linux) so two instances sharing a data dir keep each other's records. Remaining limitation: the lock is best effort. If it cannot be taken within 2 s, or a crashed process left it behind (a lock older than 10 s is broken), the write goes ahead unlocked and can in rare cases lose one record. A plain append is not rewritten, so a crash mid-append can leave one damaged line, which is skipped on read.
 
 ## Next steps (not built)
 
-1. Learn from alignment corrections: record how far the user drags surface corners after Quick re-align (`calib/realign.py`) and use the median as a warning threshold, or to tune `MAX_REPROJ_ERROR_PX`.
-2. Add `scan_pi` using a bucket remembered from the previous scan with that camera.
+1. ~~Learn from alignment corrections~~ (built, see below).
+2. ~~Add `scan_pi` using a bucket remembered from the previous scan with that camera~~ (built, see below).
 3. A "What FacadeKit has learned" panel in the wizard's Advanced section, using `GET /learning/scans`, with a Forget button.

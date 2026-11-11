@@ -100,7 +100,7 @@ export function useMagicSelect(magic: MagicProps | undefined): MagicState {
         });
         if (id !== counter.current) return;
         setResult(res);
-        setNote(fellBack ? "Using the simple selector (model download failed)." : "");
+        setNote(fellBack ? "Using the simple selector because the smart model could not be downloaded. Connect to the internet and try Magic select again later." : "");
       } catch (e) {
         if (id !== counter.current) return;
         setResult(null);
@@ -110,7 +110,7 @@ export function useMagicSelect(magic: MagicProps | undefined): MagicState {
         } else if (e instanceof ApiError) {
           setError(userMessage(e.code, e.message));
         } else {
-          setError("Something went wrong.");
+          setError("Something went wrong. Click the object again, or draw the surface by hand.");
         }
       } finally {
         if (id === counter.current) setBusy(false);
@@ -205,7 +205,7 @@ export function useMagicSelect(magic: MagicProps | undefined): MagicState {
 /** Toolbar controls for the Magic select tool. */
 export function MagicControls({ ms }: { ms: MagicState }) {
   // Shown only once we know MobileSAM is unavailable; no failure wording.
-  const simpleOnly = ms.mobileSam === false && <span>Simple selector</span>;
+  const simpleOnly = ms.mobileSam === false && <span title="Smart selection is not available, so a simpler tool picks the object.">Simple selector</span>;
   if (!ms.active) {
     return (
       <>

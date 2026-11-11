@@ -91,6 +91,9 @@ export default function ClipList({
           {beats.busy ? `Finding beats… ${Math.round(beats.progress * 100)} %` : "Find beats"}
         </button>
       </div>
+      {project.timeline.audio_asset_id === null ? (
+        <p className={styles.hint}>To find beats, pick a song or video under &quot;Show audio&quot;.</p>
+      ) : null}
       {beats.error ? <p role="alert">{beats.error}</p> : null}
       <div className={styles.bar}>
         <h3>Clips</h3>
@@ -111,6 +114,14 @@ export default function ClipList({
           </tr>
         </thead>
         <tbody>
+          {rows.length === 0 ? (
+            <tr>
+              <td colSpan={7}>
+                No clips yet. Press &quot;Add clip&quot; to put a video, picture or effect on the
+                timeline.
+              </td>
+            </tr>
+          ) : null}
           {rows.map(({ clip, trackIndex }) => (
             <tr
               key={clip.id}

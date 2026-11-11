@@ -137,21 +137,22 @@ c2p = stack(coord_x, coord_y) with NaN where not valid         # shape (Hc, Wc, 
 We need the inverse lookup: for each projector pixel, which camera pixel sees it.
 
 ```
-G = 8                                        # grid step in projector pixels
+G = max(8, 2 * 2**skip_lsb)                  # grid step in projector pixels
 gw, gh = W // G + 1, H // G + 1
-sum = zeros(gh, gw, 2); cnt = zeros(gh, gw)
-for each valid camera pixel (u, v) with projector coord (px, py):
-  i, j = round(py / G), round(px / G)
-  sum[i, j] += (u, v); cnt[i, j] += 1
-grid = sum / cnt where cnt > 0
-measured = cnt > 0
+w_pix = 1 / (1 + (|grad log(contrast)| / 0.05)^2)   # low next to reflectance edges (see below)
+for each decoded block b (camera pixels with the same decoded projector coordinate p_b):
+  centroid_b = mean (u, v) of its pixels; weight_b = sum of w_pix over its pixels
+  i, j = round(p_b.y / G), round(p_b.x / G)                       # nearest node
+measured = node has at least one block
 
-# global model, used for sanity and for filling big holes
+# global model, used for sanity, as a weak prior on local slopes and for filling big holes
 H_c2p, inliers = cv2.findHomography(cam_pts, proj_pts, RANSAC, 6.0)     # from a random 20k subset
 planarity = inlier fraction
 
-# fill holes
-small holes: normalized convolution (Gaussian sigma = 2 cells) of grid*measured / measured,
+# node value: weighted local affine fit  centroid = c + J (p_b - node)  over the blocks of the
+# 5x5 nodes around it (Gaussian sigma 1 node), J pulled weakly towards H_c2p's slope; grid = c
+# fill holes (nodes with no block within 2 nodes)
+small holes: normalized convolution (Gaussian sigma = 2 cells) of grid*fitted / fitted,
              accepted where the blurred weight > 0.05
 remaining holes: inverse(H_c2p) applied to the cell's projector coordinate
 grid = 3x3 median filter of grid
@@ -159,6 +160,8 @@ p2c = bilinear upsample of grid to (H, W, 2) float32
 proj_view = cv2.remap(WHITE colour photo, p2c[...,0], p2c[...,1], INTER_LINEAR)
 coverage = mean(measured)
 ```
+
+Why the weights: next to a strong reflectance edge (a dark door frame on a light wall, mortar lines) the camera blurs albedo x stripe, so every stripe edge's zero crossing moves towards the darker side by about `sigma_psf^2 * |grad log albedo|` (0.5-1 projector px for a 1 px camera blur). No per-pixel decision can undo that. The white-minus-black image is the blurred albedo times smooth light, so its log-gradient marks the biased pixels without knowing the blur, gamma or wall. Weights are per decoded block, not per pixel: uneven weights inside a block would move its centroid. Details and numbers: `docs/07-scan-memory.md`, "Albedo-edge bias in the projector map".
 
 Outputs stored per calibration: `p2c.npy`, `measured_mask.png` (upsampled `measured`), `proj_view.png`, `calibration.json` (settings, `coverage`, `planarity`, `H_c2p`, camera resolution, warnings).
 

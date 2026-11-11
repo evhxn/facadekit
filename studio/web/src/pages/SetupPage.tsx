@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useParams, useSearchParams } from "react-router-dom";
+import { getCalibration } from "../api/client";
+import type { CameraCheck, CameraRoi } from "../api/types";
 import { useProjectStore } from "../state/projectStore";
 import styles from "./SetupPage.module.css";
 import StepCamera from "./setup/StepCamera";
@@ -15,6 +17,13 @@ export default function SetupPage() {
   const [step, setStep] = useState<number | null>(null);
   const [projectorReady, setProjectorReady] = useState(false);
   const [cameraId, setCameraId] = useState<string | null>(null);
+  const [roi, setRoi] = useState<CameraRoi | null>(null); // crop of the camera picture
+  const [roiFromLastScan, setRoiFromLastScan] = useState(false);
+  const roiRef = useRef(roi);
+  roiRef.current = roi;
+  const [check, setCheck] = useState<CameraCheck | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const phone = searchParams.get("phone") === "1";
   const [piHost, setPiHost] = useState<string | null>(null); // FPP address when the projector is on the Pi
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -22,8 +31,45 @@ export default function SetupPage() {
     useProjectStore
       .getState()
       .load(projectId)
-      .catch(() => setLoadError("Could not open this project."));
+      .catch(() => setLoadError("Could not open this project. Go back to Projects and open it again."));
   }, [projectId]);
+
+  // A crop and a check result belong to one camera.
+  const changeCamera = (id: string | null) => {
+    if (id === cameraId) return;
+    setCameraId(id);
+    setRoi(null);
+    setRoiFromLastScan(false);
+    setCheck(null);
+  };
+  const changeRoi = (next: CameraRoi | null) => {
+    setRoi(next);
+    setRoiFromLastScan(false);
+  };
+
+  // Start from the crop of the latest scan when it was made with the chosen camera.
+  const lastCalibrationId = project?.calibration_id ?? null;
+  useEffect(() => {
+    if (!cameraId || !lastCalibrationId) return;
+    let cancelled = false;
+    getCalibration(projectId, lastCalibrationId)
+      .then((cal) => {
+        const last = cal.settings?.roi;
+        if (cancelled || !last || cal.camera_id !== cameraId) return;
+        if (roiRef.current) return; // the user already chose a crop
+        setRoi(last);
+        setRoiFromLastScan(true);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, cameraId, lastCalibrationId]);
+
+  const goScan = (viaPhone: boolean) => {
+    setSearchParams(viaPhone ? { phone: "1" } : {}, { replace: true });
+    setStep(3);
+  };
 
   const loaded = project !== null && project.id === projectId;
   useEffect(() => {
@@ -47,8 +93,30 @@ export default function SetupPage() {
           onReadyChange={setProjectorReady}
         />
       ) : null}
-      {step === 2 ? <StepCamera cameraId={cameraId} onCameraChange={setCameraId} /> : null}
-      {step === 3 ? <StepScan project={project} cameraId={cameraId} piHost={piHost} /> : null}
+      {step === 2 ? (
+        <StepCamera
+          projectId={projectId}
+          cameraId={cameraId}
+          onCameraChange={changeCamera}
+          roi={roi}
+          onRoiChange={changeRoi}
+          roiFromLastScan={roiFromLastScan}
+          check={check}
+          onCheckChange={setCheck}
+          onNext={() => goScan(false)}
+          onUsePhone={() => goScan(true)}
+        />
+      ) : null}
+      {step === 3 ? (
+        <StepScan
+          project={project}
+          cameraId={cameraId}
+          piHost={piHost}
+          roi={roi}
+          onRoiReset={() => changeRoi(null)}
+          phone={phone}
+        />
+      ) : null}
       {step === 3 && project.calibration_id && project.surfaces.length > 0 ? (
         <StepRealign project={project} cameraId={cameraId} />
       ) : null}
@@ -60,7 +128,7 @@ export default function SetupPage() {
           <button
             type="button"
             disabled={(step === 1 && !projectorReady) || (step === 2 && !cameraId)}
-            onClick={() => setStep(step + 1)}
+            onClick={() => (step === 2 ? goScan(false) : setStep(step + 1))}
             className="primary"
           >
             Next
