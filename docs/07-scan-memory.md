@@ -32,6 +32,8 @@ With an empty log the wizard behaves exactly as before: the "standard" strategy 
 
 Evidence from other contexts counts less: same lighting but another camera ×0.5, same camera but other lighting ×0.25, neither ×0.
 
+Picture scale (T-205): the record also stores `scale`, `"fine"` when `finest_readable_skip(px_per_proj_px) <= 2` and `"coarse"` otherwise (`null` when unknown, and in every record written before T-205). When the caller passes a scale and a record has a different one, that record's weight is multiplied by `DIFFERENT_SCALE = 0.5` on top of the camera/lighting factor (so the sibling share of a failure gets it too). Records without `scale`, and calls without `scale`, count exactly as before, and an empty log is unchanged. Moving the camera closer after a "too small" warning therefore halves what was learned at the old distance. `remembered_strategy` (Pi and phone scans) passes no scale, because the scale is unknown before the recording. `learn_eval` passes no scale either, so its numbers do not depend on this factor.
+
 ## Reward
 
 - Failed scan (`SCAN_FAILED`) or user verdict "bad": 0, and it counts double (`MISTAKE_WEIGHT = 2`).
@@ -61,10 +63,11 @@ Not logged: cancelled scans, and failures before a strategy is chosen (`TOO_BRIG
 # calib/learn.py
 STRATEGIES: tuple[Strategy, ...]; get_strategy(id) -> Strategy | None
 contrast_bucket(median_contrast) -> "low" | "medium" | "high"
-class ScanRecord(BaseModel)          # one line of scans.jsonl
+class ScanRecord(BaseModel)          # one line of scans.jsonl; `scale` optional (T-205)
 reward(record) -> float
-posterior(records, camera_id, bucket) -> dict[str, tuple[float, float]]
-choose(records, camera_id, bucket) -> Strategy
+posterior(records, camera_id, bucket, scale=None) -> dict[str, tuple[float, float]]
+choose(records, camera_id, bucket, scale=None) -> Strategy
+scale_class(px_per_proj_px) -> "fine" | "coarse" | None;  DIFFERENT_SCALE = 0.5
 class ScanMemory(path): records(), append(record), set_verdict(calibration_id, verdict) -> bool, clear()
 class ScanAdvisor(memory): choose(camera_id, pre) -> Strategy; succeeded(...); failed(...)
 learning_enabled() -> bool           # env FACADEKIT_LEARN=0 turns it off
@@ -170,6 +173,10 @@ Not pursued: sub-block refinement from the finest modulated bit (its zero crossi
 - Walls that are textured everywhere (rough brick, stucco) lower most weights. The fit then behaves like the old unweighted average; random albedo gives biases of both signs that mostly cancel. Regular strong patterns (mortar lines every few cm) leave a small residual.
 - The fit spans +-2 nodes (16 projector px at `skip_lsb` 2, 64 px at `very_soft`). A depth step (door recess) with a large camera-projector baseline is smoothed over that width. The old 3x3 median and cell averaging smoothed over a similar span.
 - The 0.05 scale was chosen on the simulator. It is not critical there (0.02-0.08 equal), but has not been checked against real webcam noise; a very noisy dim scan raises `|grad log contrast|` from noise alone and so lowers all weights, which again only reduces to the old behaviour.
+
+## Picture scale as context (T-205)
+
+`learn_eval --n 18`, before -> after adding `scale`: tuning regret 0.490 -> 0.490, held-out regret 1.143 -> 1.143, final-scan gap 0.000 -> 0.000, first scan ok 7/12 and 1/6 unchanged, every outcome cell identical. This is by construction: the harness calls `choose` without a scale, which behaves exactly as before. The factor is covered by unit tests (`test_calib_learn.py`), not by the harness.
 
 ## Bug fixed on the way
 

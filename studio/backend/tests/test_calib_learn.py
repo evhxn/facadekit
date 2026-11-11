@@ -8,6 +8,8 @@ import pytest
 from facadekit.calib.capture import CaptureSet, run_capture
 from facadekit.calib.decode import DecodeResult, decode
 from facadekit.calib.learn import (
+    DIFFERENT_SCALE,
+    SIBLING_SHARE,
     STRATEGIES,
     ScanAdvisor,
     ScanMemory,
@@ -15,7 +17,9 @@ from facadekit.calib.learn import (
     choose,
     contrast_bucket,
     learning_enabled,
+    posterior,
     reward,
+    scale_class,
     summarize,
 )
 from facadekit.calib.maps import build_maps
@@ -69,6 +73,43 @@ def test_empty_history_keeps_the_defaults() -> None:
     s = choose([], "cam", "high")
     assert s.id == "standard"
     assert s.apply(CalibSettings()) == CalibSettings()  # nothing changes until something fails
+
+
+def test_scale_class() -> None:
+    assert scale_class(None) is None
+    assert scale_class(0.9) == "fine"
+    assert scale_class(0.05) == "coarse"
+
+
+def test_scale_empty_log_and_old_records() -> None:
+    assert choose([], "cam", "high", scale="coarse").id == "standard"
+    assert choose([], "cam", "high", scale="fine").id == "standard"
+    old = (
+        '{"id": "scn_1", "at": "t", "camera_id": "cam", "bucket": "high", '
+        '"median_contrast": 100.0, "lit_fraction": 0.5, "strategy": "standard", "ok": false}'
+    )
+    rec = ScanRecord.model_validate_json(old)
+    assert rec.scale is None
+    # a record without scale counts exactly as before, whatever scale is asked for
+    assert posterior([rec], "cam", "high", "fine") == posterior([rec], "cam", "high")
+    assert posterior([rec], "cam", "high", "coarse") == posterior([rec], "cam", "high")
+
+
+def test_picture_scale_halves_evidence_from_the_other_class() -> None:
+    history = [_rec("standard", ok=False, scale="coarse") for _ in range(2)]
+    assert choose(history, "cam", "high", scale="coarse").id != "standard"
+    prior_a, prior_b = STRATEGIES[0].prior
+
+    def evidence(scale: str | None) -> float:
+        a, b = posterior(history, "cam", "high", scale)["standard"]  # type: ignore[arg-type]
+        return a + b - prior_a - prior_b
+
+    assert evidence("fine") == pytest.approx(DIFFERENT_SCALE * evidence("coarse"))
+    assert evidence(None) == evidence("coarse")
+    assert choose(history, "cam", "high", scale=None).id == choose(history, "cam", "high").id
+    # sibling shares carry the factor too
+    sib = posterior(history, "cam", "high", "fine")["low_light"]
+    assert sib[1] - 1.0 == pytest.approx(DIFFERENT_SCALE * 2 * 2 * SIBLING_SHARE)
 
 
 def test_one_failure_switches_and_each_further_failure_moves_on() -> None:

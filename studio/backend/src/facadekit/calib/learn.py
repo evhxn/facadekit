@@ -21,12 +21,14 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from facadekit.calib.jsonl_store import atomic_write, file_lock, read_lines
+from facadekit.calib.quality import finest_readable_skip
 from facadekit.ids import new_id
 from facadekit.models.calibration import Calibration, CalibSettings
 from facadekit.models.jobs import utc_now_iso
 
 Bucket = Literal["low", "medium", "high"]
 Verdict = Literal["good", "bad"]
+Scale = Literal["fine", "coarse"]
 
 MAX_RECORDS = 500  # the log is trimmed to the newest records when it is rewritten
 MISTAKE_WEIGHT = 2.0  # a failed or rejected scan counts double: mistakes teach more
@@ -34,6 +36,7 @@ SAME_BUCKET_OTHER_CAMERA = 0.5
 SAME_CAMERA_OTHER_BUCKET = 0.25
 SIBLING_SHARE = 0.5  # how much of a failed scan also counts against same-or-finer-block strategies
 TIME_COST_PER_FRAME = 0.01  # reward given up for each extra averaged frame
+DIFFERENT_SCALE = 0.5  # evidence from the other picture-scale class counts half
 
 
 @dataclass(frozen=True)
@@ -80,6 +83,13 @@ def contrast_bucket(median_contrast: float) -> Bucket:
     return "high"
 
 
+def scale_class(px_per_proj_px: float | None) -> Scale | None:
+    """Picture scale: "fine" when stripes are readable at skip_lsb <= 2, else "coarse"."""
+    if px_per_proj_px is None:
+        return None
+    return "fine" if finest_readable_skip(px_per_proj_px) <= 2 else "coarse"
+
+
 class ScanRecord(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -96,6 +106,7 @@ class ScanRecord(BaseModel):
     planarity: float | None = None
     calibration_id: str | None = None
     verdict: Verdict | None = None
+    scale: Scale | None = None  # absent in records written before T-205
 
 
 def reward(record: ScanRecord) -> float:
@@ -111,7 +122,9 @@ def reward(record: ScanRecord) -> float:
     return min(1.0, max(0.0, value))
 
 
-def _weight(record: ScanRecord, camera_id: str, bucket: Bucket) -> float:
+def _weight(
+    record: ScanRecord, camera_id: str, bucket: Bucket, scale: Scale | None = None
+) -> float:
     same_camera = record.camera_id == camera_id
     same_bucket = record.bucket == bucket
     if same_camera and same_bucket:
@@ -123,18 +136,21 @@ def _weight(record: ScanRecord, camera_id: str, bucket: Bucket) -> float:
     else:
         return 0.0
     mistake = not record.ok or record.verdict == "bad"
-    return similarity * (MISTAKE_WEIGHT if mistake else 1.0)
+    w = similarity * (MISTAKE_WEIGHT if mistake else 1.0)
+    if scale is not None and record.scale is not None and record.scale != scale:
+        w *= DIFFERENT_SCALE
+    return w
 
 
 def posterior(
-    records: list[ScanRecord], camera_id: str, bucket: Bucket
+    records: list[ScanRecord], camera_id: str, bucket: Bucket, scale: Scale | None = None
 ) -> dict[str, tuple[float, float]]:
     """Beta(a, b) per strategy id for this camera and lighting."""
     out = {s.id: s.prior for s in STRATEGIES}
     for rec in records:
         if rec.strategy not in out:
             continue
-        w = _weight(rec, camera_id, bucket)
+        w = _weight(rec, camera_id, bucket, scale)
         if w == 0.0:
             continue
         r = reward(rec)
@@ -144,6 +160,7 @@ def posterior(
             # Stripes the camera cannot resolve stay unresolved with more frames or a lower
             # threshold, so a failure also counts (less) against same-or-finer-block strategies.
             # Not in dim light: there noise, not blur, is the likelier cause and averaging helps.
+            # w already includes the picture-scale factor, so the sibling share gets it too.
             used = _BY_ID[rec.strategy]
             for other in STRATEGIES:
                 if other.id != used.id and other.skip_lsb <= used.skip_lsb:
@@ -152,9 +169,11 @@ def posterior(
     return out
 
 
-def choose(records: list[ScanRecord], camera_id: str, bucket: Bucket) -> Strategy:
+def choose(
+    records: list[ScanRecord], camera_id: str, bucket: Bucket, scale: Scale | None = None
+) -> Strategy:
     """The strategy with the highest expected reward; ties go to the earlier strategy."""
-    post = posterior(records, camera_id, bucket)
+    post = posterior(records, camera_id, bucket, scale)
     best = STRATEGIES[0]
     best_mean = -1.0
     for s in STRATEGIES:
@@ -222,7 +241,12 @@ class ScanAdvisor:
         self.memory = memory
 
     def choose(self, camera_id: str, pre: dict[str, float]) -> Strategy:
-        return choose(self.memory.records(), camera_id, contrast_bucket(pre["median_contrast"]))
+        return choose(
+            self.memory.records(),
+            camera_id,
+            contrast_bucket(pre["median_contrast"]),
+            scale_class(pre.get("px_per_proj_px")),
+        )
 
     def remembered_strategy(self, camera_id: str) -> Strategy | None:
         """For Pi-driven scans, which render the pattern video before the lighting is measured:
@@ -246,6 +270,7 @@ class ScanAdvisor:
                 "median_contrast": pre["median_contrast"],
                 "lit_fraction": pre["lit_fraction"],
                 "strategy": strategy.id,
+                "scale": scale_class(pre.get("px_per_proj_px")),
                 **fields,
             }
         )
