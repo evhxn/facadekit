@@ -21,7 +21,7 @@ from facadekit.store.project_store import SUBFOLDERS, load_project_dir, save_pro
 
 Point = tuple[float, float]
 
-MAX_CORNER_ERROR_PX = 3.0
+MAX_CORNER_ERROR_PX = 1.5
 
 
 @dataclass
@@ -74,7 +74,10 @@ def detect_door_quad(proj_view: np.ndarray) -> list[Point]:
         raise FkError(INTERNAL, "Could not reduce the door outline to four corners")
     corners = _order_corners(approx.reshape(-1, 2).astype(np.float64))
 
-    pts = contour.reshape(-1, 2).astype(np.float64)
+    # Contour points are indices of boundary pixels inside the mask; their centres are at
+    # +0.5 in pixel-corner coordinates, and the true edge lies half a pixel further out.
+    pts = contour.reshape(-1, 2).astype(np.float64) + 0.5
+    centroid = pts.mean(axis=0)
     lines: list[np.ndarray] = []
     for i in range(4):
         a, b = corners[i], corners[(i + 1) % 4]
@@ -86,10 +89,32 @@ def detect_door_quad(proj_view: np.ndarray) -> list[Point]:
         if len(side) < 2:
             raise FkError(INTERNAL, "Too few contour points on a door edge")
         fit = cv2.fitLine(side.astype(np.float32), cv2.DIST_L2, 0, 0.01, 0.01).reshape(-1)
-        lines.append(fit.astype(np.float64))
+        line = fit.astype(np.float64)
+        normal = np.array([-line[1], line[0]])
+        if float(normal @ (line[2:4] - centroid)) < 0:
+            normal = -normal
+        line[2:4] = line[2:4] + 0.5 * normal
+        lines.append(line)
     # Side i joins corner i and i+1; corner i is the intersection of sides i-1 and i.
     refined = [_intersect(lines[(i - 1) % 4], lines[i]) for i in range(4)]
     return [(float(p[0]), float(p[1])) for p in refined]
+
+
+def _map_corner_error(p2c: np.ndarray, h_p2c: np.ndarray, corners: np.ndarray) -> float:
+    """Max distance between p2c (bilinearly sampled at the corners) and the true p2c."""
+    h, w = p2c.shape[:2]
+    worst = 0.0
+    for cx, cy in corners:
+        fx, fy = float(cx) - 0.5, float(cy) - 0.5  # p2c[y, x] is the pixel centre (x+.5, y+.5)
+        x0, y0 = int(np.clip(np.floor(fx), 0, w - 2)), int(np.clip(np.floor(fy), 0, h - 2))
+        tx, ty = fx - x0, fy - y0
+        got = (
+            p2c[y0, x0] * (1 - tx) * (1 - ty) + p2c[y0, x0 + 1] * tx * (1 - ty)
+            + p2c[y0 + 1, x0] * (1 - tx) * ty + p2c[y0 + 1, x0 + 1] * tx * ty
+        )  # fmt: skip
+        want = apply_h(h_p2c, np.array([[cx, cy]]))[0]
+        worst = max(worst, float(np.linalg.norm(got - want)))
+    return worst
 
 
 def _green_dominant(px: np.ndarray) -> bool:
@@ -181,6 +206,10 @@ def run_e2e(
     detected = np.array(quad, dtype=np.float64)
     err = float(np.max(np.linalg.norm(detected - truth, axis=1)))
     log(f"max corner error {err:.2f} px")
+    p2c = np.load(project_dir / "calibration" / cal.id / "p2c.npy")
+    map_err = _map_corner_error(p2c, scene.h_p2c, truth)
+    log(f"  (a) detected door quad vs ground truth: {err:.2f} px")
+    log(f"  (b) calibration map alone (p2c vs scene.h_p2c): {map_err:.2f} px")
 
     cam = scene.render_camera(frame, np.random.default_rng(scene.seed))
     centre = apply_h(scene.h_p2c, truth.mean(axis=0))[0]

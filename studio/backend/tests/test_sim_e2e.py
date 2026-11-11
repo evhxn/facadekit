@@ -8,7 +8,7 @@ from tests.conftest import FakeFpp
 
 def test_e2e(tmp_path: Path) -> None:
     result = run_e2e(tmp_path, log=lambda m: None)
-    assert result.max_corner_error_px < 3.0
+    assert result.max_corner_error_px < 1.5
     assert result.coverage > 0.85
     assert result.render_path.is_file()
 

@@ -35,7 +35,10 @@ def _capture(scene: SimScene) -> CaptureSet:
 def test_exact_synthetic() -> None:
     h_true = np.array([[1.0, 0.02, 1.0], [0.01, 1.0, 1.0], [2e-5, -1e-5, 1.0]])
     wc, hc = 640, 360
-    uu, vv = np.meshgrid(np.arange(wc, dtype=np.float64), np.arange(hc, dtype=np.float64))
+    # pixel-corner convention: camera pixel (u, v) is centred at (u + 0.5, v + 0.5)
+    uu, vv = np.meshgrid(
+        np.arange(wc, dtype=np.float64) + 0.5, np.arange(hc, dtype=np.float64) + 0.5
+    )
     pts = np.stack([uu, vv], axis=-1).reshape(1, -1, 2)
     c2p = cv2.perspectiveTransform(pts, h_true).reshape(hc, wc, 2).astype(np.float32)
     decoded = DecodeResult(
@@ -53,7 +56,7 @@ def test_exact_synthetic() -> None:
     checked = 0
     while checked < 200:
         x, y = rng.integers(40, 600), rng.integers(30, 330)
-        cam = _apply(inv, float(x), float(y))
+        cam = _apply(inv, x + 0.5, y + 0.5)
         if not (5 <= cam[0] < wc - 5 and 5 <= cam[1] < hc - 5):
             continue
         assert np.abs(maps.p2c[y, x] - cam).max() < 1.0
