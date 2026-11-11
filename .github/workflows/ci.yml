@@ -19,7 +19,6 @@ jobs:
       - run: uv run pytest -q
   web:
     runs-on: ubuntu-latest
-    if: hashFiles('studio/web/package.json') != ''
     defaults:
       run:
         working-directory: studio/web
@@ -54,3 +53,8 @@ jobs:
         with:
           name: parity-results
           path: studio/web/test-results
+  actionlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:latest -color
