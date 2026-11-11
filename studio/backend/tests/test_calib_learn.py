@@ -294,3 +294,53 @@ def test_pi_failure_before_decoding_is_not_logged(tmp_path: Path) -> None:
         )
     assert exc.value.code == "CAMERA_NO_PROJECTION"
     assert advisor.memory.records() == []
+
+
+def _leftovers(directory: Path, log: Path) -> list[str]:
+    return sorted(p.name for p in directory.iterdir() if p != log)
+
+
+def test_damaged_utf8_log_keeps_valid_lines(tmp_path: Path) -> None:
+    log = tmp_path / "learning" / "scans.jsonl"
+    log.parent.mkdir()
+    good = _rec("standard", calibration_id="cal_1").model_dump_json().encode()
+    log.write_bytes(good + b"\n\xff\xfe\xc3\x28 broken\n" + good + b"\n")
+    mem = ScanMemory(log)
+    assert len(mem.records()) == 2
+    assert mem.set_verdict("cal_1", "bad") is True
+    assert [r.verdict for r in mem.records()] == ["bad", "bad"]
+    mem.append(_rec("standard"))
+    assert len(mem.records()) == 3
+    assert _leftovers(log.parent, log) == []
+
+
+def test_two_instances_share_one_log(tmp_path: Path) -> None:
+    log = tmp_path / "learning" / "scans.jsonl"
+    a, b = ScanMemory(log), ScanMemory(log)
+    for i in range(6):
+        (a if i % 2 == 0 else b).append(_rec("standard", calibration_id=f"cal_{i}"))
+    assert a.set_verdict("cal_0", "good") and b.set_verdict("cal_5", "bad")
+    got = a.records()
+    assert [r.calibration_id for r in got] == [f"cal_{i}" for i in range(6)]
+    assert (got[0].verdict, got[5].verdict) == ("good", "bad")
+    assert _leftovers(log.parent, log) == []
+
+
+def test_concurrent_writers_lose_nothing(tmp_path: Path) -> None:
+    import threading
+
+    log = tmp_path / "scans.jsonl"
+    mems = [ScanMemory(log) for _ in range(4)]
+
+    def work(m: ScanMemory, k: int) -> None:
+        for i in range(10):
+            m.append(_rec("standard", calibration_id=f"cal_{k}_{i}"))
+            m.set_verdict(f"cal_{k}_{i}", "good")
+
+    threads = [threading.Thread(target=work, args=(m, k)) for k, m in enumerate(mems)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert len(mems[0].records()) == 40
+    assert _leftovers(tmp_path, log) == []

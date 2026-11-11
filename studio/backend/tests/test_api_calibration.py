@@ -185,6 +185,28 @@ def test_scan_memory_routes(sim_client: TestClient, tmp_path: Path) -> None:
     assert sim_client.get(f"{API}/learning/scans").json()["scans"] == 0
 
 
+def test_scan_feedback_survives_damaged_log(sim_client: TestClient, tmp_path: Path) -> None:
+    pid = _project(sim_client)["id"]
+    body = {"mode": "scan", "camera_id": "sim", "settings": {"discard_frames": 0}}
+    job = _wait(
+        sim_client,
+        sim_client.post(f"{API}/projects/{pid}/calibrations", json=body).json()["job_id"],
+    )
+    cid = job["result"]["calibration_id"]
+    log = tmp_path / "learning" / "scans.jsonl"
+    log.write_bytes(log.read_bytes() + b"\xff\xfe\xc3\x28 damaged\n")
+    url = f"{API}/projects/{pid}/calibrations/{cid}/feedback"
+    assert sim_client.post(url, json={"verdict": "good"}).json() == {"recorded": True}
+    assert sim_client.get(f"{API}/learning/scans").json()["scans"] == 1
+    again = _wait(
+        sim_client,
+        sim_client.post(f"{API}/projects/{pid}/calibrations", json=body).json()["job_id"],
+    )
+    assert again["state"] == "succeeded", again
+    assert sim_client.get(f"{API}/learning/scans").json()["scans"] == 2
+    assert sorted(p.name for p in log.parent.iterdir()) == [log.name]
+
+
 def _fake_pi(monkeypatch: pytest.MonkeyPatch) -> list[int]:
     """Replace the Pi/FPP side of a Pi-driven scan with the simulator; returns skip_lsb per scan."""
     from facadekit.api import routes_calibration as rc

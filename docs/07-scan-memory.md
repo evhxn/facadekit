@@ -140,6 +140,10 @@ After the capture, the contrast is measured from the recorded black and white im
 
 Same opt-outs as laptop scans: `learn: false`, `FACADEKIT_LEARN=0`, or explicit `skip_lsb`, `average_frames` or `min_conf` in `settings`. No new endpoint fields (the existing `learn` flag now also covers `scan_pi`).
 
+## Damaged logs and several writers
+
+Code: `calib/jsonl_store.py`, shared by `ScanMemory` and `AlignMemory`. The log is read as bytes and decoded with replacement, so invalid UTF-8 never raises: undecodable or invalid lines are skipped and the valid ones load. Rewrites go through a unique temp file in the same directory and `os.replace`; the temp file is removed on error. Appends and rewrites take a lock file (`<log>.lock`, exclusive create, standard library only, same on Windows, macOS and Linux) so two instances sharing a data dir keep each other's records. Remaining limitation: the lock is best effort. If it cannot be taken within 2 s, or a crashed process left it behind (a lock older than 10 s is broken), the write goes ahead unlocked and can in rare cases lose one record. A plain append is not rewritten, so a crash mid-append can leave one damaged line, which is skipped on read.
+
 ## Next steps (not built)
 
 1. ~~Learn from alignment corrections~~ (built, see below).

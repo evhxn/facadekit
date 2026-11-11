@@ -20,6 +20,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
+from facadekit.calib.jsonl_store import atomic_write, file_lock, read_lines
 from facadekit.ids import new_id
 from facadekit.models.calibration import Calibration, CalibSettings
 from facadekit.models.jobs import utc_now_iso
@@ -176,12 +177,8 @@ class ScanMemory:
             return self._read()
 
     def _read(self) -> list[ScanRecord]:
-        try:
-            lines = self.path.read_text(encoding="utf-8").splitlines()
-        except OSError:
-            return []
         out: list[ScanRecord] = []
-        for line in lines:
+        for line in read_lines(self.path):
             if not line.strip():
                 continue
             try:
@@ -191,21 +188,18 @@ class ScanMemory:
         return out
 
     def append(self, record: ScanRecord) -> None:
-        with self._lock:
+        with self._lock, file_lock(self.path):
             self.path.parent.mkdir(parents=True, exist_ok=True)
             with self.path.open("a", encoding="utf-8") as f:
                 f.write(record.model_dump_json() + "\n")
 
     def _rewrite(self, records: list[ScanRecord]) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self.path.with_suffix(".tmp")
         body = "".join(r.model_dump_json() + "\n" for r in records[-MAX_RECORDS:])
-        tmp.write_text(body, encoding="utf-8")
-        os.replace(tmp, self.path)
+        atomic_write(self.path, body)
 
     def set_verdict(self, calibration_id: str, verdict: Verdict) -> bool:
         """Store the user's opinion of a finished scan. False when the scan is not in the log."""
-        with self._lock:
+        with self._lock, file_lock(self.path):
             records = self._read()
             found = False
             for rec in records:

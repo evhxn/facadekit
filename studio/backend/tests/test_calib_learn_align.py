@@ -73,6 +73,26 @@ def test_memory_roundtrip_trim_and_switch(tmp_path: Path, monkeypatch: pytest.Mo
     assert mem.warning(10_000.0) is None
 
 
+def test_damaged_utf8_log_keeps_valid_lines(tmp_path: Path) -> None:
+    log = tmp_path / "learning" / "realign.jsonl"
+    mem = la.AlignMemory(log)
+    mem.record_applied("p", 3.0, 1.0, 40)
+    log.write_bytes(log.read_bytes() + b"\xff\xfe\xc3\x28\n")
+    assert [r.max_shift_px for r in mem.records()] == [3.0]
+    mem.record_applied("p", 4.0, 1.0, 40)
+    assert [r.max_shift_px for r in mem.records()] == [3.0, 4.0]
+    assert [p.name for p in log.parent.iterdir()] == [log.name]
+
+
+def test_two_instances_share_one_log(tmp_path: Path) -> None:
+    log = tmp_path / "learning" / "realign.jsonl"
+    a, b = la.AlignMemory(log), la.AlignMemory(log)
+    for i in range(9):
+        (a if i % 2 == 0 else b).record_applied("p", float(i), 1.0, 40)
+    assert [r.max_shift_px for r in a.records()] == [float(i) for i in range(9)]
+    assert [p.name for p in log.parent.iterdir()] == [log.name]
+
+
 @pytest.fixture
 def client(tmp_path: Path) -> TestClient:  # type: ignore[misc]
     with TestClient(create_app(data_dir=tmp_path)) as c:
@@ -141,3 +161,14 @@ def test_route_with_learning_off_writes_nothing(
     assert resp["warning"] is None
     assert not (tmp_path / "learning" / "realign.jsonl").exists()
     assert client.get(f"{API}/learning/realign").json()["enabled"] is False
+
+
+def test_route_survives_damaged_log(client: TestClient, tmp_path: Path) -> None:
+    pid, body = _setup(client, tmp_path)
+    log = tmp_path / "learning" / "realign.jsonl"
+    log.parent.mkdir(exist_ok=True)
+    log.write_bytes(b"\xff\xfe\x80 not utf-8\n")
+    resp = client.post(f"{API}/projects/{pid}/realign", json=body)
+    assert resp.status_code == 200, resp.text
+    assert client.get(f"{API}/learning/realign").json()["corrections"] == 1
+    assert [p.name for p in log.parent.iterdir()] == [log.name]

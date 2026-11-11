@@ -18,13 +18,13 @@ Storage: `<data dir>/learning/realign.jsonl`, newest 500 kept, same switch as sc
 
 from __future__ import annotations
 
-import os
 import statistics
 import threading
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
+from facadekit.calib.jsonl_store import atomic_write, file_lock, read_lines
 from facadekit.calib.learn import MAX_RECORDS, learning_enabled
 from facadekit.ids import new_id
 from facadekit.models.jobs import utc_now_iso
@@ -79,12 +79,8 @@ class AlignMemory:
             return self._read()
 
     def _read(self) -> list[AlignRecord]:
-        try:
-            lines = self.path.read_text(encoding="utf-8").splitlines()
-        except OSError:
-            return []
         out: list[AlignRecord] = []
-        for line in lines:
+        for line in read_lines(self.path):
             if not line.strip():
                 continue
             try:
@@ -94,14 +90,11 @@ class AlignMemory:
         return out
 
     def append(self, record: AlignRecord) -> None:
-        with self._lock:
+        with self._lock, file_lock(self.path):
             records = self._read()
             records.append(record)
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            tmp = self.path.with_suffix(".tmp")
             body = "".join(r.model_dump_json() + "\n" for r in records[-MAX_RECORDS:])
-            tmp.write_text(body, encoding="utf-8")
-            os.replace(tmp, self.path)
+            atomic_write(self.path, body)
 
     def clear(self) -> None:
         with self._lock:
