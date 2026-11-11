@@ -201,7 +201,9 @@ def test_cancelled_and_precheck_failures_are_not_logged(tmp_path: Path) -> None:
     advisor = ScanAdvisor(ScanMemory(tmp_path / "scans.jsonl"))
     with pytest.raises(FkError) as exc:
         _scan(tmp_path, SimScene(gain=0.15, noise_sigma=8.0), advisor)
-    assert exc.value.code == "TOO_BRIGHT"  # fails before a strategy is chosen
+    # A dim, noisy projection is a speckled lit mask: no blob holds half the lit pixels, so the
+    # precheck refuses it as "no projection" (before T-202 it ended in TOO_BRIGHT).
+    assert exc.value.code == "CAMERA_NO_PROJECTION"  # fails before a strategy is chosen
     assert advisor.memory.records() == []
 
 

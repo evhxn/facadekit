@@ -287,6 +287,13 @@ Privacy note under the panel: "The video goes straight from your phone to this c
 - **Crop equivalence on the default scene:** the scan with the suggested crop and the scan without one differ by at most 0.25 px in median `p2c` over measured pixels, both e2e corner errors stay < 1.5 px, and `h_c2p_full` agrees within 0.1 px at the four door corners.
 - **Exactness:** `CroppedCamera` images equal the full capture sliced (`np.array_equal`). The sim's random-number sequence does not depend on the crop.
 - **Blur rule (T-202):** on the 18 `learn_eval` scenes, `skip_blur ≤ 2` predicts "standard succeeds" on at least 15 of 18. If not, tune `MOD_OK` within 0.15–0.40 and record the table in this doc.
+- **Tuning result (T-202, 2026-11-11):** on the 18 `make_scenes(18)` scenes, "standard succeeds" (`scan_once`, record ok) against `modulation[2] >= MOD_OK` (the probe's bit-2 stripe modulation; `skip_blur <= 2` is equivalent):
+
+  | `MOD_OK` | 0.15 | 0.20 | 0.25 | 0.30 | 0.35 | 0.40 |
+  |---|---|---|---|---|---|---|
+  | agreement | 17/18 | 18/18 | 18/18 | 18/18 | 18/18 | 18/18 |
+
+  Bit-2 modulation of the scans that failed with "standard" is at most 0.181 (blur 3.5 to 5.0); of the ones that succeeded at least 0.415 (blur 0.5 to 1.5). Every value from 0.20 to 0.40 separates them, so `MOD_OK` is set to **0.30**, the middle of that gap (margin 0.12 below, 0.11 above), instead of the initial 0.25. Simulator only; spike S-9 re-checks it on real cameras.
 - **Scan memory:** `learn_eval` regret does not regress (tuning ≤ 0.490, held-out ≤ 1.143).
 - **Phone video (T-207):** `make_phone_video(scene, …)` renders the playback sequence through the simulator into an H.264 file with a random 3–25 s pre-roll and a 3 s tail. Analysis gives map corner error < 1.5 px on a 1920×1080 phone-like scene. A 4 px shift halfway through gives `PHONE_MOVED`. A cut-short file gives `PHONE_VIDEO_NO_PATTERN`. A 90°-rotated file gives the same result as the unrotated one.
 

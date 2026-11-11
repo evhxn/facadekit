@@ -22,6 +22,9 @@ class CalibQuality(BaseModel):
     planarity: float
     median_contrast: float
     lit_fraction: float
+    px_per_proj_px: float | None = None
+    snr: float | None = None
+    verdict: Literal["good", "marginal", "too_coarse"] | None = None
 
 
 class Calibration(BaseModel):

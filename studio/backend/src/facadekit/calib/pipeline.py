@@ -10,11 +10,23 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from facadekit.calib.capture import CaptureSet, precheck, run_capture
+from facadekit.calib.capture import (
+    CaptureSet,
+    lit_stats,
+    no_projection_error,
+    precheck,
+    run_capture,
+)
 from facadekit.calib.decode import decode
 from facadekit.calib.learn import ScanAdvisor, Strategy, get_strategy
 from facadekit.calib.maps import build_maps, make_proj_view
 from facadekit.calib.patterns import PatternSpec
+from facadekit.calib.quality import (
+    lit_blob,
+    projection_found,
+    px_per_proj_px_from_h,
+    verdict,
+)
 from facadekit.calib.tuning import measure_latency
 from facadekit.devices.base import Camera, ProjectorDisplay
 from facadekit.errors import FkError
@@ -137,10 +149,10 @@ def run_calibration(
 def _contrast_stats(capture: CaptureSet) -> dict[str, float]:
     """Quality numbers from the black (first) and white (second) pattern images."""
     contrast = capture.images[1] - capture.images[0]
-    thr = max(12.0, 0.15 * float(np.percentile(contrast, 95)))
-    lit = contrast > thr
-    median = float(np.median(contrast[lit])) if lit.any() else 0.0
-    return {"lit_fraction": float(lit.mean()), "median_contrast": median}
+    blob = lit_blob(contrast)
+    if blob is None or not projection_found(blob):
+        raise no_projection_error()
+    return lit_stats(contrast, capture.images[1], blob, capture.spec.width, capture.spec.height)
 
 
 def run_calibration_from_capture(
@@ -164,12 +176,6 @@ def run_calibration_from_capture(
     """
     if pre is None:  # a recorded (Pi-driven) capture had no separate precheck
         pre = _contrast_stats(capture)
-        if pre["lit_fraction"] < 0.05:
-            raise FkError(
-                "CAMERA_NO_PROJECTION",
-                "The camera does not see the projected light. Check that the camera faces the "
-                "projection and that the projector is on.",
-            )
     used = get_strategy(strategy) if advisor is not None and strategy is not None else None
     try:
         cal = _decode_capture(
@@ -221,6 +227,15 @@ def _decode_capture(
     if capture.controls_applied.get("auto_exposure") is False:
         warnings.append("CAMERA_CONTROLS_UNAVAILABLE")
 
+    if maps.h_c2p is not None:
+        scale: float | None = px_per_proj_px_from_h(maps.h_c2p, spec.width, spec.height)
+    else:
+        scale = pre.get("px_per_proj_px")
+    snr = pre.get("snr")
+    quality_verdict = (
+        verdict(scale, snr if snr is not None else float("inf"))[0] if scale is not None else None
+    )
+
     cal = Calibration(
         id=new_id("cal"),
         created_at=utc_now_iso(),
@@ -236,6 +251,9 @@ def _decode_capture(
             planarity=maps.planarity,
             median_contrast=pre["median_contrast"],
             lit_fraction=pre["lit_fraction"],
+            px_per_proj_px=scale,
+            snr=snr,
+            verdict=quality_verdict,
         ),
         h_c2p=maps.h_c2p.tolist() if maps.h_c2p is not None else None,
         warnings=warnings,
