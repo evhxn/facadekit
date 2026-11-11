@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict
 
 from facadekit.api.deps import AppState, get_state
 from facadekit.calib.learn import StrategySummary, Verdict, learning_enabled, summarize
+from facadekit.calib.learn_align import AlignSummary, summarize_align
 from facadekit.calib.pipeline import load_calibration
 
 router = APIRouter()
@@ -55,4 +56,18 @@ def learning_summary(state: State) -> LearningSummary:
 def forget_scans(state: State) -> Response:
     if state.scan_memory is not None:
         state.scan_memory.clear()
+    return Response(status_code=204)
+
+
+@router.get("/learning/realign")
+def realign_summary(state: State) -> AlignSummary:
+    records = state.align_memory.records() if state.align_memory is not None else []
+    enabled = state.align_memory is not None and learning_enabled()
+    return summarize_align(records, enabled)
+
+
+@router.delete("/learning/realign", status_code=204)
+def forget_realign(state: State) -> Response:
+    if state.align_memory is not None:
+        state.align_memory.clear()
     return Response(status_code=204)

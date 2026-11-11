@@ -29,6 +29,7 @@ from facadekit.api import ws as ws_module
 from facadekit.api.deps import AppState
 from facadekit.api.routes_devices import CameraManager
 from facadekit.calib.learn import ScanMemory
+from facadekit.calib.learn_align import AlignMemory
 from facadekit.config import projects_dir
 from facadekit.errors import BAD_REQUEST, NOT_FOUND, FkError, http_status
 from facadekit.jobs.runner import JobRunner
@@ -78,6 +79,7 @@ def create_app(
         sim_scene=sim_scene,
         sim_display=sim_display,
         scan_memory=ScanMemory(root.parent / "learning" / "scans.jsonl"),
+        align_memory=AlignMemory(root.parent / "learning" / "realign.jsonl"),
     )
 
     @asynccontextmanager

@@ -113,8 +113,25 @@ Not solved: coverage is 100 % even when the corner error is 9-18 px (scenes 1005
 - Pi-driven scans (`mode: "scan_pi"`) are not learned yet: the pattern video is rendered before the lighting is measured.
 - Learning is per computer. Sharing results between users would need consent and a server, and is out of scope.
 
+## Learning from alignment corrections (2026-11-11)
+
+Code: `calib/learn_align.py`, routes in `api/routes_learning.py`, hook in `POST /projects/{pid}/realign`.
+
+**Signal.** The backend never sees the user dragging corners after Quick re-align (the editor saves whole projects), so the signal is what re-align measures itself: `max_shift_px`, the largest distance any surface corner moved when the estimated drift was applied. `reproj_error_px` and `inliers` are stored too but drive nothing. Only applied re-aligns (`apply: true`) are logged; previews are not.
+
+**Log.** `<data dir>/learning/realign.jsonl`, one JSON object per line (`id, at, project_id, max_shift_px, reproj_error_px, inliers`), newest 500 kept, nothing uploaded. `FACADEKIT_LEARN=0` stops both writing and warning.
+
+**Use.** Warning threshold = `clamp(2 x median(max_shift_px of the last 20), 40 px, 160 px)`. Bounds: never below 40 px (`WARN_DEFAULT_SHIFT_PX`), never above 4 x that (`WARN_CAP_SHIFT_PX`). Fewer than 5 records (`MIN_SAMPLES`), including an empty log: no threshold and no warning, exactly the old behaviour. When a re-align (preview or apply) exceeds the threshold, `RealignResponse.warning` carries a message; otherwise it is `null`. `MAX_REPROJ_ERROR_PX` (4 px) is not touched: it stays a hard refusal and is never loosened or tightened by the log.
+
+| Route | Purpose |
+|---|---|
+| `GET /api/v1/learning/realign` | `{"enabled", "corrections", "median_shift_px", "warn_threshold_px"}` |
+| `DELETE /api/v1/learning/realign` | Forget the re-align history (204) |
+
+Limit: the 40 px floor is a guess for 1080p projectors; tune it with field data. The wizard does not show `warning` yet.
+
 ## Next steps (not built)
 
-1. Learn from alignment corrections: record how far the user drags surface corners after Quick re-align (`calib/realign.py`) and use the median as a warning threshold, or to tune `MAX_REPROJ_ERROR_PX`.
+1. ~~Learn from alignment corrections~~ (built, see below).
 2. Add `scan_pi` using a bucket remembered from the previous scan with that camera.
 3. A "What FacadeKit has learned" panel in the wizard's Advanced section, using `GET /learning/scans`, with a Forget button.

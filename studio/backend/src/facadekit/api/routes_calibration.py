@@ -258,6 +258,7 @@ class RealignResponse(BaseModel):
     reproj_error_px: float
     max_shift_px: float
     project: Project | None
+    warning: str | None = None  # set when the shift is far above this user's usual re-align
 
 
 def _read_view(project_dir: Path, cid: str, name: str, *, required: bool) -> np.ndarray | None:
@@ -294,13 +295,19 @@ def realign(pid: str, body: RealignRequest, state: State) -> RealignResponse:
         for p in surface.quad
     ]
     max_shift = max(shifts, default=0.0)
+    warning = state.align_memory.warning(max_shift) if state.align_memory is not None else None
     out: Project = moved
     if body.apply:
         out = state.store.save(moved.model_copy(update={"calibration_id": body.new_calibration_id}))
         state.events.publish({"type": "project", "project_id": pid, "revision": out.revision})
+        if state.align_memory is not None:
+            state.align_memory.record_applied(
+                pid, max_shift, result.reproj_error_px, result.inliers
+            )
     return RealignResponse(
         inliers=result.inliers,
         reproj_error_px=result.reproj_error_px,
         max_shift_px=max_shift,
         project=out,
+        warning=warning,
     )
