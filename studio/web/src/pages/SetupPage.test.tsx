@@ -3,7 +3,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as client from "../api/client";
 import * as events from "../api/events";
-import type { Calibration, Job, Project } from "../api/types";
+import type { Calibration, CameraCheck, CameraRoi, Job, Project } from "../api/types";
 import { useProjectStore } from "../state/projectStore";
 import SetupPage from "./SetupPage";
 import StepCamera from "./setup/StepCamera";
@@ -19,6 +19,7 @@ vi.mock("../api/client", async (orig) => ({
   cameraSnapshotUrl: vi.fn((cid: string) => `/snap/${cid}.jpg`),
   setCameraControls: vi.fn(),
   startCalibration: vi.fn(),
+  startCameraCheck: vi.fn(),
   getCalibration: vi.fn(),
   sendScanFeedback: vi.fn(() => Promise.resolve({ recorded: true })),
   projViewUrl: vi.fn(() => "/projview.png"),
@@ -92,6 +93,35 @@ function renderSetup() {
       </Routes>
     </MemoryRouter>,
   );
+}
+
+const sampleRoi: CameraRoi = {
+  x: 320,
+  y: 180,
+  w: 640,
+  h: 360,
+  frame_width: 1280,
+  frame_height: 720,
+  bin: 1,
+};
+
+function sampleCheck(over: Partial<CameraCheck> = {}): CameraCheck {
+  return {
+    verdict: "too_coarse",
+    reasons: ["SMALL_IN_FRAME"],
+    camera_width: 1280,
+    camera_height: 720,
+    lit_box: sampleRoi,
+    suggested_roi: sampleRoi,
+    px_per_proj_px: 0.16,
+    proj_px_per_cam_px: 6.4,
+    stripe_modulation: {},
+    snr: 10,
+    median_contrast: 80,
+    controls: {},
+    suggest_1080p: false,
+    ...over,
+  };
 }
 
 const next = () => screen.getByRole("button", { name: "Next" }) as HTMLButtonElement;
@@ -190,21 +220,164 @@ describe("Step 1 - projector on the Raspberry Pi", () => {
   });
 });
 
+const noop = () => {};
+function cameraProps(over: Partial<React.ComponentProps<typeof StepCamera>> = {}) {
+  return {
+    projectId: "p1",
+    cameraId: null,
+    onCameraChange: noop,
+    roi: null,
+    onRoiChange: noop,
+    roiFromLastScan: false,
+    check: null,
+    onCheckChange: noop,
+    onNext: noop,
+    onUsePhone: noop,
+    ...over,
+  } as React.ComponentProps<typeof StepCamera>;
+}
+
 describe("Step 2 - camera", () => {
   it("says so when there is no camera", async () => {
     m.listCameras.mockResolvedValue([]);
-    render(<StepCamera cameraId={null} onCameraChange={() => {}} />);
+    render(<StepCamera {...cameraProps()} />);
     expect(await screen.findByText(/No camera found/)).toBeTruthy();
   });
 
   it("shows the snapshot for a single camera", async () => {
     m.listCameras.mockResolvedValue([{ id: "cam0", name: "Cam", width: 640, height: 480 }]);
     const onChange = vi.fn();
-    const { rerender } = render(<StepCamera cameraId={null} onCameraChange={onChange} />);
+    const { rerender } = render(<StepCamera {...cameraProps({ onCameraChange: onChange })} />);
     await waitFor(() => expect(onChange).toHaveBeenCalledWith("cam0"));
-    rerender(<StepCamera cameraId="cam0" onCameraChange={onChange} />);
+    rerender(<StepCamera {...cameraProps({ cameraId: "cam0", onCameraChange: onChange })} />);
     const img = screen.getByAltText("Live camera view") as HTMLImageElement;
     expect(img.getAttribute("src")).toMatch(/^\/snap\/cam0\.jpg\?t=\d+$/);
+  });
+});
+
+describe("Step 2 - camera check", () => {
+  const cam = { id: "cam0", name: "Cam", width: 1280, height: 720 };
+  beforeEach(() => {
+    m.listCameras.mockResolvedValue([cam]);
+  });
+
+  it("runs the check with the current crop, then shows the result card", async () => {
+    m.startCameraCheck.mockResolvedValue({ job_id: "jc" });
+    let finish: (j: Job) => void = () => {};
+    ev.waitForJob.mockReturnValue(new Promise<Job>((resolve) => (finish = resolve)));
+    const onCheckChange = vi.fn();
+    render(<StepCamera {...cameraProps({ cameraId: "cam0", roi: sampleRoi, onCheckChange })} />);
+    fireEvent.click(screen.getByRole("button", { name: "Check the camera view" }));
+    expect(
+      await screen.findByText("Checking… the projector will flash and show stripes for a few seconds."),
+    ).toBeTruthy();
+    expect(m.startCameraCheck).toHaveBeenCalledWith("p1", "cam0", sampleRoi);
+    await act(async () => {
+      finish(job({ kind: "analyze", result: { check: sampleCheck() } }));
+    });
+    expect(onCheckChange).toHaveBeenCalledWith(sampleCheck());
+  });
+
+  it("stops asking the camera for pictures while the check runs", async () => {
+    vi.useFakeTimers();
+    try {
+      m.startCameraCheck.mockResolvedValue({ job_id: "jc" });
+      ev.waitForJob.mockReturnValue(new Promise<Job>(() => {}));
+      render(<StepCamera {...cameraProps({ cameraId: "cam0" })} />);
+      const img = screen.getByAltText("Live camera view") as HTMLImageElement;
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Check the camera view" }));
+      });
+      const before = img.getAttribute("src");
+      fireEvent.load(img);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+      expect(img.getAttribute("src")).toBe(before);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("suggests the crop: Crop to the lit area then Use this crop sends the suggestion up", () => {
+    const onRoiChange = vi.fn();
+    render(
+      <StepCamera
+        {...cameraProps({ cameraId: "cam0", check: sampleCheck(), onRoiChange })}
+      />,
+    );
+    expect(screen.getByText(/about 6 projector pixels/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Crop to the lit area" }));
+    expect(screen.getByText(/Only the inside of the box is used/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Use this crop" }));
+    expect(onRoiChange).toHaveBeenLastCalledWith(sampleRoi);
+  });
+
+  it("sends an edited box up and shows the zoomed preview afterwards", () => {
+    const onRoiChange = vi.fn();
+    const props = cameraProps({ cameraId: "cam0", check: sampleCheck(), roi: sampleRoi, onRoiChange });
+    const { rerender } = render(<StepCamera {...props} />);
+    expect(m.cameraSnapshotUrl).toHaveBeenCalledWith("cam0", sampleRoi);
+    expect(screen.getByAltText("Zoomed view of the cropped area")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Change the crop" }));
+    const area = screen.getByTestId("crop-area");
+    area.getBoundingClientRect = () => ({ width: 640, height: 360, left: 0, top: 0 }) as DOMRect;
+    fireEvent(
+      screen.getByRole("button", { name: /^Bottom right corner/ }),
+      new MouseEvent("pointerdown", { bubbles: true, clientX: 480, clientY: 270 }),
+    );
+    act(() => {
+      window.dispatchEvent(new MouseEvent("pointermove", { clientX: 544, clientY: 270 }));
+      window.dispatchEvent(new MouseEvent("pointerup", { clientX: 544, clientY: 270 }));
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Use this crop" }));
+    const sent = onRoiChange.mock.calls.at(-1)?.[0] as CameraRoi;
+    expect(Math.abs(sent.w - 768)).toBeLessThanOrEqual(2);
+    rerender(<StepCamera {...props} roi={sent} />);
+    expect(screen.getByAltText("Zoomed view of the cropped area")).toBeTruthy();
+  });
+
+  it("says where a crop came from and lets the user drop it", () => {
+    const onRoiChange = vi.fn();
+    render(
+      <StepCamera
+        {...cameraProps({ cameraId: "cam0", roi: sampleRoi, roiFromLastScan: true, onRoiChange })}
+      />,
+    );
+    expect(screen.getByText("Using the crop from your last scan.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Use the whole picture" }));
+    expect(onRoiChange).toHaveBeenCalledWith(null);
+  });
+
+  it("a failed check shows what to do and offers Check again", async () => {
+    m.startCameraCheck.mockResolvedValue({ job_id: "jc" });
+    ev.waitForJob.mockResolvedValue(
+      job({ state: "failed", error: { code: "CAMERA_NO_PROJECTION", message: "raw" }, result: null }),
+    );
+    render(<StepCamera {...cameraProps({ cameraId: "cam0" })} />);
+    fireEvent.click(screen.getByRole("button", { name: "Check the camera view" }));
+    const banner = await screen.findByRole("alert");
+    expect(banner.textContent).toMatch(/Move the camera so the whole white rectangle/);
+    expect(screen.getByRole("button", { name: "Check again" })).toBeTruthy();
+  });
+
+  it("an unexpected failure still ends with an action, and a size mismatch drops the crop", async () => {
+    const onRoiChange = vi.fn();
+    m.startCameraCheck.mockRejectedValue(new Error("boom"));
+    render(<StepCamera {...cameraProps({ cameraId: "cam0", roi: sampleRoi, onRoiChange })} />);
+    fireEvent.click(screen.getByRole("button", { name: "Check the camera view" }));
+    expect((await screen.findByRole("alert")).textContent).toMatch(/press Check again/);
+
+    m.startCameraCheck.mockRejectedValue(
+      new client.ApiError(
+        "BAD_REQUEST",
+        "The crop was drawn for a different camera picture size. Check the camera again.",
+        422,
+      ),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Check again" }));
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/different camera picture size/));
+    expect(onRoiChange).toHaveBeenCalledWith(null);
   });
 });
 
@@ -292,6 +465,109 @@ describe("Step 3 - scan", () => {
       camera_id: "cam0",
       host: "fpp.local",
     });
+  });
+
+  it("sends the crop with a camera scan and leaves it out without one", async () => {
+    m.startCalibration.mockResolvedValue({ job_id: "j1" });
+    ev.waitForJob.mockResolvedValue(job({ state: "failed", error: null, result: null }));
+    const { unmount } = render(
+      <MemoryRouter>
+        <StepScan project={project} cameraId="cam0" roi={sampleRoi} />
+      </MemoryRouter>,
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Start scan" }));
+    });
+    expect(m.startCalibration).toHaveBeenLastCalledWith("p1", {
+      mode: "scan",
+      camera_id: "cam0",
+      settings: { settle_ms: 0, roi: sampleRoi },
+    });
+    unmount();
+    render(
+      <MemoryRouter>
+        <StepScan project={project} cameraId="cam0" roi={null} />
+      </MemoryRouter>,
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Start scan" }));
+    });
+    const body = m.startCalibration.mock.calls.at(-1)?.[1];
+    expect(body?.settings).toEqual({ settle_ms: 0 });
+    expect(body?.settings && "roi" in body.settings).toBe(false);
+  });
+
+  it("does not send the crop on a Pi scan", async () => {
+    m.startCalibration.mockResolvedValue({ job_id: "j1" });
+    ev.waitForJob.mockResolvedValue(job({ state: "failed", error: null, result: null }));
+    render(
+      <MemoryRouter>
+        <StepScan project={project} cameraId="cam0" piHost="fpp.local" roi={sampleRoi} />
+      </MemoryRouter>,
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Start scan" }));
+    });
+    expect(m.startCalibration).toHaveBeenCalledWith("p1", {
+      mode: "scan_pi",
+      camera_id: "cam0",
+      host: "fpp.local",
+    });
+  });
+
+  it("drops a crop that was drawn for another picture size and says what to do", async () => {
+    const onRoiReset = vi.fn();
+    m.startCalibration.mockResolvedValue({ job_id: "j1" });
+    ev.waitForJob.mockResolvedValue(
+      job({
+        state: "failed",
+        error: {
+          code: "BAD_REQUEST",
+          message: "The crop was drawn for a different camera picture size. Check the camera again.",
+        },
+        result: null,
+      }),
+    );
+    render(
+      <MemoryRouter>
+        <StepScan project={project} cameraId="cam0" roi={sampleRoi} onRoiReset={onRoiReset} />
+      </MemoryRouter>,
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Start scan" }));
+    });
+    expect(await screen.findByText(/Check the camera again\./)).toBeTruthy();
+    expect(onRoiReset).toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
+  });
+
+  it("adds the small-picture line on the result screen for marginal and too coarse scans", async () => {
+    m.getProject.mockResolvedValue({ ...project, calibration_id: "c1" });
+    for (const verdict of ["marginal", "too_coarse", "good"] as const) {
+      cleanup();
+      m.getCalibration.mockResolvedValue({
+        ...calibration(["CROP_TOO_TIGHT"]),
+        quality: { coverage: 0.9, planarity: 0, median_contrast: 0, lit_fraction: 0, verdict },
+      });
+      render(
+        <MemoryRouter>
+          <StepScan project={{ ...project, calibration_id: "c1" }} cameraId="cam0" />
+        </MemoryRouter>,
+      );
+      await screen.findByText("Measured 90% of the projection.");
+      const line = "Your camera saw the projection small, so check the outlines carefully on the house.";
+      expect(screen.queryByText(line) !== null).toBe(verdict !== "good");
+      expect(screen.getByText(/Part of the lit area touched the edge of your crop/)).toBeTruthy();
+    }
+  });
+
+  it("shows the phone note when the phone was chosen", () => {
+    render(
+      <MemoryRouter>
+        <StepScan project={project} cameraId="cam0" phone />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText(/Scanning with your phone is coming soon/)).toBeTruthy();
   });
 
   it("skip scan starts manual mode", async () => {
@@ -397,5 +673,83 @@ describe("Quick re-align", () => {
     expect(await screen.findByText(/too different/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Apply" })).toBeNull();
     expect(screen.getByRole("button", { name: /place surfaces by hand/ })).toBeTruthy();
+  });
+});
+
+describe("Crop across the wizard", () => {
+  const withLast = { ...project, calibration_id: "c1", surfaces: [] } as unknown as Project;
+
+  it("starts from the crop of the last scan and sends it with the next scan", async () => {
+    useProjectStore.setState({ project: withLast, dirty: false });
+    m.getProject.mockResolvedValue(withLast);
+    m.listCameras.mockResolvedValue([{ id: "cam0", name: "Cam", width: 1280, height: 720 }]);
+    m.getCalibration.mockResolvedValue({
+      ...calibration(),
+      camera_id: "cam0",
+      settings: { settle_ms: 300, roi: sampleRoi },
+    } as unknown as Calibration);
+    m.startCalibration.mockResolvedValue({ job_id: "j1" });
+    ev.waitForJob.mockResolvedValue(job({ state: "failed", error: null, result: null }));
+    renderSetup();
+    fireEvent.click(await screen.findByRole("button", { name: "Back" })); // to the camera step
+    expect(await screen.findByText("Using the crop from your last scan.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    await act(async () => {
+      fireEvent.click(await screen.findByRole("button", { name: "Start scan" }));
+    });
+    expect(m.startCalibration).toHaveBeenCalledWith("p1", {
+      mode: "scan",
+      camera_id: "cam0",
+      settings: { settle_ms: 0, roi: sampleRoi },
+    });
+  });
+
+  it("ignores the last crop when it was made with another camera", async () => {
+    useProjectStore.setState({ project: withLast, dirty: false });
+    m.getProject.mockResolvedValue(withLast);
+    m.listCameras.mockResolvedValue([{ id: "cam0", name: "Cam", width: 1280, height: 720 }]);
+    m.getCalibration.mockResolvedValue({
+      ...calibration(),
+      camera_id: "other",
+      settings: { settle_ms: 300, roi: sampleRoi },
+    } as unknown as Calibration);
+    renderSetup();
+    fireEvent.click(await screen.findByRole("button", { name: "Back" }));
+    await screen.findByAltText("Live camera view");
+    await waitFor(() => expect(m.getCalibration).toHaveBeenCalled());
+    expect(screen.queryByText("Using the crop from your last scan.")).toBeNull();
+  });
+
+  it("Use my phone instead goes to the scan step with the coming-soon note", async () => {
+    useProjectStore.setState({ project, dirty: false });
+    m.listCameras.mockResolvedValue([{ id: "cam0", name: "Cam", width: 1280, height: 720 }]);
+    m.projectorStatus.mockResolvedValue({ connected: true, width: 1920, height: 1080, dpr: 1, mode: "blank" });
+    m.startCameraCheck.mockResolvedValue({ job_id: "jc" });
+    ev.waitForJob.mockResolvedValue(job({ result: { check: sampleCheck() } }));
+    renderSetup();
+    await waitFor(() => expect(next().disabled).toBe(false));
+    fireEvent.click(next());
+    fireEvent.click(await screen.findByRole("button", { name: "Check the camera view" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Use my phone instead" }));
+    expect(await screen.findByText(/Scanning with your phone is coming soon/)).toBeTruthy();
+    expect(screen.getByText("Step 3 of 3: Scan")).toBeTruthy();
+  });
+
+  it("re-align scans with the crop of the scan it compares against", async () => {
+    const calibrated = { ...withLast, surfaces: [{ id: "s1", name: "Door", quad: [[0, 0], [1, 0], [1, 1], [0, 1]] }] } as unknown as Project;
+    useProjectStore.setState({ project: calibrated, dirty: false });
+    m.getProject.mockResolvedValue(calibrated);
+    m.getCalibration.mockResolvedValue({
+      ...calibration(),
+      camera_id: null,
+      settings: { settle_ms: 300, roi: sampleRoi },
+    } as unknown as Calibration);
+    m.startCalibration.mockResolvedValue({ job_id: "j1" });
+    ev.waitForJob.mockResolvedValue(job({ state: "failed", error: null, result: null }));
+    renderSetup();
+    await act(async () => {
+      fireEvent.click(await screen.findByRole("button", { name: /Projector moved/ }));
+    });
+    expect(m.startCalibration).toHaveBeenCalledWith("p1", { mode: "scan", settings: { roi: sampleRoi } });
   });
 });

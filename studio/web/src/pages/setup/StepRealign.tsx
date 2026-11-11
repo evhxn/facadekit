@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { ApiError, cancelJob, projViewUrl, realign, startCalibration } from "../../api/client";
+import { ApiError, cancelJob, getCalibration, projViewUrl, realign, startCalibration } from "../../api/client";
 import type { RealignResponse } from "../../api/client";
 import { userMessage } from "../../api/errors";
 import { waitForJob } from "../../api/events";
-import type { Job, Project } from "../../api/types";
+import type { Calibration, Job, Project } from "../../api/types";
 import ErrorBanner from "../../components/ErrorBanner";
 import JobProgress from "../../components/JobProgress";
 import { useProjectStore } from "../../state/projectStore";
@@ -46,9 +46,19 @@ export default function StepRealign({ project, cameraId }: Props) {
     setPhase("scanning");
     setJob(null);
     try {
-      const body = cameraId
-        ? { mode: "scan" as const, camera_id: cameraId }
-        : { mode: "scan" as const };
+      // Scan with the same crop as the scan being compared against, so both see the same picture.
+      let earlier: Calibration | null = null;
+      try {
+        earlier = await getCalibration(pid, oldId);
+      } catch {
+        // Without the old settings the scan still works; the maps are stored for the whole picture.
+      }
+      const sameCamera = !cameraId || !earlier?.camera_id || earlier.camera_id === cameraId;
+      const roi = sameCamera ? earlier?.settings?.roi : null;
+      const body: Parameters<typeof startCalibration>[1] = cameraId
+        ? { mode: "scan", camera_id: cameraId }
+        : { mode: "scan" };
+      if (roi) body.settings = { roi };
       const { job_id } = await startCalibration(pid, body);
       const final = await waitForJob(job_id, (j) => mounted.current && setJob(j));
       if (!mounted.current) return;

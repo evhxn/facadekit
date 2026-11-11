@@ -11,9 +11,10 @@ import {
 } from "../../api/client";
 import { userMessage } from "../../api/errors";
 import { waitForJob } from "../../api/events";
-import type { CalibSettings, Calibration, Job, Project } from "../../api/types";
+import type { CalibSettings, Calibration, CameraRoi, Job, Project } from "../../api/types";
 import ErrorBanner from "../../components/ErrorBanner";
 import JobProgress from "../../components/JobProgress";
+import { COPY, isPictureSizeMessage } from "./cameraCopy";
 import LearningPanel from "./LearningPanel";
 import { useProjectStore } from "../../state/projectStore";
 import styles from "../SetupPage.module.css";
@@ -23,6 +24,12 @@ interface Props {
   cameraId: string | null;
   /** FPP address when the projector is plugged into the Raspberry Pi; null = this computer. */
   piHost?: string | null;
+  /** Crop of the camera picture chosen on the camera step; sent with camera scans only. */
+  roi?: CameraRoi | null;
+  /** Forget the crop (it was drawn for another picture size). */
+  onRoiReset?: () => void;
+  /** The user chose "Use my phone instead". */
+  phone?: boolean;
 }
 
 /** Projector-view photo; where the measured mask is black, a red tint is laid over it. */
@@ -71,7 +78,14 @@ const STRATEGY_NOTES: Record<string, string> = {
 
 type Phase = "idle" | "running" | "failed" | "done";
 
-export default function StepScan({ project, cameraId, piHost = null }: Props) {
+export default function StepScan({
+  project,
+  cameraId,
+  piHost = null,
+  roi = null,
+  onRoiReset,
+  phone = false,
+}: Props) {
   const navigate = useNavigate();
   const pid = project.id;
   const [phase, setPhase] = useState<Phase>(project.calibration_id ? "done" : "idle");
@@ -97,6 +111,11 @@ export default function StepScan({ project, cameraId, piHost = null }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pid, project.calibration_id]);
 
+  const fail = (message: string) => {
+    if (isPictureSizeMessage(message)) onRoiReset?.();
+    setError(message);
+  };
+
   const run = async (mode: "scan" | "manual") => {
     setError(null);
     setPhase("running");
@@ -105,7 +124,8 @@ export default function StepScan({ project, cameraId, piHost = null }: Props) {
       // settle_ms 0 means "automatic": the backend measures the projector-to-camera delay.
       // The backend fills in the other fields, so only this one is sent.
       const settle_ms = fixedWait ? Math.min(1500, Math.max(300, Math.round(waitMs) || 300)) : 0;
-      const settings = { settle_ms } as CalibSettings;
+      const settings: Partial<CalibSettings> = { settle_ms };
+      if (roi) settings.roi = roi; // only used by the camera branch below; Pi scans ignore it
       let body: Parameters<typeof startCalibration>[1] = { mode: "manual" };
       if (mode === "scan" && cameraId) {
         body = piHost
@@ -119,7 +139,7 @@ export default function StepScan({ project, cameraId, piHost = null }: Props) {
       if (final.state !== "succeeded") {
         setPhase("failed");
         if (final.state === "cancelled") setError("The scan was cancelled. Press Scan again when you are ready.");
-        else if (final.error) setError(userMessage(final.error.code, final.error.message));
+        else if (final.error) fail(userMessage(final.error.code, final.error.message));
         else setError(userMessage("SCAN_FAILED", "The scan did not work."));
         return;
       }
@@ -135,7 +155,7 @@ export default function StepScan({ project, cameraId, piHost = null }: Props) {
       setPhase("done");
     } catch (e) {
       if (!mounted.current) return;
-      setError(
+      fail(
         e instanceof ApiError
           ? userMessage(e.code, e.message)
           : "The scan result could not be loaded. Press Scan again.",
@@ -171,6 +191,11 @@ export default function StepScan({ project, cameraId, piHost = null }: Props) {
         {low ? (
           <p>The camera could not see the red areas. Surfaces there may need manual alignment.</p>
         ) : null}
+        {calibration.quality?.verdict === "marginal" ||
+        calibration.quality?.verdict === "too_coarse" ? (
+          <p>{COPY.smallResult}</p>
+        ) : null}
+        {warnings.includes("CROP_TOO_TIGHT") ? <p>{COPY.cropTight}</p> : null}
         {warnings.includes("NON_PLANAR") ? (
           <p>This wall is not flat. That is OK, but check alignment carefully.</p>
         ) : null}
@@ -223,6 +248,7 @@ export default function StepScan({ project, cameraId, piHost = null }: Props) {
         </>
       ) : (
         <>
+          {phone ? <p className={styles.note}>{COPY.phoneSoon}</p> : null}
           {piHost ? (
             <p>The scan takes about a minute. FPP will stop whatever it is playing.</p>
           ) : (

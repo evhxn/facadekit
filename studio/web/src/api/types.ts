@@ -95,6 +95,8 @@ export interface CalibSettings {
   discard_frames: number;
   average_frames: number;
   min_conf?: number;
+  /** Crop of the camera picture in full-frame pixels; null or missing = the whole picture. */
+  roi?: CameraRoi | null;
 }
 export interface CameraRoi {
   x: number;
@@ -126,6 +128,9 @@ export interface CalibQuality {
   planarity: number;
   median_contrast: number;
   lit_fraction: number;
+  px_per_proj_px?: number | null;
+  snr?: number | null;
+  verdict?: CameraVerdict | null;
 }
 export interface Calibration {
   id: string;

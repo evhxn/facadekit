@@ -170,7 +170,7 @@ export const startCalibration = (
     mode: "scan" | "manual" | "scan_pi";
     camera_id?: string;
     host?: string;
-    settings?: CalibSettings;
+    settings?: Partial<CalibSettings>;
   },
 ) => request<{ job_id: string }>("POST", `/projects/${enc(pid)}/calibrations`, body);
 /** Tell scan memory whether a finished scan looked right; it steers the next scan. */

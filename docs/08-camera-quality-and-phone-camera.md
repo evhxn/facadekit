@@ -305,7 +305,7 @@ Privacy note under the panel: "The video goes straight from your phone to this c
    - `CameraRoi {x, y, w, h: int, frame_width, frame_height: int, bin: Literal[1, 2] = 1}`;
    - `CalibSettings.roi: CameraRoi | None = None`;
    - `CalibQuality.px_per_proj_px: float | None = None`, `snr: float | None = None`, `verdict: Literal["good", "marginal", "too_coarse"] | None = None`.
-2. §6.4 `devices/base.py`: `CroppedCamera(camera, roi)` implements `Camera`. `CameraManager` opens OpenCV cameras at `FACADEKIT_CAMERA_SIZE`, default `1920x1080` (was 1280×720). This changes behaviour; see open question 2.
+2. §6.4 `devices/base.py`: `CroppedCamera(camera, roi)` implements `Camera`. `CameraManager` opens OpenCV cameras at `FACADEKIT_CAMERA_SIZE`. The default stays `1280x720`; 1080p is opt-in with `FACADEKIT_CAMERA_SIZE=1920x1080` (owner decision, so existing setups behave as before). The wizard only hints at it (`CameraCheck.suggest_1080p`); there is no settings UI for it.
 3. §6.6 `calib/*`:
    - new `calib/quality.py` (§3 functions);
    - `precheck` returns extra keys `lit_px`, `px_per_proj_px`, `snr`, `p99_white`, `lit_x0`, `lit_y0`, `lit_x1`, `lit_y1`;
@@ -328,7 +328,7 @@ Privacy note under the panel: "The video goes straight from your phone to this c
 | Risk | Mitigation |
 |---|---|
 | The 3-camera-pixel stripe rule and `MOD_OK` are simulator-derived | Spike **S-9** (owner): a far-webcam field scan at three distances, comparing the verdict with scan success; adjust two constants in `calib/quality.py`. |
-| Webcams at 1080p may drop to 5 fps (uncompressed YUYV over USB 2) | Latency tuning already measures the frame interval. `FACADEKIT_CAMERA_SIZE=1280x720` restores the old behaviour. Extend spike S-3 with "does 1080p open, at what fps". |
+| Webcams at 1080p may drop to 5 fps (uncompressed YUYV over USB 2) | Latency tuning already measures the frame interval. The default is 720p, so nothing changes until the owner sets `FACADEKIT_CAMERA_SIZE=1920x1080`; the wizard hint tells them how. Extend spike S-3 with "does 1080p open, at what fps". |
 | Phone recordings: does AE/AF lock hold for 60 s; HEVC/HDR (iPhone HLG, Dolby Vision) through the bundled imageio-ffmpeg; stabilisation drift; rotation metadata; whether iOS Safari transcodes videos picked in a file input | Spike **S-10** (owner): one iPhone and one Android, 4 recordings each, run through the T-207 analysis CLI. Fallbacks: "Most Compatible" format; AirDrop/cable then laptop upload. |
 | The marker search over a long recording finds a false flash train (for example the wizard's white/grid toggles) | Segments must be 0.6–1.4 s long, and the projector is black during the countdown. Recording that starts during the wizard's white toggling is harmless because those toggles are not 1 s periodic. Tested with 25 s pre-roll. |
 | Upload of large files over Wi-Fi fails midway | Clear error; retry. Laptop upload as fallback. No resumable upload in the MVP. |
