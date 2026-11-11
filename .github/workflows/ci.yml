@@ -62,4 +62,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:latest -color -ignore 'SC2035'
+      - run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:latest -color
