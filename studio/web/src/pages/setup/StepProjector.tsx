@@ -138,6 +138,7 @@ export default function StepProjector({ project, onReadyChange, piHost, onPiHost
       <button
         type="button"
         onClick={() => window.open("/projector", "fk-projector", "popup,width=800,height=600")}
+        className="primary"
       >
         Open projector window
       </button>

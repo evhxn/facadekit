@@ -1,5 +1,9 @@
 # Ticket index
 
+## Status
+
+MVP and v1 built on 2026-11-10. Fix tickets from the review are in [REVIEW-01.md](REVIEW-01.md) (R-001 to R-009).
+
 Tickets for **FacadeKit** (working name). Each `T-XXX.md` is self-contained: a builder model should need only that file plus the repository. Background lives in `docs/` (02 architecture, 04 repo structure, 05 interfaces).
 
 **Models:** H = Claude Haiku (mechanical work), S = Claude Sonnet (needs judgment), S⚑ = Sonnet with a flag: escalate to a stronger model if the acceptance tests cannot be met after two attempts.

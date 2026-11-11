@@ -9,6 +9,7 @@
   user-select: none;
 }
 .status {
+  color: var(--muted);
   display: flex;
   justify-content: space-between;
   font-size: 0.9em;
@@ -24,14 +25,14 @@
   min-height: 64px;
   font-size: 1.4em;
   border-radius: 10px;
-  border: 2px solid #888;
-  background: #f4f4f4;
-  color: #111;
+  border: 2px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
 }
 .on {
-  background: #1a73e8;
-  border-color: #1a73e8;
-  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
 }
 .corners {
   display: grid;
@@ -76,5 +77,5 @@
   letter-spacing: 0.2em;
 }
 .error {
-  color: #c00;
+  color: var(--danger);
 }

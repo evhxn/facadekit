@@ -25,10 +25,12 @@
 }
 .hint {
   margin: 0;
-  opacity: 0.7;
+  color: var(--muted);
   font-size: 13px;
 }
 .table {
+  display: block;
+  overflow-x: auto;
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
@@ -43,5 +45,6 @@
   cursor: pointer;
 }
 .selected {
-  background: rgba(0, 102, 204, 0.18);
+  background: var(--surface-2);
+  box-shadow: inset 3px 0 0 var(--accent);
 }

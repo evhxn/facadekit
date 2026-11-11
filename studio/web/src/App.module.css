@@ -1,18 +1,83 @@
 .header {
   display: flex;
   align-items: center;
-  gap: 24px;
-  padding: 12px 16px;
-  border-bottom: 1px solid #ddd;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-5);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  font-size: 1.15rem;
+  letter-spacing: 0.02em;
 }
 
 .nav {
   display: flex;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  counter-reset: step;
+}
+
+.step {
+  counter-increment: step;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--target);
+  padding: 0 var(--space-3) 0 var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.step::before {
+  content: counter(step);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid var(--muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.step:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.step[aria-current="page"] {
+  color: var(--text);
+  border-color: var(--accent);
+  background: var(--surface-2);
+  font-weight: 600;
+}
+
+.step[aria-current="page"]::before {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+
+.done::before {
+  content: "\2713";
+  border-color: var(--ok);
+  color: var(--ok);
+}
+
+.done[aria-current="page"]::before {
+  background: var(--ok);
+  border-color: var(--ok);
+  color: var(--on-accent);
 }
 
 .main {
-  padding: 16px;
+  padding: var(--space-4);
 }
 
 .projector {
@@ -21,4 +86,14 @@
   overflow: hidden;
   background: #000;
   color: #fff;
+}
+
+@media (max-width: 600px) {
+  .nav {
+    width: 100%;
+  }
+  .step {
+    flex: 1 1 calc(50% - var(--space-2));
+    justify-content: flex-start;
+  }
 }

@@ -7,6 +7,16 @@ import numpy as np
 
 Point = tuple[float, float]
 
+# Homographies here use pixel-corner coordinates ((0, 0) is the top-left corner of the
+# top-left pixel). cv2.warpPerspective treats integer coordinates as pixel centres, so
+# conjugate with a half-pixel shift before calling it.
+_HALF_IN = np.array([[1.0, 0.0, 0.5], [0.0, 1.0, 0.5], [0.0, 0.0, 1.0]])
+_HALF_OUT = np.array([[1.0, 0.0, -0.5], [0.0, 1.0, -0.5], [0.0, 0.0, 1.0]])
+
+
+def _cv_warp_matrix(h: np.ndarray) -> np.ndarray:
+    return np.asarray(_HALF_OUT @ h @ _HALF_IN, dtype=np.float64)
+
 
 @dataclass
 class SimScene:
@@ -103,7 +113,9 @@ class SimScene:
             light = np.zeros((wh, ww, 3), dtype=np.float32)
         else:
             lin = np.power(proj_image.astype(np.float32) / 255.0, np.float32(self.gamma))
-            light = cv2.warpPerspective(lin, self.h_p2w, (ww, wh), flags=cv2.INTER_LINEAR)
+            light = cv2.warpPerspective(
+                lin, _cv_warp_matrix(self.h_p2w), (ww, wh), flags=cv2.INTER_LINEAR
+            )
             if light.ndim == 2:
                 light = np.repeat(light[:, :, None], 3, axis=2)
         for ox0, oy0, ox1, oy1 in self.occluders_world:
@@ -111,7 +123,10 @@ class SimScene:
             light[y0 : max(int(round(oy1)), 0), x0 : max(int(round(ox1)), 0)] = 0
         radiance = self._albedo_float() * (self.ambient + self.gain * light)
         cam = cv2.warpPerspective(
-            radiance.astype(np.float32), self.h_w2c, self.cam_size, flags=cv2.INTER_LINEAR
+            radiance.astype(np.float32),
+            _cv_warp_matrix(self.h_w2c),
+            self.cam_size,
+            flags=cv2.INTER_LINEAR,
         )
         if self.blur_sigma > 0:
             cam = cv2.GaussianBlur(cam, (0, 0), self.blur_sigma)

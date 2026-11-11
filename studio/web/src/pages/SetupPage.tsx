@@ -61,6 +61,7 @@ export default function SetupPage() {
             type="button"
             disabled={(step === 1 && !projectorReady) || (step === 2 && !cameraId)}
             onClick={() => setStep(step + 1)}
+            className="primary"
           >
             Next
           </button>

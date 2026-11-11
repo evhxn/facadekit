@@ -320,7 +320,12 @@ export default function FppPanel({
               }}
             />
           </label>
-          <button type="button" onClick={() => void connect()} disabled={host === ""}>
+          <button
+            type="button"
+            onClick={() => void connect()}
+            disabled={host === ""}
+            className="primary"
+          >
             Connect
           </button>
         </div>
@@ -390,6 +395,7 @@ export default function FppPanel({
           </label>
           <button
             type="button"
+            className="primary"
             onClick={() => void send()}
             disabled={!isConnected || !selectedRenderId || sending || aligning}
           >

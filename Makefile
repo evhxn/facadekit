@@ -1,4 +1,4 @@
-.PHONY: setup lint test build-web dev
+.PHONY: setup lint test build-web dev run run-sim
 
 setup:
 	cd studio/backend && uv sync --all-extras
@@ -14,6 +14,12 @@ test:
 
 build-web:
 	cd studio/web && pnpm build
+
+run:
+	cd studio/backend && uv run facadekit serve
+
+run-sim:
+	cd studio/backend && uv run facadekit serve --sim
 
 dev:
 	@echo "Run these in two terminals:"

@@ -332,7 +332,9 @@ export default function ClipForm({
       <div className={styles.row}>
         {isNew ? (
           <>
-            <button type="submit">Add to timeline</button>
+            <button type="submit" className="primary">
+              Add to timeline
+            </button>
             <button type="button" onClick={onCancel}>
               Cancel
             </button>
@@ -342,7 +344,7 @@ export default function ClipForm({
             <button type="button" onClick={onCancel}>
               Close
             </button>
-            <button type="button" onClick={onRemove}>
+            <button type="button" onClick={onRemove} className="danger">
               Remove clip
             </button>
           </>

@@ -11,6 +11,15 @@ from facadekit.errors import BAD_IMAGE_SIZE, BAD_REQUEST, FFMPEG_FAILED, FkError
 from facadekit.media.ffmpeg import ffmpeg_exe
 from facadekit.render.presets import Preset
 
+# Convert BGR to YUV with the BT.709 matrix (limited range) and tag the stream as BT.709, so
+# players that assume BT.709 for HD show the intended colours. Whether the Pi decoder honours
+# these tags is unverified until hardware spike S-2 is run.
+COLOR_ARGS: list[str] = [
+    "-vf", "scale=in_range=pc:out_range=tv:out_color_matrix=bt709",
+    "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709",
+    "-color_range", "tv",
+]  # fmt: skip
+
 
 class Encoder:
     """Pipes raw BGR frames into ffmpeg, producing an H.264 + AAC MP4."""
@@ -45,7 +54,7 @@ class Encoder:
         else:
             cmd += ["-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo"]
         cmd += ["-map", "0:v:0", "-map", "1:a:0"]
-        cmd += list(preset.video_args) + list(preset.audio_args)
+        cmd += COLOR_ARGS + list(preset.video_args) + list(preset.audio_args)
         cmd += ["-t", f"{duration_ms / 1000:.3f}", "-movflags", "+faststart", str(out_path)]
 
         self._stderr: IO[bytes] = tempfile.TemporaryFile()

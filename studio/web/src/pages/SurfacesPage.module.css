@@ -10,13 +10,17 @@
 }
 .panel {
   overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-3);
 }
 .toggle {
   display: block;
   margin-bottom: 8px;
 }
 .note {
-  color: #c60;
+  color: var(--warn);
   margin: 4px 0 8px;
 }
 .props {
@@ -32,4 +36,14 @@
 .row {
   display: flex;
   gap: 8px;
+}
+
+@media (max-width: 800px) {
+  .page {
+    grid-template-columns: minmax(0, 1fr);
+    height: auto;
+  }
+  .canvasArea {
+    height: 60vh;
+  }
 }

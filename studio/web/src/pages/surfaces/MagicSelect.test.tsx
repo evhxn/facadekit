@@ -42,8 +42,27 @@ beforeAll(() => {
     (window as unknown as { PointerEvent: unknown }).PointerEvent = class extends MouseEvent {};
   }
 });
-beforeEach(() => segment.mockReset());
-afterEach(cleanup);
+// The capabilities request is a plain fetch; answer it with the engines under test.
+let fetchMock: ReturnType<typeof vi.fn>;
+const useEngines = (engines: string[]) => {
+  fetchMock = vi.fn().mockResolvedValue({
+    ok: true,
+    status: 200,
+    json: () => Promise.resolve({ segment_engines: engines, beats: false }),
+  });
+  vi.stubGlobal("fetch", fetchMock);
+};
+/** Let the capabilities request settle. */
+const capabilitiesLoaded = () => act(() => new Promise<void>((r) => setTimeout(r, 0)));
+
+beforeEach(() => {
+  segment.mockReset();
+  useEngines(["grabcut"]);
+});
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 const setup = (disabledReason?: string) => {
   const onAccept = vi.fn<(q: Quad, m: Mask | null) => void>();
@@ -124,15 +143,45 @@ describe("Magic select", () => {
     expect(onAccept).toHaveBeenCalledWith(quad, null);
   });
 
-  it("retries once with grabcut when the model download fails", async () => {
+  it("retries once with grabcut when MobileSAM is listed but its download fails", async () => {
+    useEngines(["mobilesam", "grabcut"]);
     segment.mockRejectedValueOnce(new ApiError("MODEL_DOWNLOAD_FAILED", "x", 502));
     segment.mockResolvedValueOnce(res(nine));
     const { canvas } = setup();
+    await capabilitiesLoaded();
     start();
     down(canvas, 200, 150);
     await waitFor(() => expect(segment).toHaveBeenCalledTimes(2));
+    expect(segment.mock.calls[0]?.[2]).toBeUndefined();
     expect(segment.mock.calls[1]?.[2]).toBe("grabcut");
     await screen.findByText(/Using the simple selector/);
+  });
+
+  it("asks for grabcut and shows no download failure when MobileSAM is not published", async () => {
+    segment.mockResolvedValue(res(nine));
+    const { canvas } = setup();
+    await screen.findByText("Simple selector");
+    start();
+    down(canvas, 200, 150);
+    await waitFor(() => expect(segment).toHaveBeenCalledTimes(1));
+    expect(segment.mock.calls[0]?.[2]).toBe("grabcut");
+    await waitFor(() =>
+      expect((screen.getByText("Create surface") as HTMLButtonElement).disabled).toBe(false),
+    );
+    expect(screen.queryByText(/download failed/i)).toBeNull();
+    expect(screen.queryByText(/Using the simple selector/)).toBeNull();
+  });
+
+  it("lets the server choose the engine when MobileSAM is available", async () => {
+    useEngines(["mobilesam", "grabcut"]);
+    segment.mockResolvedValue(res(nine));
+    const { canvas } = setup();
+    await capabilitiesLoaded();
+    start();
+    down(canvas, 200, 150);
+    await waitFor(() => expect(segment).toHaveBeenCalledTimes(1));
+    expect(segment.mock.calls[0]?.[2]).toBeUndefined();
+    expect(screen.queryByText("Simple selector")).toBeNull();
   });
 
   it("shows a friendly message for BAD_REQUEST", async () => {

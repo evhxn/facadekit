@@ -176,6 +176,7 @@ export default function MediaLibrary({
               ) : null}
               <button
                 type="button"
+                className="danger"
                 aria-label={`Delete ${a.original_name}`}
                 onClick={() => void remove(a)}
               >

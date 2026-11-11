@@ -111,7 +111,7 @@ export default function RenderPanel({
           Include audio
         </label>
         {hasAudio ? null : <span className={styles.note}>The timeline has no audio.</span>}
-        <button type="button" onClick={() => void render()} disabled={busy}>
+        <button type="button" onClick={() => void render()} disabled={busy} className="primary">
           Render show
         </button>
       </div>

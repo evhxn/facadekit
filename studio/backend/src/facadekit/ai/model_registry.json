@@ -1,4 +1,4 @@
 {
-  "mobilesam_encoder": {"filename": "mobilesam_encoder.onnx", "url": "https://github.com/OWNER/facadekit/releases/download/models-v1/mobilesam_encoder.onnx", "sha256": "TO_BE_FILLED_BY_SPIKE_S6", "size_bytes": 0},
-  "mobilesam_decoder": {"filename": "mobilesam_decoder.onnx", "url": "https://github.com/OWNER/facadekit/releases/download/models-v1/mobilesam_decoder.onnx", "sha256": "TO_BE_FILLED_BY_SPIKE_S6", "size_bytes": 0}
+  "mobilesam_encoder": {"filename": "mobilesam_encoder.onnx", "url": "https://github.com/evhxn/facadekit/releases/download/models-v1/mobilesam_encoder.onnx", "sha256": "TO_BE_FILLED_BY_SPIKE_S6", "size_bytes": 0},
+  "mobilesam_decoder": {"filename": "mobilesam_decoder.onnx", "url": "https://github.com/evhxn/facadekit/releases/download/models-v1/mobilesam_decoder.onnx", "sha256": "TO_BE_FILLED_BY_SPIKE_S6", "size_bytes": 0}
 }

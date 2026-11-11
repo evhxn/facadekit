@@ -51,7 +51,12 @@ export default function SurfaceList({ surfaces, selectedId, onSelect, onRename, 
               {s.name}
             </button>
           )}
-          <button type="button" aria-label={`Delete ${s.name}`} onClick={() => onDelete(s.id)}>
+          <button
+            type="button"
+            aria-label={`Delete ${s.name}`}
+            onClick={() => onDelete(s.id)}
+            className="danger"
+          >
             Delete
           </button>
         </li>

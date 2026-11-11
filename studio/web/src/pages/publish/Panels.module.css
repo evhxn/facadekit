@@ -1,7 +1,8 @@
 .panel {
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  padding: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
   margin: 0 0 1rem;
 }
 .row {
@@ -12,21 +13,21 @@
   margin: 0.5rem 0;
 }
 .warn {
-  color: #8a5a00;
+  color: var(--warn);
   margin: 0.25rem 0;
 }
 .note {
-  color: #666;
+  color: var(--muted);
   font-size: 0.9rem;
 }
 .ok {
-  color: #1a6b2a;
+  color: var(--ok);
 }
 .reminder {
-  background: #fff4d6;
-  border: 1px solid #e0b84a;
-  border-radius: 4px;
-  padding: 0.5rem 0.75rem;
+  background: var(--warn-bg);
+  border: 1px solid var(--warn);
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3);
 }
 .list {
   list-style: none;
@@ -42,4 +43,13 @@
 }
 .input {
   min-width: 14rem;
+  max-width: 100%;
+}
+
+.row label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 100%;
 }

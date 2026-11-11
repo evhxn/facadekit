@@ -89,10 +89,14 @@ export default function ProjectsPage() {
           <li key={p.id} className={styles.item}>
             <span className={styles.name}>{p.name}</span>
             <span className={styles.date}>{new Date(p.modified_at).toLocaleString()}</span>
-            <button type="button" onClick={() => navigate(`/p/${p.id}/surfaces`)}>
+            <button
+              type="button"
+              onClick={() => navigate(`/p/${p.id}/surfaces`)}
+              className="primary"
+            >
               Open
             </button>
-            <button type="button" onClick={() => void onDelete(p)}>
+            <button type="button" onClick={() => void onDelete(p)} className="danger">
               Delete
             </button>
           </li>
@@ -142,7 +146,7 @@ export default function ProjectsPage() {
           Use your projector&apos;s <em>native</em> resolution (see its manual or label), not the
           highest it accepts.
         </p>
-        <button type="submit" disabled={busy}>
+        <button type="submit" disabled={busy} className="primary">
           New project
         </button>
       </form>

@@ -26,3 +26,14 @@
   grid-area: strip;
   min-width: 0;
 }
+
+@media (max-width: 900px) {
+  .page {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "preview"
+      "centre"
+      "library"
+      "strip";
+  }
+}

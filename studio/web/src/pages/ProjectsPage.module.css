@@ -6,35 +6,44 @@
 .list {
   list-style: none;
   padding: 0;
+  display: grid;
+  gap: var(--space-2);
 }
 .item {
+  flex-wrap: wrap;
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.5rem 0;
-  border-bottom: 1px solid #ddd;
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
 }
 .name {
   flex: 1;
   font-weight: 600;
 }
 .date {
-  color: #666;
+  color: var(--muted);
   font-size: 0.9rem;
 }
 .form {
   display: grid;
-  gap: 0.75rem;
+  gap: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
   margin-top: 1.5rem;
-  max-width: 28rem;
+  max-width: 30rem;
 }
 .field {
   display: grid;
   gap: 0.25rem;
 }
 .help {
-  color: #666;
-  font-size: 0.85rem;
+  color: var(--muted);
+  font-size: 0.9rem;
   margin: 0;
 }
 .custom {
