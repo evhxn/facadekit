@@ -31,6 +31,7 @@ MAX_RECORDS = 500  # the log is trimmed to the newest records when it is rewritt
 MISTAKE_WEIGHT = 2.0  # a failed or rejected scan counts double: mistakes teach more
 SAME_BUCKET_OTHER_CAMERA = 0.5
 SAME_CAMERA_OTHER_BUCKET = 0.25
+SIBLING_SHARE = 0.5  # how much of a failed scan also counts against same-or-finer-block strategies
 TIME_COST_PER_FRAME = 0.01  # reward given up for each extra averaged frame
 
 
@@ -60,6 +61,7 @@ STRATEGIES: tuple[Strategy, ...] = (
     Strategy("low_light", "Low light", 2, 6, 0.06, (2.0, 1.0)),
     Strategy("soft_focus", "Soft focus", 3, 3, 0.10, (2.0, 1.0)),
     Strategy("low_light_soft", "Low light, soft focus", 3, 6, 0.06, (1.5, 1.0)),
+    Strategy("very_soft", "Very soft focus", 4, 3, 0.10, (1.5, 1.0)),
 )
 _BY_ID = {s.id: s for s in STRATEGIES}
 
@@ -137,6 +139,15 @@ def posterior(
         r = reward(rec)
         a, b = out[rec.strategy]
         out[rec.strategy] = (a + w * r, b + w * (1.0 - r))
+        if not rec.ok and rec.bucket != "low":
+            # Stripes the camera cannot resolve stay unresolved with more frames or a lower
+            # threshold, so a failure also counts (less) against same-or-finer-block strategies.
+            # Not in dim light: there noise, not blur, is the likelier cause and averaging helps.
+            used = _BY_ID[rec.strategy]
+            for other in STRATEGIES:
+                if other.id != used.id and other.skip_lsb <= used.skip_lsb:
+                    oa, ob = out[other.id]
+                    out[other.id] = (oa, ob + SIBLING_SHARE * w)
     return out
 
 

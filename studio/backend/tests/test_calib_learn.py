@@ -74,19 +74,41 @@ def test_empty_history_keeps_the_defaults() -> None:
 def test_one_failure_switches_and_each_further_failure_moves_on() -> None:
     history: list[ScanRecord] = []
     tried = []
-    for _ in range(4):
+    for _ in range(len(STRATEGIES)):
+        s = choose(history, "cam", "low")
+        tried.append(s.id)
+        history.append(_rec(s.id, ok=False, bucket="low"))
+    assert tried == [s.id for s in STRATEGIES]  # every strategy gets its turn
+    assert choose(history, "cam", "low").id == "standard"  # all failed once: start over
+
+
+def test_failure_rules_out_same_or_finer_blocks_unless_lighting_is_dim() -> None:
+    """Blurred stripes stay blurred with more frames: skip the same-block siblings."""
+    history: list[ScanRecord] = []
+    tried = []
+    for _ in range(3):
         s = choose(history, "cam", "high")
         tried.append(s.id)
         history.append(_rec(s.id, ok=False))
-    assert tried == [s.id for s in STRATEGIES]  # every strategy gets its turn
-    assert choose(history, "cam", "high").id == "standard"  # all failed once: start over
+    assert tried == ["standard", "soft_focus", "very_soft"]
+    # in dim light noise is the likelier cause, so low_light is tried right after standard
+    assert choose([_rec("standard", ok=False, bucket="low")], "cam", "low").id == "low_light"
+
+
+def test_coarsest_strategy_rescues_a_very_blurred_camera() -> None:
+    history = [
+        _rec("standard", ok=False),
+        _rec("soft_focus", ok=False),
+        _rec("very_soft", coverage=0.99),
+    ]
+    assert choose(history, "cam", "high").id == "very_soft"
 
 
 def test_success_is_remembered() -> None:
-    history = [_rec("standard", ok=False), _rec("low_light", coverage=0.97)]
-    assert choose(history, "cam", "high").id == "low_light"
-    history.append(_rec("low_light", coverage=0.97))
-    assert choose(history, "cam", "high").id == "low_light"
+    history = [_rec("standard", ok=False), _rec("soft_focus", coverage=0.97)]
+    assert choose(history, "cam", "high").id == "soft_focus"
+    history.append(_rec("soft_focus", coverage=0.97))
+    assert choose(history, "cam", "high").id == "soft_focus"
 
 
 def test_user_verdict_bad_counts_as_a_mistake() -> None:
@@ -98,7 +120,7 @@ def test_user_verdict_bad_counts_as_a_mistake() -> None:
 
 def test_context_limits_what_a_mistake_teaches() -> None:
     history = [_rec("standard", ok=False)]
-    assert choose(history, "cam", "high").id == "low_light"
+    assert choose(history, "cam", "high").id == "soft_focus"
     # another camera in the same lighting: half weight, not enough to abandon the default
     assert choose(history, "other", "high").id == "standard"
     # same camera in different lighting: quarter weight
@@ -106,7 +128,7 @@ def test_context_limits_what_a_mistake_teaches() -> None:
     # another camera and other lighting: ignored
     assert choose(history * 10, "other", "low").id == "standard"
     # but repeated failures elsewhere do add up
-    assert choose(history * 2, "other", "high").id == "low_light"
+    assert choose(history * 2, "other", "high").id == "soft_focus"
 
 
 def test_memory_roundtrip_verdict_and_damage(tmp_path: Path) -> None:
@@ -158,20 +180,19 @@ def test_easy_scene_uses_standard_and_logs_it(tmp_path: Path) -> None:
 
 
 def test_out_of_focus_camera_is_learned(tmp_path: Path) -> None:
-    """A blurred camera cannot resolve the fine stripes: the wizard fails twice, then adapts."""
+    """A blurred camera cannot resolve the fine stripes: one failure, then the wizard adapts."""
     scene = SimScene(blur_sigma=4.0)
     advisor = ScanAdvisor(ScanMemory(tmp_path / "scans.jsonl"))
-    for expected in ("standard", "low_light"):
-        with pytest.raises(FkError) as exc:
-            _scan(tmp_path, scene, advisor)
-        assert exc.value.code == "SCAN_FAILED"
-        assert advisor.memory.records()[-1].strategy == expected
+    with pytest.raises(FkError) as exc:
+        _scan(tmp_path, scene, advisor)
+    assert exc.value.code == "SCAN_FAILED"
+    assert advisor.memory.records()[-1].strategy == "standard"
     cal = _scan(tmp_path, scene, advisor)
     assert cal.strategy == "soft_focus"  # type: ignore[attr-defined]
     assert cal.settings.skip_lsb == 3  # type: ignore[attr-defined]
     assert cal.quality.coverage > 0.5  # type: ignore[attr-defined]
-    assert [r.ok for r in advisor.memory.records()] == [False, False, True]
-    # A brand new advisor reading the same log does not repeat the two mistakes.
+    assert [r.ok for r in advisor.memory.records()] == [False, True]
+    # A brand new advisor reading the same log does not repeat the mistake.
     again = ScanAdvisor(ScanMemory(tmp_path / "scans.jsonl"))
     assert again.choose("sim", {"median_contrast": 82.0, "lit_fraction": 0.5}).id != "standard"
 
