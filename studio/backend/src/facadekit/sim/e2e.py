@@ -21,7 +21,7 @@ from facadekit.store.project_store import SUBFOLDERS, load_project_dir, save_pro
 
 Point = tuple[float, float]
 
-MAX_CORNER_ERROR_PX = 1.5
+MAX_CORNER_ERROR_PX = 1.0
 
 
 @dataclass
