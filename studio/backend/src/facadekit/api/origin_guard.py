@@ -62,7 +62,12 @@ def _header(scope: Scope, name: bytes) -> str | None:
 
 
 class OriginGuardMiddleware:
-    """Pure ASGI middleware rejecting foreign Host headers and cross-site Origins."""
+    """Pure ASGI middleware rejecting foreign Host headers and cross-site requests.
+
+    Every request needs an allowed Host. A foreign Origin is refused on sockets, on unsafe
+    methods and on any /api or /ws path; /api requests a browser marks as
+    ``Sec-Fetch-Site: cross-site`` are refused whatever the method.
+    """
 
     def __init__(self, app: ASGIApp, *, hostnames: set[str]) -> None:
         self.app = app
@@ -73,10 +78,22 @@ class OriginGuardMiddleware:
         host = host_of(raw_host) if raw_host is not None else None
         if host is None or host not in self.hostnames:
             return False
+        # API and socket paths are never meant to be loaded by another site, not even with GET:
+        # some GETs have effects (camera snapshot opens the webcam, /fpp/status and
+        # /fpp/sequences make the server call the given host). Page loads stay open so a link
+        # to the app from elsewhere still works.
+        path = str(scope.get("path", ""))
+        is_api = path in ("/api", "/ws") or path.startswith(("/api/", "/ws/"))
+        if is_api and scope["type"] == "http":
+            fetch_site = _header(scope, b"sec-fetch-site")
+            if fetch_site is not None and fetch_site.strip().lower() == "cross-site":
+                return False
         origin = _header(scope, b"origin")
         if origin is None:
             return True
-        checked = scope["type"] == "websocket" or str(scope["method"]) not in _SAFE_METHODS
+        checked = (
+            is_api or scope["type"] == "websocket" or str(scope["method"]) not in _SAFE_METHODS
+        )
         if not checked:
             return True
         try:
