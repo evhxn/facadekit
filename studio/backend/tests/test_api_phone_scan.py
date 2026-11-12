@@ -354,8 +354,11 @@ def test_lying_content_length_hits_the_stream_cap(
         content=body,
         headers={"content-type": "multipart/form-data; boundary=fkb", "content-length": "1000"},
     )
-    assert resp.status_code == 400
-    assert resp.json()["error"]["message"] == "The video is larger than 4 GB."
+    assert resp.status_code == 400  # over the cap, and more bytes than declared
+    assert resp.json()["error"]["message"] in (
+        "The video is larger than 4 GB.",
+        routes_calibration.MSG_BAD_UPLOAD,
+    )
     assert _leftovers(client, pid) == []
 
 
@@ -613,6 +616,11 @@ def test_cancelled_queued_analysis_frees_the_slot(
     client.post(f"{API}/jobs/{queued}/cancel")
     gate.set()
     _wait(client, show["job_id"])
+    # The cancelled job never ran, so its upload is still there until the next upload sweeps it.
+    assert _leftovers(client, pid) == [f"{sid}.upload"]
+    bad = _upload(client, pid, sid, b"not a video", name="clip.mp4")
+    assert bad.status_code == 422
+    assert _leftovers(client, pid) == []
     resp = _upload(client, pid, sid, video.read_bytes())
     assert resp.status_code == 202
     assert _wait(client, resp.json()["job_id"])["state"] == "succeeded"
@@ -678,3 +686,177 @@ def test_cross_site_upload_is_blocked(client: TestClient) -> None:
     )
     assert resp.status_code == 403
     assert _leftovers(client, pid) == []
+
+
+# --- security review 2: stalls, leftovers, TE+CL, early name check, job errors -------------
+
+
+def _asgi(
+    c: TestClient, path: str, headers: list[tuple[bytes, bytes]], receive: Any
+) -> tuple[int, dict[str, Any]]:
+    sent: list[dict[str, Any]] = []
+
+    async def send(message: dict[str, Any]) -> None:
+        sent.append(message)
+
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "http_version": "1.1",
+        "method": "POST",
+        "scheme": "http",
+        "path": path,
+        "raw_path": path.encode(),
+        "query_string": b"",
+        "root_path": "",
+        "headers": [(b"host", b"testserver"), *headers],
+        "client": ("127.0.0.1", 50000),
+        "server": ("testserver", 80),
+    }
+    anyio.run(_app(c), scope, receive, send)
+    status = next(m for m in sent if m["type"] == "http.response.start")["status"]
+    body = b"".join(m.get("body", b"") for m in sent if m["type"] == "http.response.body")
+    return int(status), json.loads(body)
+
+
+_MP = [(b"content-type", b"multipart/form-data; boundary=fkb")]
+
+
+def _head(name: str = "clip.mp4") -> bytes:
+    return (
+        f'--fkb\r\nContent-Disposition: form-data; name="file"; filename="{name}"\r\n\r\n'
+    ).encode() + b"\x00\x00\x00\x18ftypmp42"
+
+
+def _assert_slot_free(c: TestClient, pid: str, sid: str) -> None:
+    # A wrong container is refused with 422 after taking the slot; 409 would mean it is held.
+    assert _upload(c, pid, sid, b"not a video", name="clip.mp4").status_code == 422
+
+
+def test_stalled_upload_is_dropped_and_frees_the_slot(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(routes_calibration, "UPLOAD_IDLE_TIMEOUT_S", 0.3)
+    pid = _project(client)
+    sid = _start(client, pid)
+    calls = [0]
+
+    async def receive() -> dict[str, Any]:
+        calls[0] += 1
+        if calls[0] == 1:
+            return {"type": "http.request", "body": _head() + b"\x00" * 4096, "more_body": True}
+        await anyio.sleep(30)  # the client goes silent
+        return {"type": "http.disconnect"}
+
+    t0 = time.monotonic()
+    status, body = _asgi(client, f"{API}/projects/{pid}/phone-scans/{sid}/video", _MP, receive)
+    assert time.monotonic() - t0 < 10
+    assert status == 400
+    assert body["error"]["message"] == routes_calibration.MSG_UPLOAD_STALLED
+    assert _leftovers(client, pid) == []
+    _assert_slot_free(client, pid, sid)
+
+
+def test_slow_drip_upload_hits_the_overall_deadline(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(routes_calibration, "UPLOAD_MAX_S", 0.5)
+    pid = _project(client)
+    sid = _start(client, pid)
+    first = [True]
+
+    async def receive() -> dict[str, Any]:
+        if first[0]:
+            first[0] = False
+            return {"type": "http.request", "body": _head(), "more_body": True}
+        await anyio.sleep(0.05)  # never idle long enough for the idle timeout
+        return {"type": "http.request", "body": b"\x00", "more_body": True}
+
+    t0 = time.monotonic()
+    status, body = _asgi(client, f"{API}/projects/{pid}/phone-scans/{sid}/video", _MP, receive)
+    assert time.monotonic() - t0 < 10
+    assert status == 400
+    assert body["error"]["message"] == routes_calibration.MSG_UPLOAD_STALLED
+    assert _leftovers(client, pid) == []
+    _assert_slot_free(client, pid, sid)
+
+
+def test_transfer_encoding_with_content_length_does_not_skip_the_disk_check(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pid = _project(client)
+    sid = _start(client, pid)
+    real = shutil.disk_usage
+
+    def two_gb(path: Any) -> Any:
+        u = real(path)
+        return type(u)(u.total, u.used, 2 * 1024**3)
+
+    monkeypatch.setattr(routes_calibration.shutil, "disk_usage", two_gb)
+    body = _multipart(b"\x00\x00\x00\x18ftypmp42")
+
+    async def receive() -> dict[str, Any]:
+        return {"type": "http.request", "body": body, "more_body": False}
+
+    headers = [*_MP, (b"content-length", b"10"), (b"transfer-encoding", b"chunked")]
+    status, out = _asgi(client, f"{API}/projects/{pid}/phone-scans/{sid}/video", headers, receive)
+    assert status == 400  # the 10-byte length is ignored, so 4 GB + 1 GB is required
+    assert "disk space" in out["error"]["message"]
+    assert _leftovers(client, pid) == []
+
+
+def test_more_bytes_than_declared_is_refused(client: TestClient) -> None:
+    pid = _project(client)
+    sid = _start(client, pid)
+    body = _multipart(b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 4096)
+
+    async def receive() -> dict[str, Any]:
+        return {"type": "http.request", "body": body, "more_body": False}
+
+    headers = [*_MP, (b"content-length", b"100")]
+    status, _out = _asgi(client, f"{API}/projects/{pid}/phone-scans/{sid}/video", headers, receive)
+    assert status == 400
+    assert _leftovers(client, pid) == []
+
+
+def test_bad_extension_fails_before_the_body_is_streamed(client: TestClient) -> None:
+    pid = _project(client)
+    sid = _start(client, pid)
+    calls = [0]
+
+    async def receive() -> dict[str, Any]:
+        calls[0] += 1
+        if calls[0] == 1:
+            return {"type": "http.request", "body": _head("payload.sh"), "more_body": True}
+        return {"type": "http.request", "body": b"\x00" * 65536, "more_body": True}
+
+    status, _out = _asgi(client, f"{API}/projects/{pid}/phone-scans/{sid}/video", _MP, receive)
+    assert status == 400
+    assert calls[0] == 1  # refused at the part headers, not after reading the body
+    assert _leftovers(client, pid) == []
+
+
+def test_unexpected_job_errors_do_not_leak_details(
+    client: TestClient, video: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    secret = "/Users/someone/private/path.mp4"
+
+    def boom(*_a: Any, **_k: Any) -> Any:
+        raise RuntimeError(f"cannot open {secret}")
+
+    monkeypatch.setattr(phone, "run_phone_calibration", boom)
+    pid = _project(client)
+    sid = _start(client, pid)
+    job = _wait(client, _upload(client, pid, sid, video.read_bytes()).json()["job_id"])
+    assert job["state"] == "failed"
+    assert job["error"] == {
+        "code": "INTERNAL",
+        "message": routes_calibration.MSG_PHONE_JOB_FAILED,
+    }
+    assert _leftovers(client, pid) == []
+
+    monkeypatch.setattr(phone, "play_light_show", boom)
+    resp = client.post(f"{API}/projects/{pid}/phone-scans", json={})
+    job = _wait(client, resp.json()["job_id"])
+    assert job["error"] == {"code": "INTERNAL", "message": routes_calibration.MSG_SHOW_JOB_FAILED}
+    assert secret not in json.dumps(job)

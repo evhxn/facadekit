@@ -76,16 +76,21 @@ export const putProject = (project: Project) =>
   request<Project>("PUT", `/projects/${enc(project.id)}`, project);
 export const deleteProject = (id: string) => request<void>("DELETE", `/projects/${enc(id)}`);
 
+/** Give up on an upload after this long (the server drops uploads after 2 h as well). */
+export const UPLOAD_TIMEOUT_MS = 2 * 60 * 60 * 1000;
+
 /** POST one file as multipart field "file" with XMLHttpRequest, which reports upload progress. */
 function xhrUpload<T>(
   path: string,
   file: File,
   onProgress: ((fraction: number) => void) | undefined,
   abortMessage: string,
+  signal?: AbortSignal,
 ): Promise<T> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", BASE + path);
+    xhr.timeout = UPLOAD_TIMEOUT_MS;
     xhr.setRequestHeader("Accept", "application/json");
     if (onProgress) {
       xhr.upload.onprogress = (e) => {
@@ -111,6 +116,15 @@ function xhrUpload<T>(
     };
     xhr.onerror = () => reject(new ApiError("NETWORK", "Network error", 0));
     xhr.onabort = () => reject(new ApiError("NETWORK", abortMessage, 0));
+    xhr.ontimeout = () =>
+      reject(new ApiError("NETWORK", "Sending took too long. Check the Wi-Fi and try again.", 0));
+    if (signal) {
+      if (signal.aborted) {
+        reject(new ApiError("NETWORK", abortMessage, 0));
+        return;
+      }
+      signal.addEventListener("abort", () => xhr.abort(), { once: true });
+    }
     const form = new FormData();
     form.append("file", file);
     xhr.send(form);
@@ -206,12 +220,14 @@ export const uploadPhoneVideo = (
   sessionId: string,
   file: File,
   onProgress?: (fraction: number) => void,
+  signal?: AbortSignal,
 ) =>
   xhrUpload<{ job_id: string }>(
     `/projects/${enc(pid)}/phone-scans/${enc(sessionId)}/video`,
     file,
     onProgress,
     "Sending the video was stopped. Choose it again.",
+    signal,
   );
 export const getCalibration = (pid: string, cid: string) =>
   request<Calibration>("GET", `/projects/${enc(pid)}/calibrations/${enc(cid)}`);

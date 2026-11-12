@@ -618,6 +618,7 @@ describe("Step 3 - scan", () => {
       "phs_0123abcd",
       expect.any(File),
       expect.any(Function),
+      expect.any(AbortSignal),
     );
     expect(screen.getByRole("button", { name: "Continue to surfaces" })).toBeTruthy();
     // Scan again goes back to the phone panel, not to a webcam scan.

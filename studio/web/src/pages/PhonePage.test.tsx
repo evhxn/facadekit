@@ -81,6 +81,7 @@ describe("PhonePage", () => {
       "phs_0123abcd",
       file,
       expect.any(Function),
+      expect.any(AbortSignal),
     );
     expect(sessionStorage.getItem("fk_phone_session")).toBeNull();
   });

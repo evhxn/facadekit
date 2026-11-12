@@ -122,11 +122,13 @@ export default function PhoneScanPanel({
   const [needSession, setNeedSession] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const mounted = useRef(true);
+  const uploading = useRef<AbortController | null>(null);
 
   useEffect(() => {
     mounted.current = true;
     return () => {
       mounted.current = false;
+      uploading.current?.abort(); // leaving the step stops the upload; the server cleans up
     };
   }, []);
 
@@ -172,9 +174,18 @@ export default function PhoneScanPanel({
     setAnalysis(null);
     setSendFraction(0);
     try {
-      const { job_id } = await uploadPhoneVideo(projectId, sessionId, file, (f) => {
-        if (mounted.current) setSendFraction(f);
-      });
+      const controller = new AbortController();
+      uploading.current = controller;
+      const { job_id } = await uploadPhoneVideo(
+        projectId,
+        sessionId,
+        file,
+        (f) => {
+          if (mounted.current) setSendFraction(f);
+        },
+        controller.signal,
+      );
+      uploading.current = null;
       if (!mounted.current) return;
       setSendFraction(null);
       const final = await waitForJob(job_id, (j) => mounted.current && setAnalysis(j));

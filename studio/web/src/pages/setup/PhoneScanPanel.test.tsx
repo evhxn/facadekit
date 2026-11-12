@@ -118,6 +118,7 @@ describe("PhoneScanPanel", () => {
         "phs_0123abcd",
         file,
         expect.any(Function),
+        expect.any(AbortSignal),
       ),
     );
     act(() => progress(0.42));
@@ -126,6 +127,23 @@ describe("PhoneScanPanel", () => {
     expect(screen.getByText(/42%/)).toBeTruthy();
     await act(async () => sent({ job_id: "job_2" }));
     await waitFor(() => expect(onDone).toHaveBeenCalledWith("cal_1"));
+  });
+
+  it("aborts the upload when the panel goes away", async () => {
+    sessionStorage.setItem("fk_phone_session_prj_1", "phs_0123abcd");
+    let signal: AbortSignal | undefined;
+    mocks.uploadPhoneVideo.mockImplementation(
+      (_p: string, _s: string, _f: File, _o: unknown, sig: AbortSignal) => {
+        signal = sig;
+        return new Promise(() => {});
+      },
+    );
+    const view = render(<PhoneScanPanel projectId="prj_1" onDone={() => {}} />);
+    fireEvent.change(chooser(), { target: { files: [video()] } });
+    await waitFor(() => expect(signal).toBeDefined());
+    expect(signal!.aborted).toBe(false);
+    view.unmount();
+    expect(signal!.aborted).toBe(true);
   });
 
   it("shows the phone error text when the analysis fails", async () => {

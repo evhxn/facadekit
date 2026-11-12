@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import secrets
 import shutil
@@ -48,6 +49,7 @@ from facadekit.devices.cropped import CroppedCamera
 from facadekit.devices.display_ws import WsDisplay
 from facadekit.errors import (
     BAD_REQUEST,
+    INTERNAL,
     NOT_FOUND,
     PROJECTOR_NOT_CONNECTED,
     REVISION_CONFLICT,
@@ -66,6 +68,7 @@ Progress = Callable[[float, str], None]
 Cancel = Callable[[], bool]
 
 router = APIRouter()
+log = logging.getLogger(__name__)
 
 State = Annotated[AppState, Depends(get_state)]
 
@@ -491,6 +494,11 @@ MSG_ANALYSIS_BUSY = "A phone video is already being checked for this project. Wa
 MSG_TOO_LARGE = "The video is larger than 4 GB."
 MSG_NO_SPACE = "There is not enough free disk space for this video. Free some space and retry."
 MSG_BAD_UPLOAD = "The video did not arrive completely. Send it again."
+MSG_UPLOAD_STALLED = "Sending the video stopped. Check the Wi-Fi and send it again."
+MSG_PHONE_JOB_FAILED = "Something went wrong while checking the video. Try again."
+MSG_SHOW_JOB_FAILED = "Something went wrong during the light show. Try again."
+UPLOAD_IDLE_TIMEOUT_S = 60.0  # no bytes for this long: the upload is dropped
+UPLOAD_MAX_S = 2 * 3600.0  # 4 GB at about 0.6 MB/s; slower uploads are dropped
 
 
 class PhoneScanRequest(BaseModel):
@@ -690,6 +698,11 @@ def start_phone_scan(
                 phone.play_light_show(
                     display, spec, countdown_s=countdown_s, progress=progress, cancel=cancel
                 )
+            except FkError:
+                raise
+            except Exception as exc:  # no paths or internals in the job error
+                log.exception("phone light show failed")
+                raise FkError(INTERNAL, MSG_SHOW_JOB_FAILED) from exc
             finally:
                 _BUSY.release(key, token)
             return {"session_id": session.id}
@@ -719,8 +732,10 @@ def _body_cap() -> int:
 
 
 def _declared_length(request: Request) -> int | None:
+    """Content-Length, or None when absent or when Transfer-Encoding is also sent (then the
+    length is not trustworthy; RFC 9112 says Transfer-Encoding wins)."""
     raw = request.headers.get("content-length")
-    if raw is None:
+    if raw is None or "transfer-encoding" in request.headers:
         return None
     raw = raw.strip()
     if not raw.isascii() or not raw.isdecimal() or len(raw) > 20:
@@ -736,11 +751,14 @@ def _boundary(request: Request) -> bytes:
     return boundary
 
 
-async def _receive_video(request: Request, part: Path, boundary: bytes) -> str:
+async def _receive_video(
+    request: Request, part: Path, boundary: bytes, declared: int | None
+) -> str:
     """Stream the multipart field "file" into the new file `part`; returns the client's file
     name, which the caller only checks for its extension (never logged, never used in a path).
 
-    The byte caps are enforced on what actually arrives, not on Content-Length.
+    The byte caps are enforced on what actually arrives, not on Content-Length, and the
+    stream is dropped when it stalls (`UPLOAD_IDLE_TIMEOUT_S`) or runs past `UPLOAD_MAX_S`.
     """
     file_cap = phone.MAX_VIDEO_BYTES
     body_cap = _body_cap()
@@ -774,7 +792,12 @@ async def _receive_video(request: Request, part: Path, boundary: bytes) -> str:
         filename = params.get(b"filename")
         if filename is None:
             raise _bad_upload("Choose a video file.")
-        found.append(filename.decode("utf-8", "replace"))
+        name = filename.decode("utf-8", "replace")
+        try:
+            phone.check_upload_name(name)  # fail before up to 4 GB is streamed
+        except FkError as exc:
+            raise _bad_upload(exc.message) from exc
+        found.append(name)
         st["in_file"] = True
 
     def on_part_data(data: bytes, start: int, end: int) -> None:
@@ -805,12 +828,30 @@ async def _receive_video(request: Request, part: Path, boundary: bytes) -> str:
         },
     )
     received = 0
+    deadline = anyio.current_time() + UPLOAD_MAX_S
     with os.fdopen(_new_file(part), "wb") as out:
         try:
-            async for chunk in request.stream():
+            more = True
+            while more:
+                wait_s = min(UPLOAD_IDLE_TIMEOUT_S, deadline - anyio.current_time())
+                if wait_s <= 0:
+                    raise _bad_upload(MSG_UPLOAD_STALLED)
+                try:
+                    with anyio.fail_after(wait_s):
+                        message = await request.receive()
+                except TimeoutError as exc:
+                    raise _bad_upload(MSG_UPLOAD_STALLED) from exc
+                if message["type"] == "http.disconnect":
+                    raise ClientDisconnect()
+                if message["type"] != "http.request":
+                    continue
+                more = bool(message.get("more_body", False))
+                chunk = message.get("body", b"")
                 received += len(chunk)
                 if received > body_cap:
                     raise _bad_upload(MSG_TOO_LARGE)
+                if declared is not None and received > declared:
+                    raise _bad_upload(MSG_BAD_UPLOAD)
                 parser.write(chunk)
                 if len(pending) >= UPLOAD_CHUNK_BYTES:
                     block = bytes(pending)
@@ -826,6 +867,21 @@ async def _receive_video(request: Request, part: Path, boundary: bytes) -> str:
     if not found:
         raise _bad_upload("Choose a video file.")
     return found[0]
+
+
+def _drop_uploads(project_dir: Path) -> None:
+    """Remove every leftover `<sid>.upload` (e.g. from a job cancelled while queued).
+
+    Only called while holding the server-wide analysis slot, so no job reads one of them.
+    `*.part` files are left alone: session-file temps use that name too.
+    """
+    if os.environ.get(KEEP_VIDEO_ENV) == "1":
+        return
+    for entry in _phone_dir(project_dir).glob("*.upload"):
+        try:
+            entry.unlink()
+        except OSError:
+            continue
 
 
 def _cleanup(token: str | None, part: Path, dest: Path, key: str) -> None:
@@ -858,7 +914,8 @@ async def upload_phone_video(
         if token is None:
             return _conflict(MSG_ANALYSIS_BUSY)
         _sweep_phone_dir(project_dir)  # no analysis runs now, so nothing in use is removed
-        filename = await _receive_video(request, part, boundary)
+        _drop_uploads(project_dir)
+        filename = await _receive_video(request, part, boundary, declared)
         try:
             phone.check_upload_name(filename)
         except FkError as exc:
@@ -890,6 +947,11 @@ async def upload_phone_video(
                 result = _finish(state, pid, cal.id)
                 _session_path(project_dir, sid).unlink(missing_ok=True)
                 return result
+            except FkError:
+                raise
+            except Exception as exc:  # no paths or internals in the job error
+                log.exception("phone video analysis failed")
+                raise FkError(INTERNAL, MSG_PHONE_JOB_FAILED) from exc
             finally:
                 if os.environ.get(KEEP_VIDEO_ENV) != "1":
                     dest.unlink(missing_ok=True)

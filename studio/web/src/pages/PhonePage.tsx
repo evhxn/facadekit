@@ -42,6 +42,8 @@ export default function PhonePage() {
   const [starting, setStarting] = useState(false);
   const [fraction, setFraction] = useState<number | null>(null);
   const input = useRef<HTMLInputElement>(null);
+  const uploading = useRef<AbortController | null>(null);
+  useEffect(() => () => uploading.current?.abort(), []);
 
   const tryLoad = useCallback(async () => {
     try {
@@ -92,7 +94,10 @@ export default function PhonePage() {
     setMessage(null);
     setFraction(0);
     try {
-      await uploadPhoneVideo(projectId, sessionId, file, setFraction);
+      const controller = new AbortController();
+      uploading.current = controller;
+      await uploadPhoneVideo(projectId, sessionId, file, setFraction, controller.signal);
+      uploading.current = null;
       writeSession(projectId, null);
       setSessionId(null);
       setMessage(COPY.phonePageDone);
