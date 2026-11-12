@@ -314,7 +314,7 @@ def test_wrong_container_never_reaches_ffmpeg(
     def no_ffmpeg(*_a: object, **_k: object) -> None:
         raise AssertionError("ffmpeg must not see this file")
 
-    monkeypatch.setattr(phone, "probe", no_ffmpeg)
+    monkeypatch.setattr(phone.subprocess, "run", no_ffmpeg)
     monkeypatch.setattr(phone.subprocess, "Popen", no_ffmpeg)
     f = tmp_path / "video.mp4"
     f.write_bytes(head)
@@ -356,7 +356,7 @@ def test_upload_name_refused(name: str) -> None:
 
 def test_upload_path_is_server_named(tmp_path: Path) -> None:
     out = phone_upload_path(tmp_path, "phs_0123abcd")
-    assert out == (tmp_path / "calibration" / ".phone" / "phs_0123abcd.upload").resolve()
+    assert out == tmp_path / "calibration" / ".phone" / "phs_0123abcd.upload"
 
 
 @pytest.mark.parametrize(
@@ -463,3 +463,125 @@ def test_forced_demuxer_mismatch_is_unreadable(video: Path) -> None:
     with pytest.raises(FkError) as exc:
         list(phone._decode(video, "matroska", "fps=30", (1920, 1080), max_frames=10))
     assert _code(exc) == "PHONE_VIDEO_UNREADABLE"
+
+
+# --- security review follow-ups -----------------------------------------------------------
+
+
+def _spoofed(tmp_path: Path, size: str, seconds: int, title: str, comment: str) -> Path:
+    out = tmp_path / f"spoof_{size}.mp4"
+    _ffmpeg("-f", "lavfi", "-i", f"color=black:s={size}:d={seconds}:r=1", "-c:v", "libx264",
+            "-preset", "ultrafast", "-metadata", f"title={title}", "-metadata",
+            f"comment={comment}", str(out))  # fmt: skip
+    return out
+
+
+@pytest.fixture(scope="module")
+def huge_spoof(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """8192 x 8192 frames whose metadata pretends to be a 640 x 360, 5-minute video."""
+    return _spoofed(
+        tmp_path_factory.mktemp("spoof"), "8192x8192", 2,
+        "Stream #0:0: Video: h264, 640x360", "Duration: 00:05:00.00, start",
+    )  # fmt: skip
+
+
+def test_metadata_cannot_spoof_size(huge_spoof: Path) -> None:
+    import time
+
+    t = time.monotonic()
+    with pytest.raises(FkError) as exc:
+        analyse_phone_video(huge_spoof, PatternSpec(320, 180))
+    assert _code(exc) == "PHONE_VIDEO_UNREADABLE"
+    assert time.monotonic() - t < 5  # refused at the probe, nothing decoded
+
+
+def test_decoder_refuses_huge_frames_whatever_the_probe_says(huge_spoof: Path) -> None:
+    """-max_pixels: even a decode told to expect 640 x 360 never allocates 8192 x 8192."""
+    with pytest.raises(FkError) as exc:
+        list(phone._decode(huge_spoof, "mov", "fps=30,scale=640:360", (640, 360), max_frames=5))
+    assert _code(exc) == "PHONE_VIDEO_UNREADABLE"
+
+
+def test_metadata_cannot_spoof_duration(tmp_path: Path) -> None:
+    clip = _spoofed(
+        tmp_path, "320x180", 5, "x", "x\n  Duration: 00:02:00.00, start: 0.000000, bitrate: 1 kb/s"
+    )
+    with pytest.raises(FkError) as exc:
+        analyse_phone_video(clip, PatternSpec(320, 180))
+    assert _code(exc) == "PHONE_VIDEO_NO_PATTERN"  # its real 5 s, not the claimed 2 min
+
+
+def test_parse_info_ignores_metadata_lines() -> None:
+    text = (
+        "Input #0, mov,mp4,m4a,3gp,3g2,mj2, from 'file:/x/Duration: 00:09:00.00,.mp4':\n"
+        "  Metadata:\n"
+        "    title           : Stream #0:0: Video: h264, 640x360\n"
+        "    comment         : x\n"
+        "                    :   Duration: 00:05:00.00, start\n"
+        "  Duration: 00:01:00.00, start: 0.000000, bitrate: 26 kb/s\n"
+        "  Stream #0:0[0x1](und): Video: h264 (avc1 / 0x31637661), yuv420p(progressive), "
+        "8192x8192 [SAR 1:1 DAR 1:1], 26 kb/s, 2 fps, 2 tbr, 16384 tbn (default)\n"
+        "    Metadata:\n"
+        "      handler_name    : Display Matrix: rotation of 90.00 degrees\n"
+        "    Side data:\n"
+        "      Display Matrix: rotation of -90.00 degrees\n"
+    )
+    assert phone._parse_info(text) == (8192, 8192, 60.0)
+
+
+def test_probe_uses_forced_demuxer_and_file_protocol(
+    video: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen: list[list[str]] = []
+    real_run = subprocess.run
+
+    def spy(cmd: list[str], **kw: object) -> subprocess.CompletedProcess[bytes]:
+        seen.append(list(cmd))
+        return real_run(cmd, **kw)  # type: ignore[call-overload,no-any-return]
+
+    monkeypatch.setattr(phone.subprocess, "run", spy)
+    phone._video_size(video, "mov", 10)
+    (cmd,) = seen
+    i = cmd.index("-i")
+    assert cmd[i + 1] == f"file:{video.resolve()}"
+    pre = cmd[:i]
+    assert pre[pre.index("-protocol_whitelist") + 1] == "file"
+    assert pre[pre.index("-f") + 1] == "mov"
+    assert pre[pre.index("-max_pixels") + 1] == str(phone.MAX_VIDEO_PX)
+
+
+def test_one_deadline_for_all_passes(video: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(phone, "DECODE_TIMEOUT_S", 0.3)
+    with pytest.raises(FkError) as exc:
+        analyse_phone_video(video, _spec(_scene()))
+    assert _code(exc) == "PHONE_VIDEO_UNREADABLE"
+    assert "too long" in exc.value.message
+
+
+def test_decode_max_frames_clamped(video: Path) -> None:
+    for mf in (0, -1):
+        frames = list(phone._decode(video, "mov", "fps=30,scale=160:90", (160, 90), max_frames=mf))
+        assert len(frames) == 1
+
+
+def test_upload_path_refuses_symlinked_dirs(tmp_path: Path) -> None:
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    proj = tmp_path / "proj"
+    (proj / "calibration").mkdir(parents=True)
+    (proj / "calibration" / ".phone").symlink_to(outside, target_is_directory=True)
+    with pytest.raises(FkError):
+        phone_upload_path(proj, "phs_deadbeef")
+
+    proj2 = tmp_path / "proj2"
+    proj2.mkdir()
+    (proj2 / "calibration").symlink_to(outside, target_is_directory=True)
+    with pytest.raises(FkError):
+        phone_upload_path(proj2, "phs_deadbeef")
+
+    proj3 = tmp_path / "proj3"
+    (proj3 / "calibration" / ".phone").mkdir(parents=True)
+    (proj3 / "calibration" / ".phone" / "phs_deadbeef.upload").symlink_to(outside / "x")
+    with pytest.raises(FkError):
+        phone_upload_path(proj3, "phs_deadbeef")  # a dangling link planted at the upload name
+    assert phone_upload_path(proj3, "phs_0badcafe").parent == proj3 / "calibration" / ".phone"

@@ -3,9 +3,9 @@ a phone recorded with its own camera app into a calibration (docs/08 section 4).
 
 The video is untrusted input (it may come from an upload). Before ffmpeg sees it, the file must
 pass ``check_video_file``: a size cap and a container magic-byte check, which also decides the
-demuxer that is forced for every decode. Decoding only uses the ``file`` protocol, every decode
-has a frame cap and a wall-clock timeout, and the picture size is bounded before any buffer is
-allocated.
+demuxer that is forced for every ffmpeg run (probe and decodes). Every run uses only the
+``file`` protocol and ``-max_pixels``; every decode has a frame cap; one wall-clock budget covers
+the whole analysis; and the probed picture size is bounded before any buffer is allocated.
 """
 
 from __future__ import annotations
@@ -46,7 +46,6 @@ from facadekit.errors import (
     FkError,
 )
 from facadekit.media.ffmpeg import ffmpeg_exe
-from facadekit.media.probe import probe
 from facadekit.models.calibration import Calibration, CalibSettings, CameraRoi
 
 PHONE_CAMERA_ID = "phone"
@@ -60,7 +59,9 @@ MAX_VIDEO_BYTES = 4 * 1024**3  # docs/08: uploads over 4 GB are refused
 MIN_VIDEO_SIDE = 160  # px, displayed size
 MAX_VIDEO_SIDE = 4096
 MAX_VIDEO_PX = 4096 * 2304  # 4K plus a little; 8K phone video is refused
-DECODE_TIMEOUT_S = 1200.0  # wall clock per ffmpeg decode pass
+DECODE_TIMEOUT_S = 1200.0  # wall clock for all ffmpeg passes of one analysis together
+PROBE_TIMEOUT_S = 30.0
+DECODE_THREADS = 4
 VIDEO_EXTENSIONS = frozenset({".mp4", ".mov", ".m4v", ".3gp", ".mkv", ".webm"})
 _ISO_BMFF_BOXES = frozenset({b"ftyp", b"moov", b"mdat", b"wide", b"free", b"skip"})
 _EBML_MAGIC = b"\x1a\x45\xdf\xa3"
@@ -122,12 +123,20 @@ def check_video_file(path: Path) -> str:
 
 
 def phone_upload_path(project_dir: Path, session_id: str) -> Path:
-    """Server-generated location for an uploaded phone video; refuses any other session id."""
+    """Server-generated location for an uploaded phone video; refuses any other session id.
+
+    Returns ``<project_dir>/calibration/.phone/<session_id>.upload`` without resolving
+    symlinks, and refuses when ``calibration``, ``.phone`` or the upload itself is a symlink.
+    The caller must still create the file without following links and without clobbering:
+    ``os.open(path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW)``, or write a ``tempfile`` in the
+    same directory and ``os.replace`` it onto this path.
+    """
     if not _SESSION_ID.fullmatch(session_id):
         raise FkError(BAD_REQUEST, "Unknown light show.")
-    root = (project_dir / "calibration" / ".phone").resolve()
-    out = (root / f"{session_id}.upload").resolve()
-    if out.parent != root:
+    calib = project_dir / "calibration"
+    root = calib / ".phone"
+    out = root / f"{session_id}.upload"
+    if out.parent != root or any(p.is_symlink() for p in (calib, root, out)):
         raise FkError(BAD_REQUEST, "Unknown light show.")
     return out
 
@@ -198,18 +207,23 @@ def _decode(
     max_frames: int,
     timeout_s: float = DECODE_TIMEOUT_S,
 ) -> Iterator[np.ndarray]:
-    """Yield uint8 frames (gray (h, w) or BGR (h, w, 3)) of exactly `size` = (w, h)."""
+    """Yield uint8 frames (gray (h, w) or BGR (h, w, 3)) of exactly `size` = (w, h).
+
+    The decoder refuses pictures over MAX_VIDEO_PX whatever the container claims.
+    """
+    if timeout_s <= 0:
+        raise _unreadable("Reading the video took too long.")
     w, h = size
     shape = (h, w, 3) if colour else (h, w)
     frame_bytes = w * h * (3 if colour else 1)
-    cmd = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-nostdin"]
-    cmd += ["-protocol_whitelist", "file", "-f", demuxer]
+    cmd = _input_args(path, demuxer, "error")
+    cmd = cmd[: cmd.index("-i")]
     if start_s is not None:
         cmd += ["-ss", f"{max(0.0, start_s):.3f}"]
     if dur_s is not None:
         cmd += ["-t", f"{max(dur_s, 1 / ANALYSIS_FPS):.3f}"]
-    cmd += ["-i", f"file:{path.resolve()}", "-map", "0:v:0", "-an", "-sn", "-dn"]
-    cmd += ["-vf", vf, "-frames:v", str(max_frames)]
+    cmd += ["-i", _file_url(path), "-map", "0:v:0", "-an", "-sn", "-dn"]
+    cmd += ["-vf", vf, "-frames:v", str(max(1, max_frames))]
     cmd += ["-pix_fmt", "bgr24" if colour else "gray", "-f", "rawvideo", "-"]
     try:
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
@@ -247,22 +261,79 @@ def _decode(
         raise _unreadable()
 
 
-def _video_size(path: Path, n_patterns: int) -> tuple[int, int, float]:
+def _file_url(path: Path) -> str:
+    return f"file:{path.resolve()}"
+
+
+def _input_args(path: Path, demuxer: str, loglevel: str = "info") -> list[str]:
+    """ffmpeg arguments up to and including the input: file protocol only, forced demuxer,
+    bounded decoder picture size and threads. The probe needs ``info`` to see stream lines."""
+    return [
+        ffmpeg_exe(), "-hide_banner", "-loglevel", loglevel, "-nostdin",
+        "-threads", str(DECODE_THREADS), "-max_pixels", str(MAX_VIDEO_PX),
+        "-protocol_whitelist", "file", "-f", demuxer, "-i", _file_url(path),
+    ]  # fmt: skip
+
+
+# Only ffmpeg's own lines, at its own indentation, count. Container metadata is printed at
+# 4+ spaces (continuation lines start with spaces and ':'), so a title or comment such as
+# "Stream #0:0: Video: h264, 640x360" or "Duration: 00:05:00" cannot match.
+_INFO_DURATION = re.compile(r"^  Duration: (\d+):(\d{2}):(\d{2}(?:\.\d+)?),")
+_INFO_VIDEO = re.compile(r"^  Stream #0:\d+\S*: Video: (.*)$")
+_INFO_SIZE = re.compile(r", (\d{2,5})x(\d{2,5})(?=[ ,]|$)")
+_INFO_ROTATION = re.compile(
+    r"^      (?:Display Matrix|displaymatrix): rotation of (-?[\d.]+) degrees"
+)
+
+
+def _parse_info(text: str) -> tuple[int, int, float] | None:
+    """(displayed width, displayed height, seconds) from `ffmpeg -i` output, or None."""
+    lines = text.splitlines()
+    seconds: float | None = None
+    for ln in lines:
+        m = _INFO_DURATION.match(ln)
+        if m is not None:
+            seconds = int(m.group(1)) * 3600 + int(m.group(2)) * 60 + float(m.group(3))
+            break
+    idx = next((i for i, ln in enumerate(lines) if _INFO_VIDEO.match(ln)), None)
+    if seconds is None or idx is None:
+        return None
+    size = _INFO_SIZE.search(lines[idx])
+    if size is None:
+        return None
+    w, h = int(size.group(1)), int(size.group(2))
+    for ln in lines[idx + 1 :]:
+        if not ln.startswith("    "):  # end of this stream's block
+            break
+        rot = _INFO_ROTATION.match(ln)
+        if rot is not None and round(abs(float(rot.group(1)))) % 180 == 90:
+            w, h = h, w
+            break
+    return w, h, seconds
+
+
+def _video_size(
+    path: Path, demuxer: str, n_patterns: int, timeout_s: float = PROBE_TIMEOUT_S
+) -> tuple[int, int, float]:
     """Displayed (width, height) and duration in seconds, with the limits applied.
 
-    Called only after ``check_video_file``, so ffmpeg's own probing sees a known container.
+    The probe uses the same forced demuxer and file-only protocol as the decodes. Its numbers
+    only choose buffer sizes and reject early: the decoder's ``-max_pixels``, the pinned
+    output size and the frame caps hold even if the probe were fooled.
     """
     try:
-        asset = probe(path.resolve())
-    except FkError as exc:
+        proc = subprocess.run(
+            _input_args(path, demuxer), capture_output=True,
+            timeout=max(0.1, min(PROBE_TIMEOUT_S, timeout_s)),
+        )  # fmt: skip
+    except (subprocess.TimeoutExpired, OSError) as exc:
         raise _unreadable() from exc
-    if asset.kind != "video" or not asset.width or not asset.height or not asset.duration_ms:
+    info = _parse_info(proc.stderr.decode("utf-8", errors="replace"))
+    if info is None:
         raise _unreadable()
-    # probe() already swaps width and height for +-90 degree rotation (_ROTATION_RE).
-    w, h = asset.width, asset.height
+    w, h, seconds = info
     if min(w, h) < MIN_VIDEO_SIDE or max(w, h) > MAX_VIDEO_SIDE or w * h > MAX_VIDEO_PX:
         raise _unreadable()
-    seconds = asset.duration_ms / 1000
     if seconds > MAX_VIDEO_S:
         raise _unreadable("The video is longer than 10 minutes. Record only the light show.")
     if seconds < video_seconds(n_patterns):
@@ -303,8 +374,13 @@ def analyse_phone_video(
         if cancel is not None and cancel():
             raise FkError(CANCELLED, "Calibration cancelled")
 
+    deadline = time.monotonic() + DECODE_TIMEOUT_S  # one budget for the probe and all passes
+
+    def left() -> float:
+        return deadline - time.monotonic()
+
     demuxer = check_video_file(path)
-    full_w, full_h, seconds = _video_size(path, n)
+    full_w, full_h, seconds = _video_size(path, demuxer, n, left())
     max_frames = math.ceil(min(seconds + 2, MAX_VIDEO_S) * ANALYSIS_FPS)
     fps = f"fps={ANALYSIS_FPS}"
     full = f"scale={full_w}:{full_h}"  # no-op for a correct probe; pins the frame size
@@ -316,7 +392,7 @@ def analyse_phone_video(
     for i, f in enumerate(
         _decode(
             path, demuxer, f"{fps},scale={_SMALL_WIDTH}:{small_h}:flags=area",
-            (_SMALL_WIDTH, small_h), max_frames=max_frames,
+            (_SMALL_WIDTH, small_h), max_frames=max_frames, timeout_s=left(),
         )
     ):  # fmt: skip
         means.append(float(f.mean()))
@@ -343,7 +419,7 @@ def analyse_phone_video(
             _decode(
                 path, demuxer, f"{fps},{full}", (full_w, full_h),
                 start_s=(first + 1) / ANALYSIS_FPS, dur_s=(last - first - 1) / ANALYSIS_FPS,
-                max_frames=last - first + 1,
+                max_frames=last - first + 1, timeout_s=left(),
             ),
             (full_h, full_w),
         )  # fmt: skip
@@ -372,7 +448,7 @@ def analyse_phone_video(
         window_of[first : last + 1] = k
     sums = np.zeros((n, ch, cw), np.float32)
     counts = np.zeros(n, np.int64)
-    for i, f in enumerate(_decode(path, demuxer, crop, (cw, ch), max_frames=end)):
+    for i, f in enumerate(_decode(path, demuxer, crop, (cw, ch), max_frames=end, timeout_s=left())):
         k = int(window_of[i])
         if k >= 0:
             sums[k] += f
@@ -382,8 +458,8 @@ def analyse_phone_video(
             report(0.30 + 0.45 * i / end, "Reading the patterns")
     if (counts == 0).any():
         raise FkError(PHONE_VIDEO_NO_PATTERN, MSG_NO_PATTERN)
-    images = sums / counts[:, None, None].astype(np.float32)
-    del sums
+    images = sums  # divide in place: no second (N, h, w) array
+    images /= counts[:, None, None].astype(np.float32)
 
     # White colour photo: the middle frame of the WHITE window.
     first, last = windows[white_k]
@@ -391,7 +467,7 @@ def analyse_phone_video(
     photo = list(
         _decode(
             path, demuxer, crop, (cw, ch), colour=True,
-            start_s=mid / ANALYSIS_FPS, max_frames=1,
+            start_s=mid / ANALYSIS_FPS, max_frames=1, timeout_s=left(),
         )
     )  # fmt: skip
     if not photo:
