@@ -197,3 +197,29 @@
   text-decoration: underline;
   padding: 0 var(--space-2);
 }
+.countdown {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: var(--space-3) 0;
+}
+.qr {
+  width: 200px;
+  max-width: 100%;
+  height: auto;
+}
+.fileButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  max-width: 100%;
+  min-width: 0;
+}
+.fileButton input {
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.steps2 li + li {
+  margin-top: var(--space-2);
+}

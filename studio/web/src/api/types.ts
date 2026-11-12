@@ -149,6 +149,11 @@ export interface Calibration {
   strategy?: string | null;
 }
 export type JobState = "queued" | "running" | "succeeded" | "failed" | "cancelled";
+/** POST /projects/{pid}/phone-scans */
+export interface PhoneScanStart {
+  session_id: string;
+  job_id: string;
+}
 export interface Job {
   id: string;
   kind: "calibration" | "render" | "publish" | "analyze";

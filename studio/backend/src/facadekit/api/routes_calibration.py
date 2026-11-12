@@ -1,18 +1,28 @@
 from __future__ import annotations
 
+import os
+import secrets
+import shutil
+import threading
 import time
 from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
+import anyio
 import cv2
 import numpy as np
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse, JSONResponse
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from python_multipart.exceptions import MultipartParseError
+from python_multipart.multipart import MultipartParser, parse_options_header
+from starlette.requests import ClientDisconnect
 
 from facadekit.api.deps import AppState, get_state
 from facadekit.api.routes_devices import CameraBusyError, _busy_response
+from facadekit.calib import phone
 from facadekit.calib.capture import precheck
 from facadekit.calib.learn import STRATEGIES, ScanAdvisor, learning_enabled
 from facadekit.calib.patterns import PatternSpec, pattern_sequence
@@ -47,6 +57,7 @@ from facadekit.fpp.client import FppClient
 from facadekit.fpp.publish import publish_render
 from facadekit.geom.homography import apply_h
 from facadekit.ids import new_id
+from facadekit.jobs.runner import JobRunner
 from facadekit.models.calibration import Calibration, CalibSettings, CameraRoi
 from facadekit.models.camera_check import CameraCheck
 from facadekit.models.project import Project
@@ -464,4 +475,439 @@ def start_camera_check(
         return {"job_id": state.jobs.submit("calibration", check_job).id}
     except BaseException:
         state.cameras.release(camera_id)
+        raise
+
+
+# --- phone scans (T-208, docs/08 §4) -------------------------------------------------------
+
+PHONE_SESSION_TTL_S = 24 * 3600
+FREE_DISK_MARGIN_BYTES = 1024**3  # docs/08: keep at least 1 GB free after the upload
+UPLOAD_CHUNK_BYTES = 1024 * 1024
+MULTIPART_OVERHEAD_BYTES = 64 * 1024  # boundaries and part headers on top of the video bytes
+KEEP_VIDEO_ENV = "FACADEKIT_KEEP_PHONE_VIDEO"
+MSG_SESSION_EXPIRED = "This light show has expired. Start it again."
+MSG_SHOW_BUSY = "A light show is already running."
+MSG_ANALYSIS_BUSY = "A phone video is already being checked for this project. Wait for it."
+MSG_TOO_LARGE = "The video is larger than 4 GB."
+MSG_NO_SPACE = "There is not enough free disk space for this video. Free some space and retry."
+MSG_BAD_UPLOAD = "The video did not arrive completely. Send it again."
+
+
+class PhoneScanRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    countdown_s: int = Field(default=15, ge=5, le=60)
+    learn: bool = True
+
+
+class PhoneSession(BaseModel):
+    """`<project>/calibration/.phone/<sid>.json`: what the light show played."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    id: str
+    created_at: str
+    proj_w: int = Field(gt=0)
+    proj_h: int = Field(gt=0)
+    skip_lsb: int = Field(ge=0)
+    min_conf: float = Field(gt=0.0, lt=1.0)
+    strategy: str | None = None
+    learn: bool = True
+
+
+class _BusySlots:
+    """At most one holder per key: a request that is still streaming, or the job it submitted.
+
+    A slot whose job is no longer queued or running (finished, cancelled while queued, or
+    trimmed from the runner) counts as free, so a job that never ran cannot lock the key.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._held: dict[str, tuple[str, str | None, JobRunner | None]] = {}
+
+    def claim(self, key: str) -> str | None:
+        with self._lock:
+            held = self._held.get(key)
+            if held is not None and self._active(held):
+                return None
+            token = secrets.token_hex(8)
+            self._held[key] = (token, None, None)
+            return token
+
+    def attach(self, key: str, token: str, jobs: JobRunner, job_id: str) -> None:
+        with self._lock:
+            held = self._held.get(key)
+            if held is not None and held[0] == token:
+                self._held[key] = (token, job_id, jobs)
+
+    def release(self, key: str, token: str) -> None:
+        with self._lock:
+            held = self._held.get(key)
+            if held is not None and held[0] == token:
+                del self._held[key]
+
+    @staticmethod
+    def _active(held: tuple[str, str | None, JobRunner | None]) -> bool:
+        _token, job_id, jobs = held
+        if job_id is None or jobs is None:
+            return True  # the request is still running
+        try:
+            return jobs.get(job_id).state in ("queued", "running")
+        except FkError:
+            return False
+
+
+_BUSY = _BusySlots()
+
+
+def _conflict(message: str) -> JSONResponse:
+    return JSONResponse(
+        status_code=409, content={"error": {"code": BAD_REQUEST, "message": message}}
+    )
+
+
+_OPEN_NEW = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+_OPEN_READ = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+MSG_UNKNOWN_SESSION = "Unknown light show. Start it again."
+
+
+def _phone_dir(project_dir: Path) -> Path:
+    """Create `<project>/calibration/.phone` ourselves; refuse it if any part is a symlink."""
+    folder = project_dir
+    for part in ("calibration", ".phone"):
+        folder = folder / part
+        if folder.is_symlink():
+            raise FkError(BAD_REQUEST, "The project folder is not set up as expected.")
+        folder.mkdir(exist_ok=True)
+        if not folder.is_dir() or folder.is_symlink():
+            raise FkError(BAD_REQUEST, "The project folder is not set up as expected.")
+    return folder
+
+
+def _session_path(project_dir: Path, sid: str) -> Path:
+    _phone_dir(project_dir)
+    # phone_upload_path validates the id (^phs_[0-9a-f]{8}$) and the directory.
+    return phone.phone_upload_path(project_dir, sid).with_suffix(".json")
+
+
+def _new_file(path: Path) -> int:
+    """A fresh file descriptor; never follows or reuses an existing name."""
+    return os.open(path, _OPEN_NEW, 0o600)
+
+
+def _temp_name(final: Path) -> Path:
+    return final.with_name(f"{final.stem}.{secrets.token_hex(6)}.part")
+
+
+def _write_session(project_dir: Path, session: PhoneSession) -> None:
+    path = _session_path(project_dir, session.id)
+    tmp = _temp_name(path)
+    try:
+        with os.fdopen(_new_file(tmp), "wb") as f:
+            f.write(session.model_dump_json().encode("utf-8"))
+        os.replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def _sweep_phone_dir(project_dir: Path) -> None:
+    """Delete sessions, uploads and partial files older than a day (docs/08: sessions expire)."""
+    cutoff = time.time() - PHONE_SESSION_TTL_S
+    for entry in _phone_dir(project_dir).iterdir():
+        try:
+            if entry.lstat().st_mtime < cutoff:
+                entry.unlink()
+        except OSError:
+            continue  # a directory, or removed meanwhile
+
+
+def _load_session(project_dir: Path, sid: str) -> PhoneSession:
+    path = _session_path(project_dir, sid)
+    try:
+        with os.fdopen(os.open(path, _OPEN_READ), "rb") as f:
+            raw = f.read(64 * 1024)
+        session = PhoneSession.model_validate_json(raw)
+        created = datetime.strptime(session.created_at, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
+    except (OSError, ValidationError, ValueError) as exc:
+        raise FkError(NOT_FOUND, MSG_UNKNOWN_SESSION) from exc
+    if session.id != sid:
+        raise FkError(NOT_FOUND, MSG_UNKNOWN_SESSION)
+    age = (datetime.now(UTC) - created).total_seconds()
+    if age > PHONE_SESSION_TTL_S or age < -300:
+        path.unlink(missing_ok=True)
+        raise FkError(NOT_FOUND, MSG_SESSION_EXPIRED)
+    return session
+
+
+def _phone_advisor(state: AppState, learn: bool) -> ScanAdvisor | None:
+    if not learn or state.scan_memory is None or not learning_enabled():
+        return None
+    return ScanAdvisor(state.scan_memory)
+
+
+@router.post("/projects/{pid}/phone-scans", status_code=202, response_model=None)
+def start_phone_scan(
+    pid: str, state: State, body: PhoneScanRequest | None = None
+) -> dict[str, str] | JSONResponse:
+    body = body or PhoneScanRequest()
+    project = state.store.load(pid)
+    project_dir = state.store.project_dir(pid)
+    proj_size = (project.projector.width, project.projector.height)
+    display = _scan_display(state)
+    _check_resolution(display.size, proj_size)
+
+    settings = CalibSettings()
+    strategy_id: str | None = None
+    advisor = _phone_advisor(state, body.learn)
+    if advisor is not None:
+        strategy = advisor.remembered_strategy(phone.PHONE_CAMERA_ID) or STRATEGIES[0]
+        settings = strategy.apply(settings)
+        strategy_id = strategy.id
+
+    _sweep_phone_dir(project_dir)
+    key = f"show:{id(state)}"  # one projector per app
+    token = _BUSY.claim(key)
+    if token is None:
+        return _conflict(MSG_SHOW_BUSY)
+    try:
+        session = PhoneSession(
+            id=new_id("phs"),
+            created_at=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            proj_w=proj_size[0],
+            proj_h=proj_size[1],
+            skip_lsb=settings.skip_lsb,
+            min_conf=settings.min_conf,
+            strategy=strategy_id,
+            learn=body.learn,
+        )
+        _write_session(project_dir, session)
+        spec = PatternSpec(proj_size[0], proj_size[1], settings.skip_lsb)
+        countdown_s = body.countdown_s
+
+        def show_job(progress: Progress, cancel: Cancel) -> dict[str, Any]:
+            try:
+                phone.play_light_show(
+                    display, spec, countdown_s=countdown_s, progress=progress, cancel=cancel
+                )
+            finally:
+                _BUSY.release(key, token)
+            return {"session_id": session.id}
+
+        job = state.jobs.submit("calibration", show_job)
+        _BUSY.attach(key, token, state.jobs, job.id)
+    except BaseException:
+        _BUSY.release(key, token)
+        raise
+    return {"session_id": session.id, "job_id": job.id}
+
+
+class _Reject(Exception):
+    def __init__(self, status: int, code: str, message: str) -> None:
+        super().__init__(message)
+        self.status = status
+        self.code = code
+        self.message = message
+
+
+def _bad_upload(message: str) -> _Reject:
+    return _Reject(400, BAD_REQUEST, message)
+
+
+def _body_cap() -> int:
+    return phone.MAX_VIDEO_BYTES + MULTIPART_OVERHEAD_BYTES
+
+
+def _declared_length(request: Request) -> int | None:
+    raw = request.headers.get("content-length")
+    if raw is None:
+        return None
+    raw = raw.strip()
+    if not raw.isascii() or not raw.isdecimal() or len(raw) > 20:
+        raise _bad_upload(MSG_BAD_UPLOAD)
+    return int(raw)
+
+
+def _boundary(request: Request) -> bytes:
+    ctype, params = parse_options_header(request.headers.get("content-type", ""))
+    boundary = params.get(b"boundary")
+    if ctype != b"multipart/form-data" or not boundary or len(boundary) > 200:
+        raise _bad_upload("Send the video as a file upload.")
+    return boundary
+
+
+async def _receive_video(request: Request, part: Path, boundary: bytes) -> str:
+    """Stream the multipart field "file" into the new file `part`; returns the client's file
+    name, which the caller only checks for its extension (never logged, never used in a path).
+
+    The byte caps are enforced on what actually arrives, not on Content-Length.
+    """
+    file_cap = phone.MAX_VIDEO_BYTES
+    body_cap = _body_cap()
+    st: dict[str, Any] = {"field": b"", "value": b"", "headers": {}, "in_file": False}
+    found: list[str] = []
+    ended = [False]
+    written = [0]
+    pending = bytearray()
+
+    def on_part_begin() -> None:
+        st["headers"] = {}
+        st["in_file"] = False
+
+    def on_header_field(data: bytes, start: int, end: int) -> None:
+        st["field"] += data[start:end]
+
+    def on_header_value(data: bytes, start: int, end: int) -> None:
+        st["value"] += data[start:end]
+
+    def on_header_end() -> None:
+        st["headers"][bytes(st["field"]).lower()] = bytes(st["value"])
+        st["field"] = b""
+        st["value"] = b""
+
+    def on_headers_finished() -> None:
+        disposition, params = parse_options_header(st["headers"].get(b"content-disposition", b""))
+        if disposition != b"form-data" or params.get(b"name") != b"file":
+            return  # other fields are read and dropped
+        if found:
+            raise _bad_upload("Send one video at a time.")
+        filename = params.get(b"filename")
+        if filename is None:
+            raise _bad_upload("Choose a video file.")
+        found.append(filename.decode("utf-8", "replace"))
+        st["in_file"] = True
+
+    def on_part_data(data: bytes, start: int, end: int) -> None:
+        if not st["in_file"]:
+            return
+        written[0] += end - start
+        if written[0] > file_cap:
+            raise _bad_upload(MSG_TOO_LARGE)
+        pending.extend(data[start:end])
+
+    def on_part_end() -> None:
+        st["in_file"] = False
+
+    def on_end() -> None:
+        ended[0] = True
+
+    parser = MultipartParser(
+        boundary,
+        {
+            "on_part_begin": on_part_begin,
+            "on_header_field": on_header_field,
+            "on_header_value": on_header_value,
+            "on_header_end": on_header_end,
+            "on_headers_finished": on_headers_finished,
+            "on_part_data": on_part_data,
+            "on_part_end": on_part_end,
+            "on_end": on_end,
+        },
+    )
+    received = 0
+    with os.fdopen(_new_file(part), "wb") as out:
+        try:
+            async for chunk in request.stream():
+                received += len(chunk)
+                if received > body_cap:
+                    raise _bad_upload(MSG_TOO_LARGE)
+                parser.write(chunk)
+                if len(pending) >= UPLOAD_CHUNK_BYTES:
+                    block = bytes(pending)
+                    pending.clear()
+                    await anyio.to_thread.run_sync(out.write, block)
+            parser.finalize()
+        except MultipartParseError as exc:
+            raise _bad_upload(MSG_BAD_UPLOAD) from exc
+        if pending:
+            await anyio.to_thread.run_sync(out.write, bytes(pending))
+    if not ended[0]:
+        raise _bad_upload(MSG_BAD_UPLOAD)
+    if not found:
+        raise _bad_upload("Choose a video file.")
+    return found[0]
+
+
+def _cleanup(token: str | None, part: Path, dest: Path, key: str) -> None:
+    part.unlink(missing_ok=True)
+    if token is not None:  # only the slot holder may touch the session's upload
+        dest.unlink(missing_ok=True)
+        _BUSY.release(key, token)
+
+
+@router.post("/projects/{pid}/phone-scans/{sid}/video", status_code=202, response_model=None)
+async def upload_phone_video(
+    pid: str, sid: str, request: Request, state: State
+) -> dict[str, str] | JSONResponse:
+    project_dir = state.store.project_dir(pid)  # NOT_FOUND for an unknown project
+    _phone_dir(project_dir)  # created here; refused when it is a symlink
+    dest = phone.phone_upload_path(project_dir, sid)  # refuses any id but ^phs_[0-9a-f]{8}$
+    session = _load_session(project_dir, sid)  # NOT_FOUND when unknown or expired
+    key = f"analysis:{id(state)}"  # one phone analysis at a time on this server
+    part = _temp_name(dest)
+    token: str | None = None
+    try:
+        declared = _declared_length(request)
+        if declared is not None and declared > _body_cap():
+            raise _bad_upload(MSG_TOO_LARGE)
+        boundary = _boundary(request)
+        needed = (declared if declared is not None else _body_cap()) + FREE_DISK_MARGIN_BYTES
+        if shutil.disk_usage(project_dir).free < needed:
+            raise _bad_upload(MSG_NO_SPACE)
+        token = _BUSY.claim(key)
+        if token is None:
+            return _conflict(MSG_ANALYSIS_BUSY)
+        _sweep_phone_dir(project_dir)  # no analysis runs now, so nothing in use is removed
+        filename = await _receive_video(request, part, boundary)
+        try:
+            phone.check_upload_name(filename)
+        except FkError as exc:
+            raise _bad_upload(exc.message) from exc
+        try:
+            phone.check_video_file(part)  # container magic bytes, before ffmpeg ever runs
+        except FkError as exc:
+            status = 400 if exc.code == BAD_REQUEST else 422
+            raise _Reject(status, exc.code, exc.message) from exc
+        os.replace(part, dest)  # we hold the analysis slot, so no job is reading `dest`
+
+        advisor = _phone_advisor(state, session.learn)
+        settings = CalibSettings(skip_lsb=session.skip_lsb, min_conf=session.min_conf)
+        proj_size = (session.proj_w, session.proj_h)
+        claim = token
+
+        def video_job(progress: Progress, cancel: Cancel) -> dict[str, Any]:
+            try:
+                cal = phone.run_phone_calibration(
+                    project_dir,
+                    dest,
+                    settings,
+                    proj_size=proj_size,
+                    strategy=session.strategy,
+                    advisor=advisor,
+                    progress=progress,
+                    cancel=cancel,
+                )
+                result = _finish(state, pid, cal.id)
+                _session_path(project_dir, sid).unlink(missing_ok=True)
+                return result
+            finally:
+                if os.environ.get(KEEP_VIDEO_ENV) != "1":
+                    dest.unlink(missing_ok=True)
+                _BUSY.release(key, claim)
+
+        job = state.jobs.submit("calibration", video_job)
+        _BUSY.attach(key, token, state.jobs, job.id)
+        return {"job_id": job.id}
+    except _Reject as rej:
+        _cleanup(token, part, dest, key)
+        return JSONResponse(
+            status_code=rej.status, content={"error": {"code": rej.code, "message": rej.message}}
+        )
+    except ClientDisconnect:
+        _cleanup(token, part, dest, key)
+        return JSONResponse(
+            status_code=400, content={"error": {"code": BAD_REQUEST, "message": MSG_BAD_UPLOAD}}
+        )
+    except BaseException:
+        _cleanup(token, part, dest, key)
         raise

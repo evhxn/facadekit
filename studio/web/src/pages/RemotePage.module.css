@@ -79,3 +79,22 @@
 .error {
   color: var(--danger);
 }
+.note {
+  color: var(--muted);
+  font-size: 0.95em;
+}
+label.big {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px;
+  text-align: center;
+}
+label.big input {
+  font-size: 0.6em;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}

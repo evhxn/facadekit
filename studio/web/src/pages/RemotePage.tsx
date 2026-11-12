@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { ApiError, projectorShow, remotePair } from "../api/client";
+import { ApiError, projectorShow } from "../api/client";
 import { connectEvents } from "../api/events";
 import { userMessage } from "../api/errors";
+import PairForm from "../components/PairForm";
 import { useProjectStore } from "../state/projectStore";
 import styles from "./RemotePage.module.css";
 
@@ -32,8 +33,6 @@ export default function RemotePage() {
   const update = useProjectStore((s) => s.update);
 
   const [needsPair, setNeedsPair] = useState(false);
-  const [code, setCode] = useState("");
-  const [pairError, setPairError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [index, setIndex] = useState(0);
   const [target, setTarget] = useState<Target>(0);
@@ -145,37 +144,7 @@ export default function RemotePage() {
     setTimeout(() => void runShow(), 0);
   };
 
-  const pair = async () => {
-    setPairError(null);
-    try {
-      await remotePair(code);
-      setCode("");
-      await tryLoad();
-    } catch (e) {
-      setPairError(e instanceof ApiError ? e.message : "Pairing failed.");
-    }
-  };
-
-  if (needsPair) {
-    return (
-      <div className={`${styles.page} ${styles.pair}`}>
-        <h1>Pair this phone</h1>
-        <p>Enter the 6-digit code shown on your laptop.</p>
-        <input
-          aria-label="Pairing code"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          maxLength={6}
-          value={code}
-          onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-        />
-        <button type="button" className={styles.big} disabled={code.length !== 6} onClick={pair}>
-          Pair
-        </button>
-        {pairError && <p className={styles.error}>{pairError}</p>}
-      </div>
-    );
-  }
+  if (needsPair) return <PairForm onPaired={tryLoad} />;
   if (!project) return <p>{loadError ?? "Loading…"}</p>;
   if (surfaces.length === 0) return <p>This project has no surfaces yet.</p>;
 
