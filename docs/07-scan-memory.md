@@ -178,6 +178,39 @@ Not pursued: sub-block refinement from the finest modulated bit (its zero crossi
 
 `learn_eval --n 18`, before -> after adding `scale`: tuning regret 0.490 -> 0.490, held-out regret 1.143 -> 1.143, final-scan gap 0.000 -> 0.000, first scan ok 7/12 and 1/6 unchanged, every outcome cell identical. This is by construction: the harness calls `choose` without a scale, which behaves exactly as before. The factor is covered by unit tests (`test_calib_learn.py`), not by the harness.
 
+### Measured: far and phone scenes (2026-11-11)
+
+`learn_eval` now also runs a far/phone group (`far_scenes()`: the default scene as `near`, `scene_far_marginal`, `scene_far_too_coarse`, `scene_phone`; `--no-far` skips it). None of these were used for tuning. The 18 old scenes are replayed exactly as before (no scale): tuning regret 0.490, held-out 1.143, final-scan gap 0.000, first scan ok 7/12 and 1/6, all unchanged.
+
+| Scene | Scale | standard | low_light | soft_focus | low_light_soft | very_soft |
+|---|---|---|---|---|---|---|
+| near | fine | 1.00 / 0.1 px | 1.00 / 0.1 | 1.00 / 0.1 | 1.00 / 0.1 | 1.00 / 0.6 |
+| far_marginal | coarse | 0.92 / 0.3 | 0.97 / 0.2 | 1.00 / 0.0 | 1.00 / 0.1 | 1.00 / 0.4 |
+| far_too_coarse | coarse | FAIL | FAIL | 0.93 / 0.3 | 0.97 / 0.3 | 1.00 / 0.2 |
+| phone | fine | 1.00 / 0.1 | 1.00 / 0.1 | 1.00 / 0.1 | 1.00 / 0.1 | 1.00 / 0.8 |
+
+Per scene (one camera, empty log, 8 scans): mean regret 0.456 without and 0.456 with scale, first scan ok 3/4, final-scan gap 0.028 (`far_marginal` stays on `standard` at 92 % coverage). With and without are identical by construction: every scan of one scene has the same scale class, so the factor never applies.
+
+Moves (the same 1280x720 camera scans one scene, is moved to another distance, then scans 8 times there; regret after the move, without -> with scale; `phone` is a different camera and is not used for moves):
+
+| Move | Scales | 2 scans before | 8 scans before |
+|---|---|---|---|
+| near -> far_marginal | fine -> coarse | 0.550 -> 0.550 | 0.550 -> 0.550 |
+| near -> far_too_coarse | fine -> coarse | 1.272 -> 1.272 | 3.149 -> 2.211 |
+| far_marginal -> near | coarse -> fine | 0 -> 0 | 0 -> 0 |
+| far_marginal -> far_too_coarse | coarse -> coarse | 1.272 -> 1.272 | 2.211 -> 2.211 |
+| far_too_coarse -> near | coarse -> fine | 0 -> 0 | 0 -> 0 |
+| far_too_coarse -> far_marginal | coarse -> coarse | 0 -> 0 | 0 -> 0 |
+| Mean | | 0.516 -> 0.516 | 0.985 -> 0.829 |
+
+Verdict: the scale context helps in one case of six, and only after a long history. After 8 good `standard` scans up close, moving the camera to `far_too_coarse` costs 3 failed scans without scale and 2 with it (one failed scan saved). After 2 scans it changes nothing (the one failure already outvotes the history). It never made a choice worse here. Why the benefit is small in the simulator:
+
+- Moving closer needs no unlearning: the coarse strategies learned far away also score full reward up close (coverage 1.00, corner error 0.1 px), so there is no regret to remove.
+- `far_marginal` is "coarse" but `standard` still works there (92 % coverage), so nothing fails and the context has nothing to discount; the regret 0.550 is the coverage loss, which the factor cannot see.
+- Two classes are too coarse to separate `far_marginal` from `far_too_coarse` (both "coarse"), which is the move with the second-largest regret (2.211).
+
+No thresholds were changed for these numbers. Test: `test_moving_far_away_unlearns_faster_with_scale` (`tests/test_sim_learn_eval.py`) checks the 3 -> 2 failure case on synthetic records.
+
 ## Bug fixed on the way
 
 `build_maps` used an 8 px grid for any `skip_lsb`. With `skip_lsb=3` every decoded block centre fell exactly halfway between two grid nodes and three nodes in four stayed empty (coverage 25 %). The grid step now defaults to `max(8, 2 × block)` and must be a multiple of two blocks.
