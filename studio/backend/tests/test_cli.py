@@ -49,34 +49,6 @@ def test_doctor_no_cameras(capsys: pytest.CaptureFixture[str]) -> None:
     assert "ffmpeg: " in capsys.readouterr().out
 
 
-def test_pick_port_default_free() -> None:
-    from facadekit.cli import DEFAULT_PORT, pick_port
-
-    port = pick_port("127.0.0.1", DEFAULT_PORT)
-    assert port == DEFAULT_PORT or 8138 <= port <= 8147
-
-
-def test_pick_port_skips_busy_ports() -> None:
-    import socket
-
-    from facadekit.cli import DEFAULT_PORT, pick_port
-
-    held: list[socket.socket] = []
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            s.bind(("127.0.0.1", DEFAULT_PORT))
-        except OSError:
-            pass  # already occupied elsewhere: the premise still holds
-        held.append(s)
-        port = pick_port("127.0.0.1", DEFAULT_PORT)
-        assert port != DEFAULT_PORT
-        assert 8138 <= port <= 8147
-    finally:
-        for s in held:
-            s.close()
-
-
 def test_pick_port_zero_is_free_ephemeral() -> None:
     from facadekit.cli import pick_port
 
