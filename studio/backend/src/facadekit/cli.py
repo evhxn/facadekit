@@ -16,7 +16,6 @@ from facadekit.errors import BAD_REQUEST, INTERNAL, NOT_FOUND, RESOLUTION_MISMAT
 from facadekit.ids import slugify
 
 DEFAULT_PORT = 8137
-FALLBACK_PORTS = range(8138, 8148)
 
 COMMANDS = ["serve", "new", "calibrate", "render", "publish", "doctor", "sim"]
 
@@ -68,6 +67,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 def _port_free(host: str, port: int) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        # Match uvicorn: TIME_WAIT leftovers from a previous run must not count as busy.
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
             sock.bind((host, port))
         except OSError:
@@ -78,21 +79,16 @@ def _port_free(host: str, port: int) -> bool:
 def pick_port(host: str, requested: int) -> int:
     """Return the port ``serve`` should listen on.
 
-    0 means any free port. The default 8137 falls back to 8138-8147 when busy.
-    Any other explicit port is used as-is or reported as busy.
+    0 means any free port. Any other port is used as-is or reported as busy:
+    ``serve`` never silently moves to a different port.
     """
     if requested == 0:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.bind((host, 0))
             return int(sock.getsockname()[1])
-    candidates = [requested]
-    if requested == DEFAULT_PORT:
-        candidates += list(FALLBACK_PORTS)
-    for port in candidates:
-        if _port_free(host, port):
-            return port
-    tried = f"{candidates[0]}-{candidates[-1]}" if len(candidates) > 1 else str(requested)
-    raise FkError(BAD_REQUEST, f"Port {tried} is already in use. Try --port 0 for a free port.")
+    if _port_free(host, requested):
+        return requested
+    raise FkError(BAD_REQUEST, f"Port {requested} is already in use. Try --port 0 for a free port.")
 
 
 def _run(body: Callable[[], int]) -> int:
