@@ -42,6 +42,20 @@ class CalibSettings(BaseModel):
     roi: CameraRoi | None = None  # crop of the camera picture; None = the whole picture
 
 
+class StrictCameraRoi(CameraRoi):
+    """CameraRoi for API request bodies: unknown fields are rejected (files on disk ignore them)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class StrictCalibSettings(CalibSettings):
+    """CalibSettings for API request bodies: unknown fields are rejected."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    roi: StrictCameraRoi | None = None
+
+
 class CalibQuality(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
