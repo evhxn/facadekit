@@ -34,7 +34,15 @@ def ffmpeg_info(path: Path) -> str:
     """Return the stderr of `ffmpeg -i <path>` (exits non-zero by design)."""
     try:
         proc = subprocess.run(
-            [ffmpeg_exe(), "-hide_banner", "-nostdin", "-i", str(path)],
+            [
+                ffmpeg_exe(),
+                "-hide_banner",
+                "-nostdin",
+                "-protocol_whitelist",
+                "file",
+                "-i",
+                f"file:{path.resolve()}",
+            ],
             capture_output=True,
             timeout=30,
         )
