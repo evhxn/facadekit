@@ -106,3 +106,25 @@ def test_unknown_and_malformed_aid(client: TestClient) -> None:
         for suffix in ("file", "thumb"):
             assert client.get(f"{API}/projects/{pid}/assets/{aid}/{suffix}").status_code == 404
         assert client.delete(f"{API}/projects/{pid}/assets/{aid}").status_code == 404
+
+
+def test_put_project_cannot_point_an_asset_outside_media(
+    client: TestClient, tmp_path: Path
+) -> None:
+    """A saved project (also from a paired phone) must not turn the file routes into
+    arbitrary read/delete: asset.filename is joined to the project folder."""
+    victim = tmp_path / "victim.txt"
+    victim.write_text("keep me")
+    pid = client.post(f"{API}/projects", json={"name": "demo"}).json()["id"]
+    project = client.get(f"{API}/projects/{pid}").json()
+    project["assets"] = [
+        {
+            "id": "ast_00000001", "kind": "image", "filename": "../../victim.txt",
+            "original_name": "x.png", "width": 1, "height": 1, "duration_ms": None, "fps": None,
+        }
+    ]  # fmt: skip
+    resp = client.put(f"{API}/projects/{pid}", json=project)
+    assert resp.status_code == 422 and resp.json()["error"]["code"] == "INVALID_PROJECT"
+    assert client.get(f"{API}/projects/{pid}/assets/ast_00000001/file").status_code == 404
+    assert client.delete(f"{API}/projects/{pid}/assets/ast_00000001").status_code == 404
+    assert victim.read_text() == "keep me"

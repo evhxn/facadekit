@@ -22,7 +22,7 @@ def _video_asset() -> Asset:
     return Asset(
         id="a1",
         kind="video",
-        filename="v.mp4",
+        filename="media/v.mp4",
         original_name="v.mp4",
         width=320,
         height=180,
@@ -87,7 +87,7 @@ def test_clip_source_image(sample_image: Path) -> None:
     asset = Asset(
         id="i1",
         kind="image",
-        filename="i.png",
+        filename="media/i.png",
         original_name="i.png",
         width=64,
         height=48,
