@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 class CameraRoi(BaseModel):
     """A crop of the camera picture, in full-frame camera pixels (docs/08 section 2)."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     x: int
     y: int
@@ -32,7 +32,7 @@ class CameraRoi(BaseModel):
 
 
 class CalibSettings(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     skip_lsb: int = 2
     settle_ms: int = 300
@@ -43,7 +43,7 @@ class CalibSettings(BaseModel):
 
 
 class CalibQuality(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     coverage: float
     planarity: float
@@ -55,7 +55,7 @@ class CalibQuality(BaseModel):
 
 
 class Calibration(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     id: str
     created_at: str
@@ -70,3 +70,21 @@ class Calibration(BaseModel):
     h_c2p: list[list[float]] | None
     warnings: list[str] = Field(default_factory=list)
     strategy: str | None = None  # scan strategy chosen by scan memory (calib/learn.py)
+
+    def to_file_json(self) -> str:
+        """JSON for calibration.json: new optional fields that are None are left out, so the
+        previous release (which does not know them) reads the file unchanged."""
+        exclude: dict[str, Any] = {}
+        if self.strategy is None:
+            exclude["strategy"] = True
+        if self.settings is not None and self.settings.roi is None:
+            exclude["settings"] = {"roi"}
+        if self.quality is not None:
+            omit = {
+                name
+                for name in ("px_per_proj_px", "snr", "verdict")
+                if getattr(self.quality, name) is None
+            }
+            if omit:
+                exclude["quality"] = omit
+        return self.model_dump_json(indent=2, exclude=exclude or None)
