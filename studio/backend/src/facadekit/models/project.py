@@ -199,8 +199,32 @@ class Project(BaseModel):
         return self
 
 
-def parse_project(data: Any) -> Project:
+def _prune(value: Any, schema: dict[str, Any], defs: dict[str, Any]) -> Any:
+    """Drop object keys the schema does not know (a file saved by a newer version)."""
+    if "$ref" in schema:
+        return _prune(value, defs[schema["$ref"].rsplit("/", 1)[-1]], defs)
+    for key in ("anyOf", "oneOf", "allOf"):
+        if key in schema:
+            for option in schema[key]:
+                pruned = _prune(value, option, defs)
+                if pruned is not value:
+                    return pruned
+            return value
+    if isinstance(value, dict) and "properties" in schema:
+        props = schema["properties"]
+        return {k: _prune(v, props[k], defs) for k, v in value.items() if k in props}
+    if isinstance(value, list) and "items" in schema:
+        return [_prune(v, schema["items"], defs) for v in value]
+    return value
+
+
+def parse_project(data: Any, *, ignore_unknown: bool = False) -> Project:
+    """Validate a project. ``ignore_unknown`` (used when loading from disk) drops fields this
+    version does not know instead of rejecting them, so a newer version's file still opens."""
     try:
+        if ignore_unknown:
+            schema = Project.model_json_schema(mode="validation")
+            data = _prune(data, schema, schema.get("$defs", {}))
         return Project.model_validate(data)
     except ValidationError as exc:
         first = exc.errors()[0]

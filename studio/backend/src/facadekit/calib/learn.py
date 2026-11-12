@@ -108,6 +108,10 @@ class ScanRecord(BaseModel):
     verdict: Verdict | None = None
     scale: Scale | None = None  # absent in records written before T-205
 
+    def to_json_line(self) -> str:
+        """Compact JSON; ``scale`` is left out when None so older releases read the line."""
+        return self.model_dump_json(exclude={"scale"} if self.scale is None else None)
+
 
 def reward(record: ScanRecord) -> float:
     """0..1. Failed or rejected scans score 0; otherwise coverage, minus a small time cost."""
@@ -210,10 +214,10 @@ class ScanMemory:
         with self._lock, file_lock(self.path):
             self.path.parent.mkdir(parents=True, exist_ok=True)
             with self.path.open("a", encoding="utf-8") as f:
-                f.write(record.model_dump_json() + "\n")
+                f.write(record.to_json_line() + "\n")
 
     def _rewrite(self, records: list[ScanRecord]) -> None:
-        body = "".join(r.model_dump_json() + "\n" for r in records[-MAX_RECORDS:])
+        body = "".join(r.to_json_line() + "\n" for r in records[-MAX_RECORDS:])
         atomic_write(self.path, body)
 
     def set_verdict(self, calibration_id: str, verdict: Verdict) -> bool:

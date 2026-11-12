@@ -43,7 +43,7 @@ def _read_json(path: Path) -> Any:
 
 
 def load_project_dir(path: Path) -> Project:
-    project = parse_project(_read_json(path))
+    project = parse_project(_read_json(path), ignore_unknown=True)
     folder_id = path.name.removesuffix(PROJECT_SUFFIX)
     if project.id != folder_id:
         project = project.model_copy(update={"id": folder_id})

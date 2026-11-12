@@ -91,11 +91,10 @@ def test_roi_validators_reject(kw: dict[str, int]) -> None:
         _roi(**kw)
 
 
-def test_roi_valid_and_forbids_extra() -> None:
+def test_roi_valid_and_ignores_extra() -> None:
     assert _roi(w=64, h=64).w == 64
     assert _roi(bin=2).bin == 2
-    with pytest.raises(ValidationError):
-        CameraRoi.model_validate({**_roi().model_dump(), "extra": 1})
+    assert CameraRoi.model_validate({**_roi().model_dump(), "extra": 1}) == _roi()
 
 
 def test_settings_roi_defaults_none() -> None:

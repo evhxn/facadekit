@@ -67,7 +67,7 @@ def _commit(project_dir: Path, cal: Calibration, files: dict[str, np.ndarray]) -
                 np.save(tmp / name, data)
             else:
                 _write_png(tmp / name, data)
-        (tmp / "calibration.json").write_text(cal.model_dump_json(indent=2), encoding="utf-8")
+        (tmp / "calibration.json").write_text(cal.to_file_json(), encoding="utf-8")
         os.replace(tmp, final)
     except BaseException:
         shutil.rmtree(tmp, ignore_errors=True)
