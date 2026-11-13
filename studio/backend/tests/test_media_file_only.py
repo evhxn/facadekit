@@ -35,19 +35,14 @@ def _user_inputs(cmd: list[str]) -> list[str]:
 @pytest.fixture
 def commands(monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
     seen: list[list[str]] = []
-    real_run, real_popen = subprocess.run, subprocess.Popen
-
-    def run(cmd: list[str], *a: Any, **kw: Any) -> Any:
-        seen.append(list(cmd))
-        return real_run(cmd, *a, **kw)
+    real_popen = subprocess.Popen
 
     class Popen(real_popen):  # type: ignore[type-arg]
         def __init__(self, cmd: list[str], *a: Any, **kw: Any) -> None:
             seen.append(list(cmd))
             super().__init__(cmd, *a, **kw)
 
-    monkeypatch.setattr(subprocess, "run", run)
-    monkeypatch.setattr(subprocess, "Popen", Popen)
+    monkeypatch.setattr(subprocess, "Popen", Popen)  # subprocess.run goes through Popen too
     return seen
 
 
@@ -70,11 +65,10 @@ def test_probe_thumbnail_and_reader_open_local_files_only(
         assert reader.read() is not None
     finally:
         reader.close()
-    ffmpeg_cmds = [c for c in commands if "-i" in c]
-    assert len(ffmpeg_cmds) >= 5
-    for cmd in ffmpeg_cmds:
-        (operand,) = _user_inputs(cmd)
-        assert operand.startswith("file:/")
+    found = [f for f in (_user_inputs(c) for c in commands if "-i" in c) if f]
+    assert len(found) >= 5
+    for operands in found:
+        assert len(operands) == 1 and operands[0].startswith("file:/")
 
 
 def test_encoder_audio_input_is_local_file_only(
@@ -88,8 +82,9 @@ def test_encoder_audio_input_is_local_file_only(
         enc.write(np.zeros((36, 64, 3), np.uint8))
     enc.close()
     assert (tmp_path / "out.mp4").stat().st_size > 0
-    (cmd,) = [c for c in commands if "-i" in c]
-    assert _user_inputs(cmd) == [f"file:{sample_audio.resolve()}"]  # the frame pipe is exempt
+    # (the sample fixture's own lavfi command may be captured too; it has no file input)
+    found = [_user_inputs(c) for c in commands if "-i" in c]
+    assert [f for f in found if f] == [[f"file:{sample_audio.resolve()}"]]  # pipe is exempt
 
 
 def test_encoder_without_audio_has_no_file_input(commands: list[list[str]], tmp_path: Path) -> None:
@@ -120,8 +115,8 @@ def test_beat_analysis_decodes_a_local_file_only(
     monkeypatch.setitem(sys.modules, "librosa", types.SimpleNamespace(load=load))
     with pytest.raises(_Stop):
         beats.analyze_beats(sample_audio)
-    (cmd,) = [c for c in commands if "-i" in c]
-    assert _user_inputs(cmd) == [f"file:{sample_audio.resolve()}"]
+    found = [_user_inputs(c) for c in commands if "-i" in c]
+    assert [f for f in found if f] == [[f"file:{sample_audio.resolve()}"]]
 
 
 def test_a_playlist_with_a_media_extension_is_refused(tmp_path: Path) -> None:
