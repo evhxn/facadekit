@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from facadekit.calib.learn import STRATEGIES, ScanRecord, choose, scale_class
+from facadekit.calib.learn import STRATEGIES, ScanRecord, choose, scale_class, scale_floor
 from facadekit.sim.rl.env import (
     BUCKETS,
     Obs,
@@ -42,6 +42,7 @@ def test_default_beta_policy_is_the_shipped_policy() -> None:
     """Every comparison in docs/09 is against this policy, so it must be the real one."""
     rng = np.random.default_rng(0)
     policy = BetaPolicy(STRATEGIES)
+    with_floor = BetaPolicy(STRATEGIES, floor=True)
     for _ in range(400):
         history = []
         for _ in range(int(rng.integers(0, 14))):
@@ -63,6 +64,12 @@ def test_default_beta_policy_is_the_shipped_policy() -> None:
         )
         got = policy.choose(history, obs, rng)
         assert STRATEGIES[got].id == want.id, (history, obs)
+        # ... and the simulated floor is the product's floor
+        floored = choose(
+            [_record(r) for r in history], obs.cam, BUCKETS[obs.bucket], scale_class(obs.s),  # type: ignore[arg-type]
+            floor=scale_floor(obs.s),
+        )  # fmt: skip
+        assert STRATEGIES[with_floor.choose(history, obs, rng)].id == floored.id, (history, obs)
 
 
 def test_product_reward_matches_calib_learn() -> None:

@@ -75,6 +75,7 @@ const STRATEGY_NOTES: Record<string, string> = {
   low_light: "extra exposures for a faint picture",
   soft_focus: "wider stripes for a soft or out-of-focus picture",
   low_light_soft: "wider stripes and extra exposures",
+  very_soft: "extra-wide stripes for a small or very soft picture",
 };
 
 type Phase = "idle" | "running" | "failed" | "done";
@@ -208,7 +209,8 @@ export default function StepScan({
         {coverage !== null ? <p>Measured {coverage}% of the projection.</p> : null}
         {strategyNote ? (
           <p className={styles.note}>
-            Earlier scans with this camera had trouble, so this one used {strategyNote}.
+            This scan used {strategyNote}. FacadeKit chose that because the picture is small in the
+            camera view or earlier scans with this camera had trouble.
           </p>
         ) : null}
         {low ? (
