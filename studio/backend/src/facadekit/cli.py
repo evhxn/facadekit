@@ -17,7 +17,7 @@ from facadekit.ids import slugify
 
 DEFAULT_PORT = 8137
 
-COMMANDS = ["serve", "new", "calibrate", "render", "publish", "doctor", "sim"]
+COMMANDS = ["serve", "new", "calibrate", "render", "publish", "doctor", "sim", "phone-scan"]
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -62,6 +62,12 @@ def build_parser() -> argparse.ArgumentParser:
             sim_sub = sp.add_subparsers(dest="sim_command", required=True)
             e2e = sim_sub.add_parser("e2e")
             e2e.add_argument("--workdir", default=None)
+        elif name == "phone-scan":
+            phone_sub = sp.add_subparsers(dest="phone_command", required=True)
+            analyse = phone_sub.add_parser("analyse")
+            analyse.add_argument("project_dir")
+            analyse.add_argument("video")
+            analyse.add_argument("--skip-lsb", type=int, default=2)
     return parser
 
 
@@ -285,6 +291,47 @@ def _cmd_sim(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_phone_scan(args: argparse.Namespace) -> int:
+    import numpy as np
+
+    from facadekit.calib.phone import check_upload_name, run_phone_calibration
+    from facadekit.models.calibration import CalibSettings
+    from facadekit.store.project_store import load_project_dir
+
+    path = Path(args.project_dir)
+    video = Path(args.video)
+    check_upload_name(video.name)
+    project = load_project_dir(path)
+    proj_size = (project.projector.width, project.projector.height)
+    cal = run_phone_calibration(
+        path, video, CalibSettings(skip_lsb=args.skip_lsb),
+        proj_size=proj_size, strategy=None, advisor=None,
+        progress=lambda _f, msg: print(msg, file=sys.stderr),
+    )  # fmt: skip
+    p2c = np.load(path / "calibration" / cal.id / "p2c.npy")
+    q = cal.quality
+    roi = cal.settings.roi if cal.settings is not None else None
+    print(f"calibration: {cal.id}")
+    print(f"camera: {cal.camera_width}x{cal.camera_height}")
+    if roi is not None:
+        print(f"crop: x={roi.x} y={roi.y} w={roi.w} h={roi.h} bin={roi.bin}")
+    if q is not None:
+        print(f"coverage: {q.coverage * 100:.1f} %")
+        if q.px_per_proj_px is not None:
+            print(f"camera px per projector px: {q.px_per_proj_px:.2f}")
+        print(f"verdict: {q.verdict}")
+    w, h = proj_size
+    for name, (x, y) in {
+        "top-left": (0, 0), "top-right": (w - 1, 0),
+        "bottom-right": (w - 1, h - 1), "bottom-left": (0, h - 1),
+    }.items():  # fmt: skip
+        cx, cy = (float(v) for v in p2c[y, x])
+        print(f"corner {name}: camera ({cx:.1f}, {cy:.1f})")
+    if cal.warnings:
+        print("warnings: " + ", ".join(cal.warnings))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args, _ = parser.parse_known_args(argv)
@@ -301,5 +348,6 @@ def main(argv: list[str] | None = None) -> int:
         "publish": _cmd_publish,
         "doctor": _cmd_doctor,
         "sim": _cmd_sim,
+        "phone-scan": _cmd_phone_scan,
     }
     return _run(lambda: handlers[args.command](args))

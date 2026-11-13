@@ -88,6 +88,22 @@ def test_segment_recording_synthetic() -> None:
         assert times[last] < start + HOLD_S, k
 
 
+def test_segment_recording_whole_trace_thresholds() -> None:
+    """A phone recording may start long before the marker: 25 s of black lead-in."""
+    rng = np.random.default_rng(3)
+    delay = 25.0 + 3.7
+    times, frames = _trace(delay, rng)
+    with pytest.raises(FkError):  # the default only looks at the first 15 s
+        segment_recording(times, frames, 26)
+    windows = segment_recording(times, frames, 26, marker_search_s=None)
+    assert len(windows) == 26
+    for k, (first, last) in enumerate(windows):
+        start = delay + (len(LEAD_IN) + k) * HOLD_S
+        assert first <= last
+        assert times[first] > start, k
+        assert times[last] < start + HOLD_S, k
+
+
 def test_segment_recording_without_marker() -> None:
     rng = np.random.default_rng(2)
     times = np.cumsum(np.full(600, 0.05))

@@ -132,9 +132,17 @@ def _levels(t: np.ndarray, b: np.ndarray, runs: list[tuple[bool, float, float]],
 
 
 def segment_recording(
-    times: np.ndarray, frames_gray: np.ndarray, n_patterns: int
+    times: np.ndarray,
+    frames_gray: np.ndarray,
+    n_patterns: int,
+    *,
+    marker_search_s: float | None = _MARKER_SEARCH_S,
 ) -> list[tuple[int, int]]:
-    """Return, per pattern, the (first, last) recorded-frame indices inside its hold period."""
+    """Return, per pattern, the (first, last) recorded-frame indices inside its hold period.
+
+    Threshold statistics come from the first ``marker_search_s`` seconds, or from the whole
+    recording with ``None`` (phone recordings start at an arbitrary time).
+    """
     t = np.asarray(times, dtype=np.float64)
     if t.ndim != 1 or len(t) < 8 or len(frames_gray) != len(t):
         raise FkError("SCAN_FAILED", _LOST)
@@ -142,7 +150,7 @@ def segment_recording(
     padded = np.concatenate([b[:1], b, b[-1:]])
     b = np.median(np.stack([padded[:-2], padded[1:-1], padded[2:]]), axis=0)
 
-    early = b[t - t[0] <= _MARKER_SEARCH_S]
+    early = b if marker_search_s is None else b[t - t[0] <= marker_search_s]
     lo, hi = float(np.percentile(early, 5)), float(np.percentile(early, 95))
     if hi - lo < 1.0:
         raise FkError("SCAN_FAILED", _LOST)
