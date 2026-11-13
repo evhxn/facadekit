@@ -1,0 +1,252 @@
+{
+ "beta": {
+  "prior_mult": 0.5,
+  "mistake_weight": 2.0,
+  "other_bucket": 0.0,
+  "different_scale": 1.0,
+  "scale_sigma": 0.0,
+  "sibling_share": 1.0,
+  "discount": 0.7,
+  "select": "ucb",
+  "ucb_c": 0.5,
+  "floor": true,
+  "floor_slack": 0,
+  "skip_cost": 0.0
+ },
+ "beta_train_score": [
+  0.03220634791598649,
+  0.03706156396133618
+ ],
+ "beta_top5": [
+  [
+   [
+    0.03220634791598649,
+    0.03706156396133618
+   ],
+   {
+    "prior_mult": 0.5,
+    "mistake_weight": 2.0,
+    "other_bucket": 0.0,
+    "different_scale": 1.0,
+    "scale_sigma": 0.0,
+    "sibling_share": 1.0,
+    "discount": 0.7,
+    "select": "ucb",
+    "ucb_c": 0.5,
+    "floor": true,
+    "floor_slack": 0,
+    "skip_cost": 0.0
+   }
+  ],
+  [
+   [
+    0.03364225437886757,
+    0.03874461374320324
+   ],
+   {
+    "prior_mult": 0.5,
+    "mistake_weight": 3.0,
+    "other_bucket": 0.5,
+    "different_scale": 0.5,
+    "scale_sigma": 0.6,
+    "sibling_share": 0.5,
+    "discount": 1.0,
+    "select": "ucb",
+    "ucb_c": 1.0,
+    "floor": true,
+    "floor_slack": 0,
+    "skip_cost": 0.0
+   }
+  ],
+  [
+   [
+    0.03556887166310372,
+    0.0399331659376791
+   ],
+   {
+    "prior_mult": 0.5,
+    "mistake_weight": 4.0,
+    "other_bucket": 0.0,
+    "different_scale": 1.0,
+    "scale_sigma": 0.6,
+    "sibling_share": 0.25,
+    "discount": 1.0,
+    "select": "greedy",
+    "ucb_c": 0.0,
+    "floor": true,
+    "floor_slack": 0,
+    "skip_cost": 0.0
+   }
+  ],
+  [
+   [
+    0.036012296496648,
+    0.039551243743465955
+   ],
+   {
+    "prior_mult": 0.5,
+    "mistake_weight": 4.0,
+    "other_bucket": 0.25,
+    "different_scale": 1.0,
+    "scale_sigma": 0.15,
+    "sibling_share": 0.5,
+    "discount": 0.95,
+    "select": "greedy",
+    "ucb_c": 0.0,
+    "floor": true,
+    "floor_slack": 0,
+    "skip_cost": 0.0
+   }
+  ],
+  [
+   [
+    0.036401960555895944,
+    0.040862234320086295
+   ],
+   {
+    "prior_mult": 1.0,
+    "mistake_weight": 4.0,
+    "other_bucket": 0.5,
+    "different_scale": 1.0,
+    "scale_sigma": 0.6,
+    "sibling_share": 0.25,
+    "discount": 0.85,
+    "select": "greedy",
+    "ucb_c": 0.0,
+    "floor": true,
+    "floor_slack": 0,
+    "skip_cost": 0.0
+   }
+  ]
+ ],
+ "beta_utility": {
+  "prior_mult": 0.5,
+  "mistake_weight": 2.0,
+  "other_bucket": 0.0,
+  "different_scale": 1.0,
+  "scale_sigma": 0.0,
+  "sibling_share": 1.0,
+  "discount": 0.7,
+  "select": "ucb",
+  "ucb_c": 0.5,
+  "floor": true,
+  "floor_slack": 0,
+  "skip_cost": 0.0
+ },
+ "beta_utility_train_score": [
+  0.03220634791598649,
+  0.03706156396133618
+ ],
+ "beta_utility_top5": [
+  [
+   [
+    0.03220634791598649,
+    0.03706156396133618
+   ],
+   {
+    "prior_mult": 0.5,
+    "mistake_weight": 2.0,
+    "other_bucket": 0.0,
+    "different_scale": 1.0,
+    "scale_sigma": 0.0,
+    "sibling_share": 1.0,
+    "discount": 0.7,
+    "select": "ucb",
+    "ucb_c": 0.5,
+    "floor": true,
+    "floor_slack": 0,
+    "skip_cost": 0.0
+   }
+  ],
+  [
+   [
+    0.03364225437886757,
+    0.03874461374320324
+   ],
+   {
+    "prior_mult": 0.5,
+    "mistake_weight": 3.0,
+    "other_bucket": 0.5,
+    "different_scale": 0.5,
+    "scale_sigma": 0.6,
+    "sibling_share": 0.5,
+    "discount": 1.0,
+    "select": "ucb",
+    "ucb_c": 1.0,
+    "floor": true,
+    "floor_slack": 0,
+    "skip_cost": 0.0
+   }
+  ],
+  [
+   [
+    0.036012296496648,
+    0.039551243743465955
+   ],
+   {
+    "prior_mult": 0.5,
+    "mistake_weight": 4.0,
+    "other_bucket": 0.25,
+    "different_scale": 1.0,
+    "scale_sigma": 0.15,
+    "sibling_share": 0.5,
+    "discount": 0.95,
+    "select": "greedy",
+    "ucb_c": 0.0,
+    "floor": true,
+    "floor_slack": 0,
+    "skip_cost": 0.0
+   }
+  ],
+  [
+   [
+    0.03556887166310372,
+    0.0399331659376791
+   ],
+   {
+    "prior_mult": 0.5,
+    "mistake_weight": 4.0,
+    "other_bucket": 0.0,
+    "different_scale": 1.0,
+    "scale_sigma": 0.6,
+    "sibling_share": 0.25,
+    "discount": 1.0,
+    "select": "greedy",
+    "ucb_c": 0.0,
+    "floor": true,
+    "floor_slack": 0,
+    "skip_cost": 0.0
+   }
+  ],
+  [
+   [
+    0.0368827351320053,
+    0.040122654331167754
+   ],
+   {
+    "prior_mult": 0.5,
+    "mistake_weight": 2.0,
+    "other_bucket": 0.0,
+    "different_scale": 0.25,
+    "scale_sigma": 0.0,
+    "sibling_share": 0.5,
+    "discount": 0.95,
+    "select": "ucb",
+    "ucb_c": 1.0,
+    "floor": true,
+    "floor_slack": 0,
+    "skip_cost": 0.1
+   }
+  ]
+ ],
+ "posterior": {
+  "sigma_s": 0.12,
+  "sigma_c": 0.4,
+  "sigma_snr": 0.4,
+  "sigma_r": 0.4
+ },
+ "posterior_train_score": [
+  0.0,
+  0.024783040500309328
+ ]
+}
