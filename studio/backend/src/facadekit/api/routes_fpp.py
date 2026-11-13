@@ -10,7 +10,7 @@ from facadekit.api.deps import AppState, get_state
 from facadekit.api.routes_render import render_file, render_kind
 from facadekit.errors import BAD_REQUEST, REVISION_CONFLICT, FkError
 from facadekit.fpp.client import FppClient
-from facadekit.fpp.publish import SEQUENCES_DIR, probe_fpp, publish_render
+from facadekit.fpp.publish import probe_fpp, publish_render, sequences_dir
 
 router = APIRouter()
 
@@ -66,7 +66,7 @@ def fpp_sequences(host: str) -> dict[str, list[str]]:
     client: FppClient | None = None
     try:
         client = FppClient(host, timeout=3)
-        names = client.list_files(SEQUENCES_DIR)
+        names = client.list_files(sequences_dir())
     except FkError:
         return {"sequences": []}
     finally:

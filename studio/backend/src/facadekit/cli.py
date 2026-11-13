@@ -46,7 +46,7 @@ def build_parser() -> argparse.ArgumentParser:
             mode.add_argument("--manual", action="store_true")
         elif name == "render":
             sp.add_argument("project_dir")
-            sp.add_argument("--preset", default="pi3-1080p30")
+            sp.add_argument("--preset", default=None)  # None: default_preset_id()
             sp.add_argument("--out", default=None)
             sp.add_argument("--no-audio", action="store_true")
             sp.add_argument("--alignment-check", action="store_true")
@@ -187,10 +187,12 @@ def _cmd_render(args: argparse.Namespace) -> int:
     from facadekit.ids import new_id
     from facadekit.render.outline import render_alignment_check
     from facadekit.render.pipeline import render_project
+    from facadekit.render.presets import default_preset_id
     from facadekit.store.project_store import load_project_dir
 
     path = Path(args.project_dir)
     load_project_dir(path)
+    preset_id = args.preset or default_preset_id()
     out = Path(args.out) if args.out else path / "renders" / f"{new_id('rnd')}.mp4"
     out.parent.mkdir(parents=True, exist_ok=True)
     tty = sys.stderr.isatty()
@@ -201,11 +203,9 @@ def _cmd_render(args: argparse.Namespace) -> int:
 
     try:
         if args.alignment_check:
-            render_alignment_check(path, out, preset_id=args.preset, progress=progress)
+            render_alignment_check(path, out, preset_id=preset_id, progress=progress)
         else:
-            render_project(
-                path, args.preset, out, include_audio=not args.no_audio, progress=progress
-            )
+            render_project(path, preset_id, out, include_audio=not args.no_audio, progress=progress)
     finally:
         if tty:
             print(file=sys.stderr)
@@ -240,7 +240,7 @@ def _cmd_publish(args: argparse.Namespace) -> int:
 def _cmd_doctor(args: argparse.Namespace) -> int:
     import cv2
 
-    from facadekit.config import data_dir
+    from facadekit.config import data_dir, load_overrides
     from facadekit.media.ffmpeg import ffmpeg_exe
 
     print(f"facadekit {__version__}")
@@ -256,6 +256,10 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
     except (OSError, subprocess.SubprocessError):
         print("ffmpeg -version failed")
     print(f"data dir: {data_dir()}")
+    overrides = load_overrides()
+    print(f"config.json overrides: {len(overrides)}")
+    for key in sorted(overrides):
+        print(f"  {key} = {overrides[key]!r}")
     if not args.no_cameras:
         from facadekit.devices.camera_opencv import list_cameras
 
