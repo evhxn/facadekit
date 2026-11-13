@@ -40,7 +40,7 @@ def test_foreign_origin_on_write_is_rejected(client: TestClient) -> None:
     assert client.post(f"{API}/projects", json={"name": "A"}, headers=headers).status_code == 403
     headers["Origin"] = "null"
     assert client.post(f"{API}/projects", json={"name": "A"}, headers=headers).status_code == 403
-    headers["Origin"] = "http://localhost:5173"
+    headers["Origin"] = "http://localhost:8137"
     assert client.post(f"{API}/projects", json={"name": "A"}, headers=headers).status_code == 201
 
 
@@ -51,7 +51,7 @@ def test_foreign_origin_on_api_read_is_rejected(client: TestClient) -> None:
         resp = client.get(f"{API}{path}", headers=headers)
         assert resp.status_code == 403, path
         assert resp.json()["error"]["message"] == origin_guard.BLOCKED_MESSAGE
-    headers["Origin"] = "http://localhost:5173"
+    headers["Origin"] = "http://localhost:8137"
     assert client.get(f"{API}/health", headers=headers).status_code == 200
 
 
@@ -100,3 +100,54 @@ def test_lan_address_is_accepted_host(tmp_path: Path, monkeypatch: pytest.Monkey
     monkeypatch.setattr(origin_guard, "lan_addresses", lambda: ["192.168.1.20"])
     with TestClient(create_app(data_dir=tmp_path, lan=True)) as c:
         assert c.get(f"{API}/health", headers={"Host": "192.168.1.20:8137"}).status_code == 200
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [("localhost:8137", 8137), ("localhost", None), ("[::1]:80", 80), ("[::1]", None)],
+)
+def test_port_of(value: str, expected: int | None) -> None:
+    assert origin_guard.port_of(value) == expected
+
+
+@pytest.mark.parametrize(
+    ("host", "origin", "status"),
+    [
+        ("localhost:8137", "http://localhost:8137", 201),
+        ("localhost:8137", "http://LOCALHOST:8137", 201),
+        ("[::1]:8137", "http://[::1]:8137", 201),
+        ("localhost", "http://localhost", 201),  # default port 80 on both sides
+        ("localhost:80", "http://localhost", 201),
+        ("localhost", "https://localhost:443", 201),
+        # Vite dev server: the proxy keeps the browser's Host next to the same Origin
+        ("localhost:5173", "http://localhost:5173", 201),
+        # another web server on this machine
+        ("localhost:8137", "http://localhost:3000", 403),
+        ("localhost:8137", "http://localhost", 403),
+        ("localhost:8137", "http://127.0.0.1:8137", 403),  # same machine, different origin
+        ("127.0.0.1:8137", "http://localhost:8137", 403),
+        ("localhost:8137", "http://localhost:8137@evil.example.com", 403),
+        ("localhost:8137", "http://localhost:notaport", 403),
+        ("localhost:8137", "ftp://localhost:8137", 403),
+    ],
+)
+def test_origin_must_be_this_host_and_port(
+    client: TestClient, host: str, origin: str, status: int
+) -> None:
+    headers = {"Host": host, "Origin": origin}
+    resp = client.post(f"{API}/projects", json={"name": "A"}, headers=headers)
+    assert resp.status_code == status, (host, origin)
+    get = client.get(f"{API}/health", headers=headers)
+    assert get.status_code == (200 if status == 201 else 403)
+
+
+def test_websocket_from_another_local_port_is_rejected(client: TestClient) -> None:
+    with pytest.raises(WebSocketDisconnect):
+        with client.websocket_connect(
+            "/ws/events", headers={"Host": "localhost:8137", "Origin": "http://localhost:3000"}
+        ):
+            pass
+    with client.websocket_connect(
+        "/ws/events", headers={"Host": "localhost:8137", "Origin": "http://localhost:8137"}
+    ):
+        pass
