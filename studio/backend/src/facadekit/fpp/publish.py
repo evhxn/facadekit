@@ -1,7 +1,8 @@
 """Publish a rendered MP4 to a Falcon Player (FPP): check, upload, verify, playlist, start.
 
-Values that spike S-1 has not confirmed live in the constants below, with the plan's
-values as defaults (docs/05-interfaces.md section 7).
+Values that spike S-1 has not confirmed are the constants below (the plan's values,
+docs/05-interfaces.md section 7). They are only defaults: read them through the accessor
+functions, which apply the user's ``config.json`` (see ``facadekit.config.load_overrides``).
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from facadekit.config import override_str
 from facadekit.errors import FkError
 from facadekit.fpp.client import FppClient
 
@@ -38,6 +40,16 @@ _ALNUM = re.compile(r"[A-Za-z0-9]")
 ProgressFn = Callable[[float, str], None]
 
 
+def video_dir() -> str:
+    """FPP media directory for video files (config key ``fpp.video_dir``)."""
+    return override_str("fpp.video_dir", VIDEO_DIR)
+
+
+def sequences_dir() -> str:
+    """FPP directory for .fseq files (config key ``fpp.sequences_dir``)."""
+    return override_str("fpp.sequences_dir", SEQUENCES_DIR)
+
+
 def sanitize_name(name: str) -> str:
     """Make a file name safe for FPP: [A-Za-z0-9._-] only, prefixed with ``fk_``."""
     cleaned = _MULTI_UNDERSCORE.sub("_", _BAD_CHARS.sub("_", name))
@@ -50,11 +62,15 @@ def sanitize_name(name: str) -> str:
 
 def media_entry(media_name: str, sequence_name: str | None = None) -> dict[str, Any]:
     entry: dict[str, Any] = {
-        "type": ENTRY_TYPE_MEDIA if sequence_name is None else ENTRY_TYPE_BOTH,
+        "type": (
+            override_str("fpp.entry_type_media", ENTRY_TYPE_MEDIA)
+            if sequence_name is None
+            else override_str("fpp.entry_type_both", ENTRY_TYPE_BOTH)
+        ),
         "enabled": 1,
         "playOnce": 0,
         "mediaName": media_name,
-        "videoOut": ENTRY_VIDEO_OUT,
+        "videoOut": override_str("fpp.video_out", ENTRY_VIDEO_OUT),
     }
     if sequence_name is not None:
         entry["sequenceName"] = sequence_name
@@ -118,6 +134,7 @@ def publish_render(
     if not playlist_name.strip():
         raise FkError("BAD_REQUEST", "Playlist name is empty")
     media_name = sanitize_name(media_name)
+    target_dir = video_dir()
     client = FppClient(host)
     try:
         _report(progress, _P_VERSION, 0.0, "Checking FPP")
@@ -131,7 +148,7 @@ def publish_render(
 
         _report(progress, _P_UPLOAD, 0.0, "Uploading")
         client.upload(
-            VIDEO_DIR,
+            target_dir,
             local_path,
             media_name,
             progress=lambda frac, _msg: _report(progress, _P_UPLOAD, frac, "Uploading"),
@@ -139,7 +156,7 @@ def publish_render(
         )
 
         _report(progress, _P_VERIFY, 0.0, "Verifying")
-        if media_name not in client.list_files(VIDEO_DIR):
+        if media_name not in client.list_files(target_dir):
             raise FkError("FPP_UPLOAD_FAILED", "Upload finished but FPP does not list the file.")
         _report(progress, _P_VERIFY, 1.0, "Verifying")
 
