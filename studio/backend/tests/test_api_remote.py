@@ -163,3 +163,23 @@ def test_session_expires(tmp_path: Path) -> None:
     assert auth._valid_session(token)
     now[0] += remote_auth.SESSION_TTL_S + 1
     assert not auth._valid_session(token)
+
+
+def test_pairing_closes_after_too_many_wrong_codes_from_changing_addresses() -> None:
+    """The per-address lockout alone does not slow a device that keeps changing its address."""
+    auth = remote_auth.RemoteAuth(lan=True, code=CODE)
+    for i in range(remote_auth.MAX_WRONG_TOTAL):
+        host = f"192.168.1.{i + 2}"  # a new address for every guess: never locked out
+        assert auth.pair(host, "000000") == (None, "Wrong code")
+    closed = (None, remote_auth.PAIRING_CLOSED_MESSAGE)
+    assert auth.pair("192.168.1.200", "000000") == closed
+    assert auth.pair("192.168.1.201", CODE) == closed  # even the right code, until a restart
+    assert remote_auth.RemoteAuth(lan=True, code=CODE).pair(PHONE, CODE)[0] is not None
+
+
+def test_a_paired_session_survives_the_pairing_budget() -> None:
+    auth = remote_auth.RemoteAuth(lan=True, code=CODE)
+    token, _ = auth.pair(PHONE, CODE)
+    for i in range(remote_auth.MAX_WRONG_TOTAL):
+        auth.pair(f"10.0.0.{i + 2}", "000000")
+    assert auth._valid_session(token)

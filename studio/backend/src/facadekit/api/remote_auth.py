@@ -20,6 +20,12 @@ COOKIE_NAME = "fk_remote"
 SESSION_TTL_S = 12 * 3600
 MAX_WRONG_ATTEMPTS = 5
 LOCKOUT_S = 5 * 60
+# Wrong codes from all addresses together, per server run. The per-address lockout does not
+# slow a device that keeps changing its address; after this many misses pairing stays closed
+# until FacadeKit is restarted (which also makes a new code). 30 guesses at a 6-digit code
+# succeed with probability 0.003 %.
+MAX_WRONG_TOTAL = 30
+PAIRING_CLOSED_MESSAGE = "Too many wrong codes. Restart FacadeKit to pair a device."
 PAIR_MESSAGE = "Pair this device first"
 
 # Starlette's TestClient reports the peer as "testclient". Real peers are always IP addresses,
@@ -93,6 +99,7 @@ class RemoteAuth:
         self._sessions: dict[str, float] = {}
         self._wrong: dict[str, int] = {}
         self._locked_until: dict[str, float] = {}
+        self._wrong_total = 0
 
     def client_host(self, scope: Scope) -> str | None:
         if self._override is not None:
@@ -139,9 +146,12 @@ class RemoteAuth:
         if not self.lan or self.code is None:
             return None, PAIR_MESSAGE
         now = self._clock()
+        if self._wrong_total >= MAX_WRONG_TOTAL:
+            return None, PAIRING_CLOSED_MESSAGE
         if self._locked_until.get(host, 0.0) > now:
             return None, "Too many attempts"
         if not secrets.compare_digest(code.encode(), self.code.encode()):
+            self._wrong_total += 1
             self._wrong[host] = self._wrong.get(host, 0) + 1
             if self._wrong[host] >= MAX_WRONG_ATTEMPTS:
                 self._wrong[host] = 0
