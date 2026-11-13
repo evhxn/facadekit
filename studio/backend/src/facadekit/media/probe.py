@@ -15,11 +15,20 @@ AUDIO_EXTS = {".mp3", ".wav", ".m4a", ".flac", ".ogg", ".aac"}
 THUMB_WIDTH = 320
 _UNSUPPORTED_MSG = "Not a video, image or audio file ffmpeg can read"
 
-_DURATION_RE = re.compile(r"Duration:\s*(\d+):(\d{2}):(\d{2}(?:\.\d+)?)")
+# Only ffmpeg's own lines, at its own indentation, count. Container metadata is printed at
+# 4+ spaces, so a title/comment such as "Stream #0:0: Video: h264, 640x360" or
+# "Duration: 00:05:00" cannot match.
+_DURATION_RE = re.compile(r"^  Duration:\s*(\d+):(\d{2}):(\d{2}(?:\.\d+)?)", re.MULTILINE)
+_VIDEO_LINE_RE = re.compile(r"^  Stream #\d+:\d+\S*: Video:")
+_AUDIO_LINE_RE = re.compile(r"^  Stream #\d+:\d+\S*: Audio:", re.MULTILINE)
 _SIZE_RE = re.compile(r"(?<![\w.])(\d{2,5})x(\d{2,5})(?![\w.])")
 _FPS_RE = re.compile(r"([\d.]+) fps")
 _TBR_RE = re.compile(r"([\d.]+) tbr")
-_ROTATION_RE = re.compile(r"rotation of (-?[\d.]+) degrees|\brotate\s*:\s*(-?[\d.]+)")
+_ROTATION_RE = re.compile(
+    r"^      (?:Display Matrix|displaymatrix): rotation of (-?[\d.]+) degrees"
+    r"|^    rotate\s*:\s*(-?[\d.]+)",
+    re.MULTILINE,
+)
 
 
 def _unsupported() -> FkError:
@@ -72,7 +81,7 @@ def _probe_audio(path: Path) -> Asset:
 def _probe_video(path: Path) -> Asset:
     text = ffmpeg_info(path)
     lines = text.splitlines()
-    video_idx = next((i for i, ln in enumerate(lines) if "Video:" in ln), None)
+    video_idx = next((i for i, ln in enumerate(lines) if _VIDEO_LINE_RE.match(ln)), None)
     if video_idx is None:
         raise _unsupported()
     video_line = lines[video_idx]
@@ -87,10 +96,13 @@ def _probe_video(path: Path) -> Asset:
     if duration is None:
         raise _unsupported()
 
-    # Rotation info lives in the lines following the stream line (metadata / side data).
-    stream_text = "\n".join(lines[video_idx + 1 :])
-    stream_text = re.split(r"\n\s*Stream #", stream_text, maxsplit=1)[0]
-    rot = _ROTATION_RE.search(video_line + "\n" + stream_text)
+    # Rotation info lives in the stream's own indented block (metadata / side data).
+    block: list[str] = []
+    for ln in lines[video_idx + 1 :]:
+        if not ln.startswith("    "):
+            break
+        block.append(ln)
+    rot = _ROTATION_RE.search("\n".join(block))
     if rot is not None:
         angle = float(rot.group(1) or rot.group(2))
         if round(abs(angle)) % 180 == 90:
@@ -105,7 +117,7 @@ def _probe_video(path: Path) -> Asset:
         height=height,
         duration_ms=duration,
         fps=fps,
-        has_audio="Audio:" in text,
+        has_audio=_AUDIO_LINE_RE.search(text) is not None,
     )
 
 
