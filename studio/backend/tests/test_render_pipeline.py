@@ -20,18 +20,21 @@ QUAD = ((80.0, 30.0), (240.0, 30.0), (240.0, 150.0), (80.0, 150.0))
 def _project(tmp_path: Path, *, audio: bool = False, sample_audio: Path | None = None) -> Project:
     img = np.zeros((50, 50, 3), np.uint8)
     img[:] = (0, 0, 255)
-    cv2.imwrite(str(tmp_path / "red.png"), img)
+    (tmp_path / "media").mkdir(exist_ok=True)
+    cv2.imwrite(str(tmp_path / "media" / "red.png"), img)
     assets = [
         Asset(
-            id="red", kind="image", filename="red.png", original_name="red.png",
+            id="red", kind="image", filename="media/red.png", original_name="red.png",
             width=50, height=50, duration_ms=None, fps=None, has_alpha=False,
         )
     ]  # fmt: skip
     if audio:
         assert sample_audio is not None
-        (tmp_path / "a.wav").write_bytes(sample_audio.read_bytes())
+        (tmp_path / "media" / "a.wav").write_bytes(sample_audio.read_bytes())
         assets.append(
-            probe(tmp_path / "a.wav").model_copy(update={"id": "aud", "filename": "a.wav"})
+            probe(tmp_path / "media" / "a.wav").model_copy(
+                update={"id": "aud", "filename": "media/a.wav"}
+            )
         )
     clip = Clip(
         id="c1", asset_id="red", surface_id="s1", start_ms=0, duration_ms=2000, fit="stretch"
