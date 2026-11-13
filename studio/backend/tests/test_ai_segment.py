@@ -128,6 +128,18 @@ def test_segment_route(sim_client: TestClient) -> None:
     assert sim_client.post(f"{API}/projects/{pid}/segment", json=body).status_code == 200
     no_include = {"points": [{"x": 10, "y": 10, "label": 0}], "prefer": "grabcut"}
     assert sim_client.post(f"{API}/projects/{pid}/segment", json=no_include).status_code == 422
+    # the cache is bounded: older segmenters (each holds a full image) are dropped
+    cache = sim_client.app.state.fk.segmenters  # type: ignore[attr-defined]
+    (first,) = list(cache)
+    cache[("old", "cal_00000000", "grabcut")] = object()
+    assert (
+        sim_client.post(
+            f"{API}/projects/{pid}/segment", json={**body, "prefer": "auto"}
+        ).status_code
+        == 200
+    )
+    assert len(cache) == 2 and first not in cache
+    assert list(cache)[-1] == (first[0], first[1], "auto")
 
 
 def test_segment_route_requires_calibration(sim_client: TestClient) -> None:

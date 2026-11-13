@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
 
 API = "/api/v1"
@@ -128,3 +129,27 @@ def test_put_project_cannot_point_an_asset_outside_media(
     assert client.get(f"{API}/projects/{pid}/assets/ast_00000001/file").status_code == 404
     assert client.delete(f"{API}/projects/{pid}/assets/ast_00000001").status_code == 404
     assert victim.read_text() == "keep me"
+
+
+def test_upload_size_cap_and_free_disk_margin(
+    client: TestClient, sample_image: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from facadekit.api import routes_assets
+
+    pid = _project(client)
+    monkeypatch.setattr(routes_assets, "MAX_ASSET_BYTES", sample_image.stat().st_size - 1)
+    resp = _upload(client, pid, sample_image)
+    assert resp.status_code == 422
+    assert resp.json()["error"]["message"] == routes_assets.MSG_TOO_LARGE
+    assert list(_media(client, pid).iterdir()) == []  # nothing left behind
+
+    monkeypatch.setattr(routes_assets, "MAX_ASSET_BYTES", 8 * 1024**3)
+    monkeypatch.setattr(routes_assets, "FREE_DISK_MARGIN_BYTES", 2**62)  # more than any disk
+    resp = _upload(client, pid, sample_image)
+    assert resp.status_code == 422
+    assert resp.json()["error"]["message"] == routes_assets.MSG_NO_SPACE
+    assert list(_media(client, pid).iterdir()) == []
+    assert client.get(f"{API}/projects/{pid}").json()["assets"] == []
+
+    monkeypatch.setattr(routes_assets, "FREE_DISK_MARGIN_BYTES", 0)
+    assert _upload(client, pid, sample_image).status_code == 201

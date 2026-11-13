@@ -78,6 +78,8 @@ class SegmentRequest(BaseModel):
 
 
 _segment_lock = threading.Lock()
+# Each cached segmenter holds a full projector-view image and, for MobileSAM, its embedding.
+MAX_CACHED_SEGMENTERS = 2
 
 
 @router.post("/projects/{pid}/segment")
@@ -100,6 +102,8 @@ def segment(pid: str, body: SegmentRequest, state: State) -> dict[str, Any]:
             segmenter = get_segmenter(body.prefer)
             segmenter.set_image(image)
             state.segmenters[key] = segmenter
+            while len(state.segmenters) > MAX_CACHED_SEGMENTERS:  # oldest first
+                del state.segmenters[next(iter(state.segmenters))]
         result = segmenter.segment(points)
     engine = "mobilesam" if isinstance(segmenter, MobileSamSegmenter) else "grabcut"
     return {"outer": result.outer, "quad": result.quad, "score": result.score, "engine": engine}
