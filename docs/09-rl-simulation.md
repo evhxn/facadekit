@@ -16,6 +16,8 @@ The question was whether a better learner than the shipped one (a Beta-posterior
 
 Section 8 lists what this simulation cannot tell you.
 
+Status: the scale floor and the stripe probe are implemented in `calib/learn.py`, `calib/capture.py` and `calib/quality.py` (`docs/07`, sections "Scale floor" and "Stripe probe in the pre-check"). The first scan of all 89 held-out scenes was then run through the real pipeline with the real advisor: it picked the same strategy as the simulated policy in 89 of 89 scenes and failed in 13 (15 %), as predicted.
+
 ## 2. The problem as an RL problem
 
 | Element | Definition |

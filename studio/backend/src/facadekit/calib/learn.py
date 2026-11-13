@@ -110,11 +110,13 @@ class ScanRecord(BaseModel):
     verdict: Verdict | None = None
     scale: Scale | None = None  # absent in records written before T-205
     px_per_proj_px: float | None = None  # the measured picture scale itself (docs/09)
+    blur_floor: int | None = None  # stripe probe result, when the pre-check took it
 
     def to_json_line(self) -> str:
         """Compact JSON; newer optional fields are left out when None so older releases read
         the line."""
-        skip = {name for name in ("scale", "px_per_proj_px") if getattr(self, name) is None}
+        names = ("scale", "px_per_proj_px", "blur_floor")
+        skip = {name for name in names if getattr(self, name) is None}
         return self.model_dump_json(exclude=skip or None)
 
 
@@ -182,6 +184,16 @@ def scale_floor(px_per_proj_px: float | None) -> int | None:
     """Finest skip_lsb whose stripes the camera can resolve at this picture scale; None when
     the scale was not measured."""
     return None if px_per_proj_px is None else finest_readable_skip(px_per_proj_px)
+
+
+def readable_floor(pre: dict[str, float]) -> int | None:
+    """The floor from everything the pre-check measured: the picture scale and, when the
+    stripe probe was taken (`blur_floor`), the camera's blur. None when neither is known."""
+    floors = [scale_floor(pre.get("px_per_proj_px"))]
+    probed = pre.get("blur_floor")
+    floors.append(None if probed is None else int(probed))
+    known = [f for f in floors if f is not None]
+    return max(known) if known else None
 
 
 def allowed_strategies(floor: int | None) -> tuple[Strategy, ...]:
@@ -289,7 +301,7 @@ class ScanAdvisor:
             camera_id,
             contrast_bucket(pre["median_contrast"]),
             scale_class(pre.get("px_per_proj_px")),
-            floor=scale_floor(pre.get("px_per_proj_px")),
+            floor=readable_floor(pre),
         )
 
     def remembered_strategy(self, camera_id: str) -> Strategy | None:
@@ -316,6 +328,7 @@ class ScanAdvisor:
                 "strategy": strategy.id,
                 "scale": scale_class(pre.get("px_per_proj_px")),
                 "px_per_proj_px": pre.get("px_per_proj_px"),
+                "blur_floor": None if pre.get("blur_floor") is None else int(pre["blur_floor"]),
                 **fields,
             }
         )

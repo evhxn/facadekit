@@ -242,6 +242,26 @@ The 18 old scenes do not change because the picture fills the frame in all of th
 
 Cost: the floor trusts the 3-pixel rule. Where a finer strategy would still have worked (for example `standard` at 92 % coverage in `far_marginal`), the scan now starts one step coarser. In the simulation the final map of the held-out scenes is 1.03 px off (95th percentile, median over scenes) with the floor against 0.82 px without it.
 
+## Stripe probe in the pre-check (2026-11-13)
+
+The scale floor cannot see blur: a large picture from an out-of-focus camera still starts on `standard` and fails. The pre-check now measures blur directly.
+
+- After its black and white shots, `capture.precheck(..., probe=True)` projects the finest stripes of `skip_lsb` 2, 3 and 4 (pattern and inverse: six shots) and measures how much of their contrast survives (`quality.probe_modulation`, the same measure the camera check uses). `quality.blur_floor` is the finest of the three that keeps `MOD_OK = 0.30`, or 5 when none does. The pre-check returns it as `blur_floor`, with the three `modulation_<bit>` values.
+- `run_calibration` asks for the probe whenever an advisor is in use. `learn.readable_floor(pre)` is the larger of the scale floor and the probe's; `ScanAdvisor.choose` uses that. `ScanRecord` gains the optional `blur_floor`.
+- Scans without an advisor (learning off, or strategy fields set by the caller) take no probe and behave as before. Pi-driven and phone scans take no probe: their patterns are fixed before the camera sees anything.
+
+Why (`docs/09-rl-simulation.md`): with both floors, on the 89 held-out scenes regret per 8 scans is 0.003 (shipped 0.992; difference −0.989, 95 % interval −1.169 to −0.794) and the first scan fails at 15 % of sites, which is the share no strategy can scan at all. On the 85 shifted scenes: 0.044 against 1.357, and 16 %.
+
+End-to-end check, not a replay: the first scan of all 89 held-out scenes was run through the real `run_calibration` with a fresh `ScanAdvisor`. It chose the same strategy as the simulated policy in 89 of 89 scenes and failed in 13 (15 %), as predicted. First strategies: `very_soft` 55, `soft_focus` 22, `standard` 12.
+
+Costs and limits:
+
+- Six more shots before every learned scan (each takes the settle time plus the averaged frames, so a few seconds in total).
+- `MOD_OK` was tuned in the simulator (`docs/08` §6), whose blur is a Gaussian. On a real lens the threshold may be off. Too pessimistic: the scan starts coarser than needed and the map is less accurate, but it works. Too optimistic: the first scan fails and the log takes over, as before.
+- The probe uses x-axis stripes only.
+- I proposed this after seeing held-out results of the simulation, so its test is less clean than the scale floor's. It has no tuned parameter.
+- The out-of-focus test that used to show "one failure, then the wizard adapts" now needs an advisor that ignores the probe (`_NoProbe` in `test_calib_learn.py`); with the probe that failure no longer happens (`test_out_of_focus_camera_is_seen_before_the_scan`).
+
 ## Bug fixed on the way
 
 `build_maps` used an 8 px grid for any `skip_lsb`. With `skip_lsb=3` every decoded block centre fell exactly halfway between two grid nodes and three nodes in four stayed empty (coverage 25 %). The grid step now defaults to `max(8, 2 × block)` and must be a multiple of two blocks.

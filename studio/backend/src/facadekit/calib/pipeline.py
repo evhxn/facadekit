@@ -123,6 +123,7 @@ def run_calibration(
             settings=tuned,
             sleep=sleep,
             crop_check=settings.roi is not None,
+            probe=advisor is not None,  # the advisor uses it to skip unreadable strategies
         )
         report(0.05, "Checking setup")
         _check_cancel(cancel)

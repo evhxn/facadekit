@@ -14,6 +14,7 @@ from facadekit.calib.learn import (
     ScanAdvisor,
     ScanMemory,
     ScanRecord,
+    Strategy,
     choose,
     contrast_bucket,
     learning_enabled,
@@ -220,10 +221,18 @@ def test_easy_scene_uses_standard_and_logs_it(tmp_path: Path) -> None:
     assert rec.bucket == "high" and rec.coverage is not None and rec.coverage > 0.85
 
 
+class _NoProbe(ScanAdvisor):
+    """An advisor that does not look at the stripe probe: the log has to do the learning."""
+
+    def choose(self, camera_id: str, pre: dict[str, float]) -> Strategy:
+        return super().choose(camera_id, {k: v for k, v in pre.items() if k != "blur_floor"})
+
+
 def test_out_of_focus_camera_is_learned(tmp_path: Path) -> None:
-    """A blurred camera cannot resolve the fine stripes: one failure, then the wizard adapts."""
+    """A blurred camera cannot resolve the fine stripes: one failure, then the wizard adapts.
+    (Without the stripe probe; with it the failure does not happen, see the next test.)"""
     scene = SimScene(blur_sigma=4.0)
-    advisor = ScanAdvisor(ScanMemory(tmp_path / "scans.jsonl"))
+    advisor = _NoProbe(ScanMemory(tmp_path / "scans.jsonl"))
     with pytest.raises(FkError) as exc:
         _scan(tmp_path, scene, advisor)
     assert exc.value.code == "SCAN_FAILED"
@@ -236,6 +245,32 @@ def test_out_of_focus_camera_is_learned(tmp_path: Path) -> None:
     # A brand new advisor reading the same log does not repeat the mistake.
     again = ScanAdvisor(ScanMemory(tmp_path / "scans.jsonl"))
     assert again.choose("sim", {"median_contrast": 82.0, "lit_fraction": 0.5}).id != "standard"
+
+
+def test_out_of_focus_camera_is_seen_before_the_scan(tmp_path: Path) -> None:
+    """The stripe probe in the pre-check measures the blur, so the first scan already uses
+    stripes the camera can resolve and nothing fails (docs/09)."""
+    scene = SimScene(blur_sigma=4.0)
+    advisor = ScanAdvisor(ScanMemory(tmp_path / "scans.jsonl"))
+    cal = _scan(tmp_path, scene, advisor)
+    (rec,) = advisor.memory.records()
+    assert rec.ok and rec.blur_floor is not None and rec.blur_floor >= 3
+    assert cal.settings.skip_lsb >= rec.blur_floor  # type: ignore[attr-defined]
+    assert cal.quality.coverage > 0.9  # type: ignore[attr-defined]
+    # a sharp camera is not pushed to coarser stripes by the probe
+    sharp = ScanAdvisor(ScanMemory(tmp_path / "sharp.jsonl"))
+    assert _scan(tmp_path, default_scene(), sharp).strategy == "standard"  # type: ignore[attr-defined]
+    assert sharp.memory.records()[0].blur_floor == 2
+
+
+def test_readable_floor_combines_scale_and_probe() -> None:
+    from facadekit.calib.learn import readable_floor
+
+    assert readable_floor({"median_contrast": 90.0}) is None
+    assert readable_floor({"px_per_proj_px": 0.6}) == 2
+    assert readable_floor({"px_per_proj_px": 0.6, "blur_floor": 4.0}) == 4
+    assert readable_floor({"px_per_proj_px": 0.15, "blur_floor": 2.0}) == 4
+    assert readable_floor({"blur_floor": 3.0}) == 3
 
 
 def test_cancelled_and_precheck_failures_are_not_logged(tmp_path: Path) -> None:
