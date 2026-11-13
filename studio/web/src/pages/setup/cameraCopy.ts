@@ -52,8 +52,43 @@ export const COPY = {
     br: "Bottom right",
   },
 
-  phoneSoon:
-    "Scanning with your phone is coming soon. For now, move the camera closer or zoom in, then press Start scan.",
+  /** docs/08 section 5, phone panel, verbatim. The words in bold are buttons. */
+  phoneSteps: [
+    "Put your phone on a tripod or lean it on something steady, near the projector. Zoom in until the house fills the screen.",
+    "If your phone has Action mode or extra stabilisation, turn it off. Press and hold on the house to lock focus and brightness.",
+    "Start recording a video, then press **Start light show** (here or on your phone). The projector stays dark for 15 seconds, flashes three times, then shows stripes for about a minute.",
+    "Stop recording when the projector goes dark. Send the video to this computer, or use the phone page, and choose it here: **Choose video…**",
+  ],
+  phonePrivacy:
+    "The video goes straight from your phone to this computer. It is deleted after the scan.",
+  phoneLink: "Scan with your phone",
+  phoneTitle: "Scan with your phone",
+  phoneUseCamera: "Use the camera instead",
+  phoneStart: "Start light show",
+  phoneShowRunning: "Light show running… keep recording",
+  phoneShowDone: "Done. Stop recording and send the video.",
+  phoneShowStarting: "Starting the light show…",
+  phoneChoose: "Choose video…",
+  phoneNoSession: "Start the light show first.",
+  phoneSending: "Sending the video…",
+  phoneChecking: "Checking the video…",
+  phoneSendFromPhone: "Send from your phone instead",
+  phonePageIntro:
+    "On your phone (same Wi-Fi), scan a code or type the address, then enter the pairing code.",
+  phoneLanOff: "Restart FacadeKit with `facadekit serve --lan` to use your phone on your Wi-Fi.",
+  phoneMovedHint: " Did the phone move? Use a tripod or lean it on something steady.",
+  phoneShowFailed:
+    "The light show did not finish. Check that the projector window is open, then press Start light show again.",
+
+  /** The phone page (/phone/:projectId). */
+  phonePageTitle: "Scan with your phone",
+  phonePageStart: "Start light show in 20 s",
+  phonePageSwitch: "Now switch to your camera app and start recording.",
+  phonePageSend: "Send video",
+  phonePageDone: "Done. Look at your computer for the result.",
+  phonePageBlocked:
+    "This computer does not accept videos from phones. Send the video to the computer another way (AirDrop, cable) and choose it there.",
+
   smallResult:
     "Your camera saw the projection small, so check the outlines carefully on the house.",
   cropTight:

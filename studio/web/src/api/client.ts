@@ -8,6 +8,7 @@ import type {
   Health,
   Job,
   LearningSummary,
+  PhoneScanStart,
   Project,
   ProjectorSpec,
   Pt,
@@ -75,14 +76,21 @@ export const putProject = (project: Project) =>
   request<Project>("PUT", `/projects/${enc(project.id)}`, project);
 export const deleteProject = (id: string) => request<void>("DELETE", `/projects/${enc(id)}`);
 
-export function uploadAsset(
-  pid: string,
+/** Give up on an upload after this long (the server drops uploads after 2 h as well). */
+export const UPLOAD_TIMEOUT_MS = 2 * 60 * 60 * 1000;
+
+/** POST one file as multipart field "file" with XMLHttpRequest, which reports upload progress. */
+function xhrUpload<T>(
+  path: string,
   file: File,
-  onProgress?: (fraction: number) => void,
-): Promise<{ asset: Asset; project: Project }> {
+  onProgress: ((fraction: number) => void) | undefined,
+  abortMessage: string,
+  signal?: AbortSignal,
+): Promise<T> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", `${BASE}/projects/${enc(pid)}/assets`);
+    xhr.open("POST", BASE + path);
+    xhr.timeout = UPLOAD_TIMEOUT_MS;
     xhr.setRequestHeader("Accept", "application/json");
     if (onProgress) {
       xhr.upload.onprogress = (e) => {
@@ -92,7 +100,7 @@ export function uploadAsset(
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
-          resolve(JSON.parse(xhr.responseText) as { asset: Asset; project: Project });
+          resolve(JSON.parse(xhr.responseText) as T);
         } catch {
           reject(
             new ApiError(
@@ -107,13 +115,33 @@ export function uploadAsset(
       }
     };
     xhr.onerror = () => reject(new ApiError("NETWORK", "Network error", 0));
-    xhr.onabort = () =>
-      reject(new ApiError("NETWORK", "The upload was stopped. Import the file again.", 0));
+    xhr.onabort = () => reject(new ApiError("NETWORK", abortMessage, 0));
+    xhr.ontimeout = () =>
+      reject(new ApiError("NETWORK", "Sending took too long. Check the Wi-Fi and try again.", 0));
+    if (signal) {
+      if (signal.aborted) {
+        reject(new ApiError("NETWORK", abortMessage, 0));
+        return;
+      }
+      signal.addEventListener("abort", () => xhr.abort(), { once: true });
+    }
     const form = new FormData();
     form.append("file", file);
     xhr.send(form);
   });
 }
+
+export const uploadAsset = (
+  pid: string,
+  file: File,
+  onProgress?: (fraction: number) => void,
+): Promise<{ asset: Asset; project: Project }> =>
+  xhrUpload(
+    `/projects/${enc(pid)}/assets`,
+    file,
+    onProgress,
+    "The upload was stopped. Import the file again.",
+  );
 export const assetUrl = (pid: string, aid: string) =>
   `${BASE}/projects/${enc(pid)}/assets/${enc(aid)}/file`;
 export const assetThumbUrl = (pid: string, aid: string) =>
@@ -179,6 +207,27 @@ export const sendScanFeedback = (pid: string, cid: string, verdict: "good" | "ba
     "POST",
     `/projects/${enc(pid)}/calibrations/${enc(cid)}/feedback`,
     { verdict },
+  );
+/** Start the phone light show (docs/08 section 4); the job holds the projector about a minute. */
+export const startPhoneScan = (pid: string, countdownS = 15, learn = true) =>
+  request<PhoneScanStart>("POST", `/projects/${enc(pid)}/phone-scans`, {
+    countdown_s: countdownS,
+    learn,
+  });
+/** Send the phone video of a light show; the job result is {calibration_id}. */
+export const uploadPhoneVideo = (
+  pid: string,
+  sessionId: string,
+  file: File,
+  onProgress?: (fraction: number) => void,
+  signal?: AbortSignal,
+) =>
+  xhrUpload<{ job_id: string }>(
+    `/projects/${enc(pid)}/phone-scans/${enc(sessionId)}/video`,
+    file,
+    onProgress,
+    "Sending the video was stopped. Choose it again.",
+    signal,
   );
 export const getCalibration = (pid: string, cid: string) =>
   request<Calibration>("GET", `/projects/${enc(pid)}/calibrations/${enc(cid)}`);

@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, getProject, putProject } from "./client";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiError, getProject, putProject, UPLOAD_TIMEOUT_MS, uploadPhoneVideo } from "./client";
 import { userMessage } from "./errors";
 import { newId, type Project } from "./types";
 
@@ -74,5 +74,68 @@ describe("helpers", () => {
   });
   it("newId", () => {
     expect(newId("srf")).toMatch(/^srf_[0-9a-f]{8}$/);
+  });
+});
+
+describe("phone video upload (XHR)", () => {
+  class FakeXhr {
+    static last: FakeXhr | null = null;
+    timeout = 0;
+    upload: { onprogress: ((e: ProgressEvent) => void) | null } = { onprogress: null };
+    onload: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+    onabort: (() => void) | null = null;
+    ontimeout: (() => void) | null = null;
+    method = "";
+    url = "";
+    sent: unknown = null;
+    aborted = false;
+    constructor() {
+      FakeXhr.last = this;
+    }
+    open(method: string, url: string) {
+      this.method = method;
+      this.url = url;
+    }
+    setRequestHeader() {}
+    send(body: unknown) {
+      this.sent = body;
+    }
+    abort() {
+      this.aborted = true;
+      this.onabort?.();
+    }
+  }
+  const original = globalThis.XMLHttpRequest;
+  beforeEach(() => {
+    globalThis.XMLHttpRequest = FakeXhr as unknown as typeof XMLHttpRequest;
+  });
+  afterEach(() => {
+    globalThis.XMLHttpRequest = original;
+  });
+
+  it("posts to the session's video route with a timeout", async () => {
+    const p = uploadPhoneVideo("prj 1", "phs_0123abcd", new File(["x"], "a.mov"));
+    const xhr = FakeXhr.last!;
+    expect(xhr.method).toBe("POST");
+    expect(xhr.url).toBe("/api/v1/projects/prj%201/phone-scans/phs_0123abcd/video");
+    expect(xhr.timeout).toBe(UPLOAD_TIMEOUT_MS);
+    expect(xhr.sent).toBeInstanceOf(FormData);
+    xhr.ontimeout?.();
+    await expect(p).rejects.toMatchObject({ code: "NETWORK" });
+  });
+
+  it("aborts the request when the signal fires", async () => {
+    const controller = new AbortController();
+    const p = uploadPhoneVideo(
+      "p",
+      "phs_0123abcd",
+      new File(["x"], "a.mov"),
+      undefined,
+      controller.signal,
+    );
+    controller.abort();
+    expect(FakeXhr.last!.aborted).toBe(true);
+    await expect(p).rejects.toMatchObject({ code: "NETWORK" });
   });
 });

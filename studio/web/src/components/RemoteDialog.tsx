@@ -1,38 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { remoteInfo, type RemoteInfo } from "../api/client";
-import { encodeQr } from "./qr";
+import QrCode from "./QrCode";
 import styles from "./RemoteDialog.module.css";
-
-function QrCode({ text }: { text: string }) {
-  const matrix = useMemo(() => {
-    try {
-      return encodeQr(text);
-    } catch {
-      return null;
-    }
-  }, [text]);
-  if (!matrix) return null;
-  const quiet = 4;
-  const size = matrix.length + quiet * 2;
-  let d = "";
-  matrix.forEach((row, y) =>
-    row.forEach((dark, x) => {
-      if (dark) d += `M${x + quiet} ${y + quiet}h1v1h-1z`;
-    }),
-  );
-  return (
-    <svg
-      className={styles.qr}
-      viewBox={`0 0 ${size} ${size}`}
-      role="img"
-      aria-label={`QR code for ${text}`}
-      shapeRendering="crispEdges"
-    >
-      <rect width={size} height={size} fill="#fff" />
-      <path d={d} fill="#000" />
-    </svg>
-  );
-}
 
 export default function RemoteDialog({
   projectId,
@@ -80,7 +49,7 @@ export default function RemoteDialog({
               const url = `${base}/remote/${encodeURIComponent(projectId)}`;
               return (
                 <div key={base} className={styles.entry}>
-                  <QrCode text={url} />
+                  <QrCode text={url} className={styles.qr} />
                   <code>{url}</code>
                 </div>
               );

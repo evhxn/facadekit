@@ -16,6 +16,7 @@ import ErrorBanner from "../../components/ErrorBanner";
 import JobProgress from "../../components/JobProgress";
 import { COPY, isPictureSizeMessage } from "./cameraCopy";
 import LearningPanel from "./LearningPanel";
+import PhoneScanPanel from "./PhoneScanPanel";
 import { useProjectStore } from "../../state/projectStore";
 import styles from "../SetupPage.module.css";
 
@@ -94,7 +95,10 @@ export default function StepScan({
   const [error, setError] = useState<string | null>(null);
   const [fixedWait, setFixedWait] = useState(false);
   const [waitMs, setWaitMs] = useState(300);
+  const [usePhone, setUsePhone] = useState(phone);
   const mounted = useRef(true);
+
+  useEffect(() => setUsePhone(phone), [phone]);
 
   useEffect(() => {
     mounted.current = true;
@@ -138,7 +142,8 @@ export default function StepScan({
       setJob(final);
       if (final.state !== "succeeded") {
         setPhase("failed");
-        if (final.state === "cancelled") setError("The scan was cancelled. Press Scan again when you are ready.");
+        if (final.state === "cancelled")
+          setError("The scan was cancelled. Press Scan again when you are ready.");
         else if (final.error) fail(userMessage(final.error.code, final.error.message));
         else setError(userMessage("SCAN_FAILED", "The scan did not work."));
         return;
@@ -162,6 +167,24 @@ export default function StepScan({
       );
       setPhase("failed");
     }
+  };
+
+  const phoneDone = async (calId: string) => {
+    try {
+      await useProjectStore.getState().load(pid);
+      const cal = await getCalibration(pid, calId);
+      if (!mounted.current) return;
+      setError(null);
+      setCalibration(cal);
+      setPhase("done");
+    } catch {
+      if (mounted.current) setError("The scan result could not be loaded. Reload the page.");
+    }
+  };
+  // "Scan again" after a phone scan goes back to the phone panel, not to the webcam.
+  const again = () => {
+    if (usePhone) setPhase("idle");
+    else void run("scan");
   };
 
   const cancel = () => {
@@ -215,14 +238,14 @@ export default function StepScan({
           >
             Continue to surfaces
           </button>
-          <button type="button" onClick={() => void run("scan")}>
+          <button type="button" onClick={again}>
             Scan again
           </button>
           <button
             type="button"
             onClick={() => {
               feedback("bad");
-              void run("scan");
+              again();
             }}
           >
             Picture looks wrong, try another way
@@ -232,6 +255,19 @@ export default function StepScan({
           FacadeKit remembers which scans worked on this computer and adapts the next one.
         </p>
       </section>
+    );
+  }
+
+  if (usePhone && phase !== "running") {
+    return (
+      <>
+        <PhoneScanPanel
+          projectId={pid}
+          onDone={(calId) => void phoneDone(calId)}
+          onUseCamera={cameraId || piHost ? () => setUsePhone(false) : undefined}
+        />
+        {error ? <ErrorBanner message={error} /> : null}
+      </>
     );
   }
 
@@ -248,7 +284,6 @@ export default function StepScan({
         </>
       ) : (
         <>
-          {phone ? <p className={styles.note}>{COPY.phoneSoon}</p> : null}
           {piHost ? (
             <p>The scan takes about a minute. FPP will stop whatever it is playing.</p>
           ) : (
@@ -312,6 +347,13 @@ export default function StepScan({
                 Skip scan (manual mode)
               </button>
             </div>
+          )}
+          {piHost ? null : (
+            <p>
+              <button type="button" className={styles.linkButton} onClick={() => setUsePhone(true)}>
+                {COPY.phoneLink}
+              </button>
+            </p>
           )}
         </>
       )}

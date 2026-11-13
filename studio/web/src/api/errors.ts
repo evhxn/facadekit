@@ -21,6 +21,12 @@ const MESSAGES: Record<string, string> = {
   ASSET_IN_USE: "This file is still used by clips on the timeline. Remove those clips first.",
   REVISION_CONFLICT:
     "The project was changed somewhere else, so it was reloaded. Please repeat your last change.",
+  PHONE_VIDEO_UNREADABLE:
+    "FacadeKit cannot read this video. Record at 1080p or 4K in the 'Most Compatible' format and try again.",
+  PHONE_VIDEO_NO_PATTERN:
+    "The video does not contain the whole light show. Start recording before the projector flashes and stop after it goes dark.",
+  PHONE_MOVED:
+    "The phone moved during the light show. Use a tripod or lean it on something steady, then try again.",
   NETWORK: "Cannot reach the FacadeKit server. Check that it is running and try again.",
 };
 
