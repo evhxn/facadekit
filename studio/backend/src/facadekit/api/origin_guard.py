@@ -54,6 +54,14 @@ def host_of(header_value: str) -> str | None:
     return name.lower()
 
 
+def port_of(header_value: str) -> int | None:
+    """Port from a Host header value that `host_of` accepts; None when it names none."""
+    value = header_value.strip()
+    tail = value[value.find("]") + 1 :] if value.startswith("[") else value
+    _, sep, port = tail.rpartition(":")
+    return int(port) if sep and port.isdigit() else None
+
+
 def _header(scope: Scope, name: bytes) -> str | None:
     for key, value in scope.get("headers", []):
         if key == name:
@@ -64,9 +72,9 @@ def _header(scope: Scope, name: bytes) -> str | None:
 class OriginGuardMiddleware:
     """Pure ASGI middleware rejecting foreign Host headers and cross-site requests.
 
-    Every request needs an allowed Host. A foreign Origin is refused on sockets, on unsafe
-    methods and on any /api or /ws path; /api requests a browser marks as
-    ``Sec-Fetch-Site: cross-site`` are refused whatever the method.
+    Every request needs an allowed Host. An Origin that is not this request's own host and
+    port is refused on sockets, on unsafe methods and on any /api or /ws path; /api requests
+    a browser marks as ``Sec-Fetch-Site: cross-site`` are refused whatever the method.
     """
 
     def __init__(self, app: ASGIApp, *, hostnames: set[str]) -> None:
@@ -96,15 +104,25 @@ class OriginGuardMiddleware:
         )
         if not checked:
             return True
+        # Same origin only: the Origin must name the very host and port this request was sent
+        # to. Comparing host names alone would let any other web server on this machine (a
+        # dev tool on localhost:3000, say) drive the API. The Vite dev server passes because
+        # its proxy keeps the browser's Host header (localhost:5173) next to the same Origin.
         try:
             parts = urlsplit(origin.strip())
             hostname = parts.hostname
+            origin_port = parts.port
         except ValueError:
             return False
+        if parts.scheme not in ("http", "https") or hostname is None:
+            return False
+        default_port = 443 if parts.scheme == "https" else 80
+        assert raw_host is not None
+        host_port = port_of(raw_host)
         return (
-            parts.scheme in ("http", "https")
-            and hostname is not None
-            and (hostname.lower() in self.hostnames)
+            hostname.lower() == host
+            and (origin_port or default_port) == (host_port or default_port)
+            and host in self.hostnames
         )
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
