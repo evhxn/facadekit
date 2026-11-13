@@ -161,3 +161,45 @@ def test_projector_minimum_allows_320x180() -> None:
         ProjectorSpec(width=159, height=180)
     with pytest.raises(ValidationError):
         ProjectorSpec(width=320, height=89)
+
+
+@pytest.mark.parametrize(
+    "filename",
+    [
+        "../../../etc/passwd",
+        "/etc/passwd",
+        "media/../project.json",
+        "media/sub/file.mp4",
+        "media\\..\\x.mp4",
+        "project.json",
+        "media/.hidden",
+        "media/",
+        "C:/Windows/win.ini",
+    ],
+)
+def test_asset_filename_must_stay_inside_media(filename: str) -> None:
+    data = {
+        "id": "p",
+        "name": "p",
+        "assets": [
+            {
+                "id": "ast_00000001", "kind": "image", "filename": filename,
+                "original_name": "x.png", "width": 1, "height": 1,
+                "duration_ms": None, "fps": None,
+            }
+        ],
+    }  # fmt: skip
+    with pytest.raises(FkError) as exc:
+        parse_project(data)
+    assert exc.value.code == "INVALID_PROJECT"
+    assert "assets.0.filename" in exc.value.message
+    data["assets"][0]["filename"] = "media/ast_00000001.png"  # type: ignore[index]
+    assert parse_project(data).assets[0].filename == "media/ast_00000001.png"
+
+
+@pytest.mark.parametrize("cid", ["../../x", "cal_1", "cal_0000000g", "", "cal_00000001/.."])
+def test_calibration_id_shape(cid: str) -> None:
+    with pytest.raises(FkError) as exc:
+        parse_project({"id": "p", "name": "p", "calibration_id": cid})
+    assert exc.value.code == "INVALID_PROJECT"
+    assert parse_project({"id": "p", "name": "p", "calibration_id": "cal_0000000a"})

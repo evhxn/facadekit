@@ -276,3 +276,24 @@ def test_scan_pi_learns_from_the_previous_scan(
     assert run()["state"] == "failed"
     assert used == [2, 3, 2, 2, 2]
     assert sim_client.get(f"{API}/learning/scans").json()["scans"] == 2
+
+
+def test_request_settings_reject_unknown_keys(sim_client: TestClient) -> None:
+    project = _project(sim_client)
+    url = f"{API}/projects/{project['id']}/calibrations"
+    for settings in (
+        {"bogus": 1},
+        {
+            "roi": {
+                "x": 0,
+                "y": 0,
+                "w": 64,
+                "h": 64,
+                "frame_width": 64,
+                "frame_height": 64,
+                "bogus": 1,
+            }
+        },
+    ):
+        body = {"mode": "scan", "camera_id": "sim", "settings": settings}
+        assert sim_client.post(url, json=body).status_code == 422, settings

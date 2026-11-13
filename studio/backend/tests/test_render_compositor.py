@@ -18,11 +18,12 @@ def _surface(quad: tuple = SQUARE, aspect: float = 1.0, sid: str = "s1") -> Surf
 
 
 def _png(tmp_path: Path, name: str, img: np.ndarray) -> Asset:
-    cv2.imwrite(str(tmp_path / f"{name}.png"), img)
+    (tmp_path / "media").mkdir(exist_ok=True)
+    cv2.imwrite(str(tmp_path / "media" / f"{name}.png"), img)
     return Asset(
         id=name,
         kind="image",
-        filename=f"{name}.png",
+        filename=f"media/{name}.png",
         original_name=f"{name}.png",
         width=img.shape[1],
         height=img.shape[0],
@@ -182,11 +183,12 @@ def test_scale(tmp_path: Path) -> None:
 
 
 def test_video_loop(tmp_path: Path, sample_video: Path) -> None:
-    (tmp_path / "v.mp4").write_bytes(sample_video.read_bytes())
+    (tmp_path / "media").mkdir(exist_ok=True)
+    (tmp_path / "media" / "v.mp4").write_bytes(sample_video.read_bytes())
     asset = Asset(
         id="v",
         kind="video",
-        filename="v.mp4",
+        filename="media/v.mp4",
         original_name="v.mp4",
         width=320,
         height=180,
@@ -218,7 +220,7 @@ def test_source_alpha(tmp_path: Path) -> None:
 
 def test_missing_media(tmp_path: Path) -> None:
     red = _solid(tmp_path, "red", (0, 0, 255))
-    (tmp_path / "red.png").unlink()
+    (tmp_path / "media" / "red.png").unlink()
     p = _project([red], [[_clip("c", "red")]])
     with Compositor(p, tmp_path) as comp, pytest.raises(FkError) as exc:
         comp.frame(0)

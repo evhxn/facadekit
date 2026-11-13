@@ -50,6 +50,46 @@ def _intersect(l1: np.ndarray, l2: np.ndarray) -> np.ndarray:
     return np.array([l1[2] + s[0] * l1[0], l1[3] + s[0] * l1[1]], dtype=np.float64)
 
 
+_PROFILE_STEP = 0.25
+_PROFILE_HALF_WIDTH = 4.0
+
+
+def _edge_offset(
+    gray: np.ndarray, a: np.ndarray, b: np.ndarray, line: np.ndarray, normal: np.ndarray
+) -> float:
+    """Signed distance along `normal` (outward) from `line` to the bright-to-dark edge.
+
+    Samples the brightness across the edge over the middle 15-85 % of the side a-b, averages
+    the profiles, and returns the subpixel position of the steepest descent (three-point
+    Gaussian peak fit, which is exact for a Gaussian-blurred step). Pixel-corner coordinates.
+    """
+    direction = line[0:2]
+    origin = line[2:4]
+    length = float(np.linalg.norm(b - a))
+    s0 = float((a - origin) @ direction)
+    s1 = float((b - origin) @ direction)
+    lo, hi = min(s0, s1), max(s0, s1)
+    along = np.linspace(lo + 0.15 * (hi - lo), hi - 0.15 * (hi - lo), max(int(0.7 * length), 2))
+    offsets = np.arange(-_PROFILE_HALF_WIDTH, _PROFILE_HALF_WIDTH + 1e-9, _PROFILE_STEP)
+    p = origin + along[None, :, None] * direction + offsets[:, None, None] * normal
+    # cv2.remap indexes pixels by centre (integer = centre), hence the -0.5
+    samples = cv2.remap(
+        gray,
+        np.ascontiguousarray(p[..., 0] - 0.5, dtype=np.float32),
+        np.ascontiguousarray(p[..., 1] - 0.5, dtype=np.float32),
+        cv2.INTER_LINEAR,
+        borderMode=cv2.BORDER_REPLICATE,
+    )
+    descent = -np.gradient(samples.mean(axis=1).astype(np.float64), _PROFILE_STEP)
+    k = int(np.argmax(descent))
+    if k == 0 or k == len(descent) - 1 or np.min(descent[k - 1 : k + 2]) <= 0:
+        return 0.0
+    lm, l0, lp = np.log(descent[k - 1 : k + 2])
+    denom = lm - 2 * l0 + lp
+    frac = 0.5 * (lm - lp) / denom if denom < 0 else 0.0
+    return float(offsets[k] + frac * _PROFILE_STEP)
+
+
 def detect_door_quad(proj_view: np.ndarray) -> list[Point]:
     """Find the light-gray door in the projector view; returns TL, TR, BR, BL corners."""
     img = proj_view.astype(np.int16)
@@ -78,6 +118,7 @@ def detect_door_quad(proj_view: np.ndarray) -> list[Point]:
     # +0.5 in pixel-corner coordinates, and the true edge lies half a pixel further out.
     pts = contour.reshape(-1, 2).astype(np.float64) + 0.5
     centroid = pts.mean(axis=0)
+    gray = cv2.cvtColor(proj_view, cv2.COLOR_BGR2GRAY).astype(np.float32)
     lines: list[np.ndarray] = []
     for i in range(4):
         a, b = corners[i], corners[(i + 1) % 4]
@@ -94,6 +135,12 @@ def detect_door_quad(proj_view: np.ndarray) -> list[Point]:
         if float(normal @ (line[2:4] - centroid)) < 0:
             normal = -normal
         line[2:4] = line[2:4] + 0.5 * normal
+        # The mask edge sits where the blurred step crosses the fixed brightness threshold,
+        # which is not the step's midpoint (and opening only ever erodes noisy edges), so it
+        # lands a few tenths of a pixel inside the door. Move the line to the subpixel
+        # gradient maximum of the mean brightness profile across the edge, where a
+        # symmetrically blurred step's true edge lies whatever the levels on either side.
+        line[2:4] = line[2:4] + _edge_offset(gray, a, b, line, normal) * normal
         lines.append(line)
     # Side i joins corner i and i+1; corner i is the intersection of sides i-1 and i.
     refined = [_intersect(lines[(i - 1) % 4], lines[i]) for i in range(4)]

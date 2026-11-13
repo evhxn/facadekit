@@ -60,7 +60,13 @@ from facadekit.fpp.publish import publish_render
 from facadekit.geom.homography import apply_h
 from facadekit.ids import new_id
 from facadekit.jobs.runner import JobRunner
-from facadekit.models.calibration import Calibration, CalibSettings, CameraRoi
+from facadekit.models.calibration import (
+    Calibration,
+    CalibSettings,
+    CameraRoi,
+    StrictCalibSettings,
+    StrictCameraRoi,
+)
 from facadekit.models.camera_check import CameraCheck
 from facadekit.models.project import Project
 
@@ -79,7 +85,7 @@ class CalibrationRequest(BaseModel):
     mode: Literal["scan", "manual", "scan_pi"]
     camera_id: str | None = None
     host: str | None = None
-    settings: CalibSettings | None = None
+    settings: StrictCalibSettings | None = None
     learn: bool = True  # let scan memory pick the strategy (modes "scan" and "scan_pi")
 
 
@@ -366,7 +372,7 @@ class CameraCheckRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     camera_id: str
-    roi: CameraRoi | None = None
+    roi: StrictCameraRoi | None = None
 
 
 def _full_box(box: tuple[int, int, int, int], roi: CameraRoi | None) -> tuple[int, int, int, int]:

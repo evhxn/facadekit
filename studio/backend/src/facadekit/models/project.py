@@ -1,13 +1,27 @@
 from __future__ import annotations
 
+import re
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 
 from facadekit.errors import INVALID_PROJECT, FkError
 
 Point = tuple[float, float]  # (x, y) projector pixels
 CANVAS = "canvas"
+
+# Both values end up in file paths below the project folder and arrive from outside (PUT
+# /projects/{pid}, also from a paired phone; a project.json someone else made). They must not
+# be able to name anything outside `media/` or `calibration/<id>/`.
+_ASSET_FILE = re.compile(r"^media/[A-Za-z0-9_][A-Za-z0-9._ -]{0,199}$")
+_CALIBRATION_ID = re.compile(r"^cal_[0-9a-f]{8}$")
 
 
 class ProjectorSpec(BaseModel):
@@ -58,6 +72,14 @@ class Asset(BaseModel):
     fps: float | None
     has_audio: bool = False
     has_alpha: bool = False
+
+    @field_validator("filename")
+    @classmethod
+    def _filename_inside_media(cls, value: str) -> str:
+        # "" is what media.probe returns before the upload route fills the name in.
+        if value and not _ASSET_FILE.fullmatch(value):
+            raise ValueError("must be a file directly inside media/, like media/ast_1a2b3c4d.mp4")
+        return value
 
 
 class Generator(BaseModel):
@@ -137,6 +159,13 @@ class Project(BaseModel):
     timeline: Timeline = Field(default_factory=Timeline)
     markers: list[Marker] = Field(default_factory=list)
     fpp: FppTarget = Field(default_factory=FppTarget)
+
+    @field_validator("calibration_id")
+    @classmethod
+    def _calibration_id_shape(cls, value: str | None) -> str | None:
+        if value is not None and not _CALIBRATION_ID.fullmatch(value):
+            raise ValueError("must look like cal_1a2b3c4d")
+        return value
 
     @model_validator(mode="after")
     def _check_cross_fields(self) -> Project:
