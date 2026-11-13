@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import mimetypes
 import re
+import shutil
 from pathlib import Path, PurePosixPath
 from typing import Annotated
 
@@ -11,7 +12,13 @@ from starlette.concurrency import run_in_threadpool
 from starlette.responses import FileResponse
 
 from facadekit.api.deps import AppState, get_state
-from facadekit.errors import ASSET_IN_USE, NOT_FOUND, REVISION_CONFLICT, FkError
+from facadekit.errors import (
+    ASSET_IN_USE,
+    BAD_REQUEST,
+    NOT_FOUND,
+    REVISION_CONFLICT,
+    FkError,
+)
 from facadekit.ids import new_id
 from facadekit.media.probe import make_thumbnail, probe
 from facadekit.models.project import Asset, Project
@@ -23,6 +30,11 @@ router = APIRouter()
 State = Annotated[AppState, Depends(get_state)]
 
 CHUNK = 1024 * 1024
+MAX_ASSET_BYTES = 8 * 1024**3  # one imported file
+FREE_DISK_MARGIN_BYTES = 1024**3  # never fill the disk below this
+DISK_CHECK_EVERY_BYTES = 64 * 1024 * 1024
+MSG_TOO_LARGE = "This file is larger than 8 GB."
+MSG_NO_SPACE = "There is not enough free disk space for this file. Free some space and retry."
 _AID = re.compile(r"^ast_[0-9a-f]{8}$")
 _EXT = re.compile(r"^[a-z0-9]{1,5}$")
 
@@ -66,8 +78,17 @@ async def upload_asset(
     part = media_dir / f"{aid}.{ext}.part"
     thumb = _thumb_path(project_dir, aid)
     try:
+        written = 0
+        next_check = 0
         with part.open("wb") as handle:
             while chunk := await file.read(CHUNK):
+                written += len(chunk)
+                if written > MAX_ASSET_BYTES:
+                    raise FkError(BAD_REQUEST, MSG_TOO_LARGE)
+                if written >= next_check:  # first chunk, then every DISK_CHECK_EVERY_BYTES
+                    next_check = written + DISK_CHECK_EVERY_BYTES
+                    if shutil.disk_usage(media_dir).free < FREE_DISK_MARGIN_BYTES:
+                        raise FkError(BAD_REQUEST, MSG_NO_SPACE)
                 await run_in_threadpool(_write_chunk, handle, chunk)
         part.replace(final)
         asset = await run_in_threadpool(probe, final)
