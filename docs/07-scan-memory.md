@@ -103,7 +103,9 @@ Kept: (1) failure sharing to same-or-finer strategies, which removes the wasted 
 
 Tried and rejected: `min_conf` 0.3 or 0.5 (every scan fails: confidence of blurred stripes is low); `skip_lsb=2, min_conf=0.3` (same); sharing failures without the same-or-finer rule (standard got retried a third time); very_soft prior 1.2 (standard was retried before it).
 
-Not solved: coverage is 100 % even when the corner error is 9-18 px (scenes 1005, 1007, 1008 with `soft_focus`), so the reward cannot see that kind of inaccuracy; only the user's "looks wrong" does. Dim scenes where only more averaging helps did not occur in the synthetic set, so the `low` bucket exemption is untested against real data.
+Not solved: coverage is 100 % even when the corner error is 9-18 px (scenes 1005, 1007, 1008 with `soft_focus`), so the reward cannot see that kind of inaccuracy; only the user's "looks wrong" does.
+
+**Correction (2026-11-13, AUDIT-02 follow-up).** That inaccuracy was a fault of the harness, not of the scans. In scenes 1005, 1007 and 1008 the randomly shifted door reaches below the projector frame (lower corners at y = 1087-1110 on a 1080-line projector), and the harness compared the map with the truth at those corners, where no map exists and the value is an extrapolation. Inside the frame the `soft_focus` and `very_soft` maps of these scenes are accurate to a fraction of a pixel. `learn_eval` now scores only door corners inside the projector frame (`door_corners_in_frame`; a scene with none shows `-`). Regret, first-scan and gap numbers are unaffected: they use the reward, which never used the corner error. The sentence above about the reward being blind to inaccuracy remains true in principle, but these three scenes are not evidence for it. Dim scenes where only more averaging helps did not occur in the synthetic set, so the `low` bucket exemption is untested against real data.
 
 ## Albedo-edge bias in the projector map (2026-11-11)
 
