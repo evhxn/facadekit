@@ -13,8 +13,7 @@ Last updated: 2026-11-10.
 | 2 Architecture | `docs/02-architecture.md` (ADR-001 to ADR-023 in §9) | done |
 | 3 Roadmap | `docs/03-roadmap.md` | done |
 | 4 Build plan | `docs/04-repo-structure.md`, `docs/05-interfaces.md`, `tasks/T-001…T-038` (MVP), `tasks/T-101…T-117` (v1), `tasks/INDEX.md` | done |
-| 5 Project plan | `docs/07-scan-memory.md` | Scan memory: how the wizard learns a scan strategy from failed and rejected scans (bandit, routes, limits) |
-| `docs/06-project.md` | done |
+| 5 Project plan | `docs/06-project.md` | done |
 
 All phases are complete. All MVP tickets (T-001 to T-038) and v1 tickets (T-101 to T-117) are implemented; the code lives in `studio/backend` (Python) and `studio/web` (React/TypeScript), and the build history is in git. The first review of the built MVP + v1 is `tasks/REVIEW-01.md`, which lists fix tickets R-001 to R-009. The release workflow (`.github/workflows/release.yml`) has not been run yet; see `packaging/README.md`.
 
@@ -66,6 +65,7 @@ Owner answered Q1–Q4 (`docs/01-landscape.md` §0). Unasked assumptions A-1 to 
 | `docs/04-repo-structure.md` | Directory tree, tooling, coding conventions, numeric defaults |
 | `docs/05-interfaces.md` | All contracts: JSON schemas, Python signatures, REST + WebSocket API, FPP contract, CLI, error codes (§13 lists late additions) |
 | `docs/06-project.md` | Name, licence, contribution model, onboarding docs, hardware testing, sustainability |
+| `docs/07-scan-memory.md` | Scan memory: how the wizard learns a scan strategy from failed and rejected scans (bandit, routes, limits) |
 | `tasks/INDEX.md` | All tickets in dependency order with models, waves and parallel tracks |
 | `tasks/T-001.md` … `T-038.md` | MVP tickets, one per file, self-contained |
 | `tasks/T-101.md` … `T-117.md` | v1 tickets |
