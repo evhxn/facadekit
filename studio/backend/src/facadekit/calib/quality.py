@@ -121,27 +121,25 @@ def noise_sigma(frame_a: np.ndarray, frame_b: np.ndarray, lit: np.ndarray) -> fl
     return float(np.std((frame_a - frame_b)[lit]) / math.sqrt(2.0))
 
 
-def probe_stripes(
+PROBE_BITS: tuple[int, ...] = (2, 3, 4)  # the skip_lsb values the scan strategies use
+
+
+def probe_modulation(
     display: ProjectorDisplay,
     camera: Camera,
     spec: PatternSpec,
     settings: CalibSettings,
+    contrast: np.ndarray,
+    lit: np.ndarray,
     *,
-    bits: tuple[int, ...] = (2, 3, 4),
+    bits: tuple[int, ...] = PROBE_BITS,
     sleep: Callable[[float], None] = time.sleep,
 ) -> dict[int, float]:
-    """Project the finest x-axis stripes and measure how much of them survives."""
+    """Project the finest x-axis stripes of each `bits` entry (pattern and inverse, two shots
+    per bit) and measure how much of them survives. `contrast` and `lit` come from a black and
+    a white shot the caller already has."""
     from facadekit.calib.capture import _shoot  # capture imports this module
 
-    black, _ = _shoot(
-        display, camera, np.zeros((spec.height, spec.width), np.uint8), settings, sleep
-    )
-    white, _ = _shoot(
-        display, camera, np.full((spec.height, spec.width), 255, np.uint8), settings, sleep
-    )
-    contrast = white - black
-    blob = lit_blob(contrast)
-    lit = blob.mask if blob is not None else contrast > lit_threshold(contrast)
     out: dict[int, float] = {}
     for bit in bits:
         pos, _ = _shoot(
@@ -162,6 +160,36 @@ def probe_stripes(
     return out
 
 
+def blur_floor(modulation: dict[int, float]) -> int:
+    """Finest probed skip_lsb whose stripes keep MOD_OK of their contrast; one more than the
+    coarsest probed bit when none does."""
+    return min((b for b in sorted(modulation) if modulation[b] >= MOD_OK), default=5)
+
+
+def probe_stripes(
+    display: ProjectorDisplay,
+    camera: Camera,
+    spec: PatternSpec,
+    settings: CalibSettings,
+    *,
+    bits: tuple[int, ...] = PROBE_BITS,
+    sleep: Callable[[float], None] = time.sleep,
+) -> dict[int, float]:
+    """Project the finest x-axis stripes and measure how much of them survives."""
+    from facadekit.calib.capture import _shoot  # capture imports this module
+
+    black, _ = _shoot(
+        display, camera, np.zeros((spec.height, spec.width), np.uint8), settings, sleep
+    )
+    white, _ = _shoot(
+        display, camera, np.full((spec.height, spec.width), 255, np.uint8), settings, sleep
+    )
+    contrast = white - black
+    blob = lit_blob(contrast)
+    lit = blob.mask if blob is not None else contrast > lit_threshold(contrast)
+    return probe_modulation(display, camera, spec, settings, contrast, lit, bits=bits, sleep=sleep)
+
+
 def verdict(
     s: float,
     snr: float,
@@ -173,7 +201,7 @@ def verdict(
     skip_scale = finest_readable_skip(s)
     skip_blur: int | None = None
     if modulation is not None:
-        skip_blur = min((b for b in sorted(modulation) if modulation[b] >= MOD_OK), default=5)
+        skip_blur = blur_floor(modulation)
     need = max(skip_scale, skip_blur or 0)
     result: Verdict = "good" if need <= 2 else "marginal" if need == 3 else "too_coarse"
     reasons: list[Reason] = []

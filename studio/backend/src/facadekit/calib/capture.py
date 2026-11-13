@@ -10,9 +10,11 @@ import numpy as np
 from facadekit.calib.patterns import PatternFrame, PatternSpec, pattern_sequence, render_pattern
 from facadekit.calib.quality import (
     LitBlob,
+    blur_floor,
     lit_blob,
     lit_threshold,
     noise_sigma,
+    probe_modulation,
     projection_found,
     px_per_proj_px,
 )
@@ -89,7 +91,13 @@ def precheck(
     settings: CalibSettings | None = None,
     sleep: Callable[[float], None] = time.sleep,
     crop_check: bool = False,
+    probe: bool = False,
 ) -> dict[str, float]:
+    """Black and white shots: is there a projection, how bright, how large, how noisy.
+
+    With `probe`, six more shots measure which stripe widths survive the camera's blur and the
+    result is returned as `blur_floor` (docs/09): the finest skip_lsb worth scanning with.
+    """
     w, h = display.size
     if (w, h) != (spec.width, spec.height):
         raise FkError(
@@ -122,6 +130,13 @@ def precheck(
     frame_b = cv2.cvtColor(camera.read(), cv2.COLOR_BGR2GRAY).astype(np.float32)
     snr = median_contrast / max(noise_sigma(frame_a, frame_b, blob.mask), 0.1)
     stats["snr"] = snr
+    if probe:
+        modulation = probe_modulation(
+            display, camera, spec, settings, contrast, blob.mask, sleep=sleep
+        )
+        stats["blur_floor"] = float(blur_floor(modulation))
+        for bit, value in modulation.items():
+            stats[f"modulation_{bit}"] = value
     return stats
 
 

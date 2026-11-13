@@ -15,19 +15,13 @@ from pathlib import Path
 import cv2
 
 from facadekit.calib.patterns import PatternSpec
-from facadekit.calib.quality import MOD_OK, probe_stripes
+from facadekit.calib.quality import PROBE_BITS, blur_floor, probe_stripes
 from facadekit.models.calibration import CalibSettings
 from facadekit.sim.devices import SimCamera, SimDisplay
 from facadekit.sim.rl.outcomes import default_workers
 from facadekit.sim.rl.scenes import SceneSpec, build_scene
 
-PROBE_BITS = (2, 3, 4)
-
-
-def blur_floor(modulation: dict[int, float]) -> int:
-    """Smallest probed skip_lsb whose stripes keep MOD_OK of their contrast (5 if none),
-    as calib.quality.verdict computes it."""
-    return min((b for b in sorted(modulation) if modulation[b] >= MOD_OK), default=5)
+__all__ = ["blur_floor", "build_probes", "probe"]
 
 
 def probe(spec: SceneSpec) -> dict[int, float]:

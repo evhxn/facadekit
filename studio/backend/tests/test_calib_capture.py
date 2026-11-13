@@ -75,3 +75,35 @@ def test_cancel() -> None:
     with pytest.raises(FkError) as ei:
         run_capture(display, cam, spec, FAST, cancel=lambda: True, sleep=_noop)
     assert ei.value.code == "CANCELLED"
+
+
+def test_precheck_probe_measures_blur() -> None:
+    """Six extra shots: the finest skip_lsb whose stripes survive the camera's blur."""
+    from facadekit.calib.capture import precheck
+    from facadekit.calib.patterns import PatternSpec
+    from facadekit.sim.devices import SimCamera, SimDisplay
+    from facadekit.sim.scene import SimScene, default_scene
+
+    def run(scene: SimScene, probe: bool) -> tuple[dict[str, float], int]:
+        display = SimDisplay(scene)
+        shows = [0]
+        real_show = display.show
+
+        def counting(image):  # type: ignore[no-untyped-def]
+            shows[0] += 1
+            real_show(image)
+
+        display.show = counting  # type: ignore[method-assign]
+        camera = SimCamera(scene, display)
+        camera.open()
+        spec = PatternSpec(*scene.proj_size)
+        return precheck(display, camera, spec, sleep=lambda _s: None, probe=probe), shows[0]
+
+    plain, n_plain = run(default_scene(), False)
+    assert "blur_floor" not in plain and n_plain == 2
+    sharp, n_probe = run(default_scene(), True)
+    assert n_probe == 8 and sharp["blur_floor"] == 2.0
+    assert sharp["modulation_2"] < sharp["modulation_3"] < sharp["modulation_4"] <= 1.0
+    assert {k: v for k, v in sharp.items() if k in plain}.keys() == plain.keys()
+    blurred, _ = run(SimScene(blur_sigma=4.0), True)
+    assert blurred["blur_floor"] >= 3.0
