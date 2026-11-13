@@ -1,0 +1,5158 @@
+{
+ "tuned": {
+  "beta": {
+   "prior_mult": 0.5,
+   "mistake_weight": 2.0,
+   "other_bucket": 0.0,
+   "different_scale": 1.0,
+   "scale_sigma": 0.0,
+   "sibling_share": 1.0,
+   "discount": 0.7,
+   "select": "ucb",
+   "ucb_c": 0.5,
+   "floor": true,
+   "floor_slack": 0,
+   "skip_cost": 0.0
+  },
+  "beta_train_score": [
+   0.03220634791598649,
+   0.03706156396133618
+  ],
+  "beta_top5": [
+   [
+    [
+     0.03220634791598649,
+     0.03706156396133618
+    ],
+    {
+     "prior_mult": 0.5,
+     "mistake_weight": 2.0,
+     "other_bucket": 0.0,
+     "different_scale": 1.0,
+     "scale_sigma": 0.0,
+     "sibling_share": 1.0,
+     "discount": 0.7,
+     "select": "ucb",
+     "ucb_c": 0.5,
+     "floor": true,
+     "floor_slack": 0,
+     "skip_cost": 0.0
+    }
+   ],
+   [
+    [
+     0.03364225437886757,
+     0.03874461374320324
+    ],
+    {
+     "prior_mult": 0.5,
+     "mistake_weight": 3.0,
+     "other_bucket": 0.5,
+     "different_scale": 0.5,
+     "scale_sigma": 0.6,
+     "sibling_share": 0.5,
+     "discount": 1.0,
+     "select": "ucb",
+     "ucb_c": 1.0,
+     "floor": true,
+     "floor_slack": 0,
+     "skip_cost": 0.0
+    }
+   ],
+   [
+    [
+     0.03556887166310372,
+     0.0399331659376791
+    ],
+    {
+     "prior_mult": 0.5,
+     "mistake_weight": 4.0,
+     "other_bucket": 0.0,
+     "different_scale": 1.0,
+     "scale_sigma": 0.6,
+     "sibling_share": 0.25,
+     "discount": 1.0,
+     "select": "greedy",
+     "ucb_c": 0.0,
+     "floor": true,
+     "floor_slack": 0,
+     "skip_cost": 0.0
+    }
+   ],
+   [
+    [
+     0.036012296496648,
+     0.039551243743465955
+    ],
+    {
+     "prior_mult": 0.5,
+     "mistake_weight": 4.0,
+     "other_bucket": 0.25,
+     "different_scale": 1.0,
+     "scale_sigma": 0.15,
+     "sibling_share": 0.5,
+     "discount": 0.95,
+     "select": "greedy",
+     "ucb_c": 0.0,
+     "floor": true,
+     "floor_slack": 0,
+     "skip_cost": 0.0
+    }
+   ],
+   [
+    [
+     0.036401960555895944,
+     0.040862234320086295
+    ],
+    {
+     "prior_mult": 1.0,
+     "mistake_weight": 4.0,
+     "other_bucket": 0.5,
+     "different_scale": 1.0,
+     "scale_sigma": 0.6,
+     "sibling_share": 0.25,
+     "discount": 0.85,
+     "select": "greedy",
+     "ucb_c": 0.0,
+     "floor": true,
+     "floor_slack": 0,
+     "skip_cost": 0.0
+    }
+   ]
+  ],
+  "beta_utility": {
+   "prior_mult": 0.5,
+   "mistake_weight": 2.0,
+   "other_bucket": 0.0,
+   "different_scale": 1.0,
+   "scale_sigma": 0.0,
+   "sibling_share": 1.0,
+   "discount": 0.7,
+   "select": "ucb",
+   "ucb_c": 0.5,
+   "floor": true,
+   "floor_slack": 0,
+   "skip_cost": 0.0
+  },
+  "beta_utility_train_score": [
+   0.03220634791598649,
+   0.03706156396133618
+  ],
+  "beta_utility_top5": [
+   [
+    [
+     0.03220634791598649,
+     0.03706156396133618
+    ],
+    {
+     "prior_mult": 0.5,
+     "mistake_weight": 2.0,
+     "other_bucket": 0.0,
+     "different_scale": 1.0,
+     "scale_sigma": 0.0,
+     "sibling_share": 1.0,
+     "discount": 0.7,
+     "select": "ucb",
+     "ucb_c": 0.5,
+     "floor": true,
+     "floor_slack": 0,
+     "skip_cost": 0.0
+    }
+   ],
+   [
+    [
+     0.03364225437886757,
+     0.03874461374320324
+    ],
+    {
+     "prior_mult": 0.5,
+     "mistake_weight": 3.0,
+     "other_bucket": 0.5,
+     "different_scale": 0.5,
+     "scale_sigma": 0.6,
+     "sibling_share": 0.5,
+     "discount": 1.0,
+     "select": "ucb",
+     "ucb_c": 1.0,
+     "floor": true,
+     "floor_slack": 0,
+     "skip_cost": 0.0
+    }
+   ],
+   [
+    [
+     0.036012296496648,
+     0.039551243743465955
+    ],
+    {
+     "prior_mult": 0.5,
+     "mistake_weight": 4.0,
+     "other_bucket": 0.25,
+     "different_scale": 1.0,
+     "scale_sigma": 0.15,
+     "sibling_share": 0.5,
+     "discount": 0.95,
+     "select": "greedy",
+     "ucb_c": 0.0,
+     "floor": true,
+     "floor_slack": 0,
+     "skip_cost": 0.0
+    }
+   ],
+   [
+    [
+     0.03556887166310372,
+     0.0399331659376791
+    ],
+    {
+     "prior_mult": 0.5,
+     "mistake_weight": 4.0,
+     "other_bucket": 0.0,
+     "different_scale": 1.0,
+     "scale_sigma": 0.6,
+     "sibling_share": 0.25,
+     "discount": 1.0,
+     "select": "greedy",
+     "ucb_c": 0.0,
+     "floor": true,
+     "floor_slack": 0,
+     "skip_cost": 0.0
+    }
+   ],
+   [
+    [
+     0.0368827351320053,
+     0.040122654331167754
+    ],
+    {
+     "prior_mult": 0.5,
+     "mistake_weight": 2.0,
+     "other_bucket": 0.0,
+     "different_scale": 0.25,
+     "scale_sigma": 0.0,
+     "sibling_share": 0.5,
+     "discount": 0.95,
+     "select": "ucb",
+     "ucb_c": 1.0,
+     "floor": true,
+     "floor_slack": 0,
+     "skip_cost": 0.1
+    }
+   ]
+  ],
+  "posterior": {
+   "sigma_s": 0.12,
+   "sigma_c": 0.4,
+   "sigma_snr": 0.4,
+   "sigma_r": 0.4
+  },
+  "posterior_train_score": [
+   0.0,
+   0.024783040500309328
+  ]
+ },
+ "results": {
+  "train": {
+   "scenes": 148,
+   "skipped": 0,
+   "policies": {
+    "shipped": {
+     "single_u_regret": 0.8076141141141141,
+     "single_u_diff": 0.0,
+     "single_u_diff_ci": [
+      0.0,
+      0.0
+     ],
+     "season_u_regret": 1.8964168888888886,
+     "season_u_diff": 0.0,
+     "season_u_diff_ci": [
+      0.0,
+      0.0
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 320,
+       "regret": 0.4912361111111112,
+       "first_fail": 0.3125,
+       "diff": 0.0,
+       "diff_ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 690,
+       "regret": 0.9612850241545895,
+       "first_fail": 0.5797101449275363,
+       "diff": 0.0,
+       "diff_ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 470,
+       "regret": 1.0248865248226948,
+       "first_fail": 0.9148936170212766,
+       "diff": 0.0,
+       "diff_ci": [
+        0.0,
+        0.0
+       ]
+      }
+     },
+     "single_regret": 0.8798506006006007,
+     "single_regret_ci": [
+      0.7332691066066068,
+      1.0314858108108105
+     ],
+     "single_diff": 0.0,
+     "single_diff_ci": [
+      0.0,
+      0.0
+     ],
+     "single_first_fail": 0.6283783783783784,
+     "single_usable": 0.6229729729729729,
+     "single_last_ok": 0.8277027027027027,
+     "single_last_err": 0.719,
+     "single_last_err_mean": 1.218838693877551,
+     "single_last_gap": 0.024822822822822825,
+     "season_regret": 1.9691399259259261,
+     "season_regret_ci": [
+      1.928335190740741,
+      2.005625015740741
+     ],
+     "season_diff": 0.0,
+     "season_diff_ci": [
+      0.0,
+      0.0
+     ],
+     "season_first_fail": 0.5264444444444444,
+     "season_usable": 0.5833055555555556
+    },
+    "always-standard": {
+     "single_u_regret": 3.551627627627628,
+     "single_u_diff": 2.7440135135135133,
+     "single_u_diff_ci": [
+      2.269562631381381,
+      3.2148388701201194
+     ],
+     "season_u_regret": 5.32060562962963,
+     "season_u_diff": 3.4241887407407408,
+     "season_u_diff_ci": [
+      3.33675353425926,
+      3.5151388185185177
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 320,
+       "regret": 2.601027777777778,
+       "first_fail": 0.3125,
+       "diff": 2.109791666666667,
+       "diff_ci": [
+        1.122526041666667,
+        3.2462500000000007
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 690,
+       "regret": 4.120991948470211,
+       "first_fail": 0.5797101449275363,
+       "diff": 3.159706924315621,
+       "diff_ci": [
+        2.419389895330113,
+        3.896383816425121
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 470,
+       "regret": 3.990884160756502,
+       "first_fail": 0.9148936170212766,
+       "diff": 2.9659976359338067,
+       "diff_ci": [
+        2.150386229314421,
+        3.835722163120568
+       ]
+      }
+     },
+     "single_regret": 3.7510330330330337,
+     "single_regret_ci": [
+      3.1603064564564574,
+      4.359252552552554
+     ],
+     "single_diff": 2.8711824324324327,
+     "single_diff_ci": [
+      2.3486939939939946,
+      3.349021340090091
+     ],
+     "single_first_fail": 0.6283783783783784,
+     "single_usable": 0.3716216216216216,
+     "single_last_ok": 0.3716216216216216,
+     "single_last_err": 0.4413,
+     "single_last_err_mean": 0.6814063636363636,
+     "single_last_gap": 0.46887912912912916,
+     "season_regret": 5.6195986666666675,
+     "season_regret_ci": [
+      5.506145596296298,
+      5.732276229629631
+     ],
+     "season_diff": 3.6504587407407416,
+     "season_diff_ci": [
+      3.551521403703704,
+      3.751908825000001
+     ],
+     "season_first_fail": 0.629,
+     "season_usable": 0.371
+    },
+    "best-fixed (very_soft)": {
+     "single_u_regret": 0.19978378378378397,
+     "single_u_diff": -0.6078303303303301,
+     "single_u_diff_ci": [
+      -0.7577118430930929,
+      -0.46371976351351346
+     ],
+     "season_u_regret": 0.2999936296296299,
+     "season_u_diff": -1.596423259259259,
+     "season_u_diff_ci": [
+      -1.6346692592592589,
+      -1.5585104481481478
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 320,
+       "regret": 0.0,
+       "first_fail": 0.0,
+       "diff": -0.4912361111111112,
+       "diff_ci": [
+        -0.7387375,
+        -0.24686111111111114
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 690,
+       "regret": 0.0,
+       "first_fail": 0.06231884057971015,
+       "diff": -0.9612850241545895,
+       "diff_ci": [
+        -1.150901046698873,
+        -0.7698099838969404
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 470,
+       "regret": 0.0,
+       "first_fail": 0.425531914893617,
+       "diff": -1.0248865248226948,
+       "diff_ci": [
+        -1.3430832742316783,
+        -0.7485012411347518
+       ]
+      }
+     },
+     "single_regret": 0.0,
+     "single_regret_ci": [
+      0.0,
+      0.0
+     ],
+     "single_diff": -0.8798506006006007,
+     "single_diff_ci": [
+      -1.0216078641141142,
+      -0.744250075075075
+     ],
+     "single_first_fail": 0.16418918918918918,
+     "single_usable": 0.6516047297297297,
+     "single_last_ok": 0.8337837837837838,
+     "single_last_err": 1.4142,
+     "single_last_err_mean": 1.7235863857374392,
+     "single_last_gap": 0.0,
+     "season_regret": 0.0,
+     "season_regret_ci": [
+      0.0,
+      0.0
+     ],
+     "season_diff": -1.9691399259259261,
+     "season_diff_ci": [
+      -2.009622826851852,
+      -1.9313705212962962
+     ],
+     "season_first_fail": 0.16522222222222221,
+     "season_usable": 0.651
+    },
+    "shipped+thompson": {
+     "single_u_regret": 1.2066895645645646,
+     "single_u_diff": 0.3990754504504505,
+     "single_u_diff_ci": [
+      0.2852706737987988,
+      0.511272164039039
+     ],
+     "season_u_regret": 2.1642544814814815,
+     "season_u_diff": 0.2678375925925927,
+     "season_u_diff_ci": [
+      0.22661066018518528,
+      0.3074867111111112
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 320,
+       "regret": 0.8631968750000001,
+       "first_fail": 0.18125,
+       "diff": 0.37196076388888893,
+       "diff_ci": [
+        0.17468557291666675,
+        0.6021649826388888
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 690,
+       "regret": 1.2692674718196455,
+       "first_fail": 0.3681159420289855,
+       "diff": 0.3079824476650564,
+       "diff_ci": [
+        0.11763012479871182,
+        0.4993164371980675
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 470,
+       "regret": 1.4376127659574467,
+       "first_fail": 0.7659574468085106,
+       "diff": 0.41272624113475176,
+       "diff_ci": [
+        0.16314903073286055,
+        0.6630289893617021
+       ]
+      }
+     },
+     "single_regret": 1.2349294294294295,
+     "single_regret_ci": [
+      1.0315998254504506,
+      1.4427393055555555
+     ],
+     "single_diff": 0.3550788288288289,
+     "single_diff_ci": [
+      0.21721318130630635,
+      0.48753087274774765
+     ],
+     "single_first_fail": 0.4540540540540541,
+     "single_usable": 0.5900337837837838,
+     "single_last_ok": 0.7777027027027027,
+     "single_last_err": 0.9395,
+     "single_last_err_mean": 1.2325174630755864,
+     "single_last_gap": 0.06184887387387388,
+     "season_regret": 2.190894185185185,
+     "season_regret_ci": [
+      2.135839760185185,
+      2.2428921472222223
+     ],
+     "season_diff": 0.22175425925925932,
+     "season_diff_ci": [
+      0.17903444629629636,
+      0.2678349861111112
+     ],
+     "season_first_fail": 0.404,
+     "season_usable": 0.5685
+    },
+    "shipped+ucb(1)": {
+     "single_u_regret": 0.7313911411411411,
+     "single_u_diff": -0.07622297297297295,
+     "single_u_diff_ci": [
+      -0.12705859609609604,
+      -0.0321941253753754
+     ],
+     "season_u_regret": 1.488750851851852,
+     "season_u_diff": -0.407666037037037,
+     "season_u_diff_ci": [
+      -0.4301327898148148,
+      -0.3846424120370371
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 320,
+       "regret": 0.45581944444444444,
+       "first_fail": 0.3125,
+       "diff": -0.035416666666666666,
+       "diff_ci": [
+        -0.10625,
+        0.0
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 690,
+       "regret": 0.8891892109500805,
+       "first_fail": 0.5797101449275363,
+       "diff": -0.07209581320450889,
+       "diff_ci": [
+        -0.14371682769726257,
+        -0.01740330112721419
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 470,
+       "regret": 0.9083853427895981,
+       "first_fail": 0.9148936170212766,
+       "diff": -0.11650118203309691,
+       "diff_ci": [
+        -0.24804284869976348,
+        -0.017690307328605177
+       ]
+      }
+     },
+     "single_regret": 0.8015837087087087,
+     "single_regret_ci": [
+      0.6755862800300301,
+      0.9304315878378379
+     ],
+     "single_diff": -0.0782668918918919,
+     "single_diff_ci": [
+      -0.13365665352852857,
+      -0.032945589339339346
+     ],
+     "single_first_fail": 0.6283783783783784,
+     "single_usable": 0.6221283783783784,
+     "single_last_ok": 0.8331081081081081,
+     "single_last_err": 0.6987,
+     "single_last_err_mean": 1.2356041362530412,
+     "single_last_gap": 0.011367492492492496,
+     "season_regret": 1.5257922222222224,
+     "season_regret_ci": [
+      1.497366401851852,
+      1.555430365740741
+     ],
+     "season_diff": -0.4433477037037037,
+     "season_diff_ci": [
+      -0.4664210916666667,
+      -0.41953868703703706
+     ],
+     "season_first_fail": 0.49333333333333335,
+     "season_usable": 0.6009444444444445
+    },
+    "shipped+discount(0.85)": {
+     "single_u_regret": 0.8337042042042042,
+     "single_u_diff": 0.026090090090090085,
+     "single_u_diff_ci": [
+      0.007471471471471471,
+      0.04853132507507503
+     ],
+     "season_u_regret": 1.857051962962963,
+     "season_u_diff": -0.03936492592592594,
+     "season_u_diff_ci": [
+      -0.056250024074074104,
+      -0.022930350925925963
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 320,
+       "regret": 0.4912361111111112,
+       "first_fail": 0.3125,
+       "diff": 0.0,
+       "diff_ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 690,
+       "regret": 0.9906296296296297,
+       "first_fail": 0.5797101449275363,
+       "diff": 0.029344605475040246,
+       "diff_ci": [
+        1.4492753623188258e-05,
+        0.06888083735909821
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 470,
+       "regret": 1.070366430260047,
+       "first_fail": 0.9148936170212766,
+       "diff": 0.045479905437352246,
+       "diff_ci": [
+        0.005921985815602836,
+        0.09421985815602836
+       ]
+      }
+     },
+     "single_regret": 0.9079744744744745,
+     "single_regret_ci": [
+      0.7495318881381381,
+      1.0613112237237234
+     ],
+     "single_diff": 0.02812387387387387,
+     "single_diff_ci": [
+      0.009489545795795792,
+      0.05103299549549549
+     ],
+     "single_first_fail": 0.6283783783783784,
+     "single_usable": 0.6221283783783784,
+     "single_last_ok": 0.8108108108108109,
+     "single_last_err": 0.7003,
+     "single_last_err_mean": 1.1447826666666667,
+     "single_last_gap": 0.03347597597597598,
+     "season_regret": 1.940085,
+     "season_regret_ci": [
+      1.9028767185185185,
+      1.9768969129629632
+     ],
+     "season_diff": -0.029054925925925932,
+     "season_diff_ci": [
+      -0.04782740370370371,
+      -0.010444287037037042
+     ],
+     "season_first_fail": 0.5437777777777778,
+     "season_usable": 0.5845
+    },
+    "shipped+scale-kernel(0.3)": {
+     "single_u_regret": 0.8076141141141141,
+     "single_u_diff": 0.0,
+     "single_u_diff_ci": [
+      0.0,
+      0.0
+     ],
+     "season_u_regret": 1.9423547777777779,
+     "season_u_diff": 0.045937888888888834,
+     "season_u_diff_ci": [
+      0.021150811111111063,
+      0.06902268425925921
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 320,
+       "regret": 0.4912361111111112,
+       "first_fail": 0.3125,
+       "diff": 0.0,
+       "diff_ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 690,
+       "regret": 0.9612850241545895,
+       "first_fail": 0.5797101449275363,
+       "diff": 0.0,
+       "diff_ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 470,
+       "regret": 1.0248865248226948,
+       "first_fail": 0.9148936170212766,
+       "diff": 0.0,
+       "diff_ci": [
+        0.0,
+        0.0
+       ]
+      }
+     },
+     "single_regret": 0.8798506006006007,
+     "single_regret_ci": [
+      0.7272320007507507,
+      1.0232836336336335
+     ],
+     "single_diff": 0.0,
+     "single_diff_ci": [
+      0.0,
+      0.0
+     ],
+     "single_first_fail": 0.6283783783783784,
+     "single_usable": 0.6229729729729729,
+     "single_last_ok": 0.8277027027027027,
+     "single_last_err": 0.719,
+     "single_last_err_mean": 1.218838693877551,
+     "single_last_gap": 0.024822822822822825,
+     "season_regret": 2.052471148148148,
+     "season_regret_ci": [
+      2.012524284259259,
+      2.0924192944444444
+     ],
+     "season_diff": 0.08333122222222222,
+     "season_diff_ci": [
+      0.058382382407407396,
+      0.10842941574074064
+     ],
+     "season_first_fail": 0.574,
+     "season_usable": 0.5784444444444444
+    },
+    "shipped+floor": {
+     "single_u_regret": 0.23871321321321326,
+     "single_u_diff": -0.5689009009009008,
+     "single_u_diff_ci": [
+      -0.6950088776276275,
+      -0.45498875750750756
+     ],
+     "season_u_regret": 0.7279912962962962,
+     "season_u_diff": -1.1684255925925926,
+     "season_u_diff_ci": [
+      -1.2078966833333333,
+      -1.1294697777777778
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 320,
+       "regret": 0.4912361111111112,
+       "first_fail": 0.3125,
+       "diff": 0.0,
+       "diff_ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 690,
+       "regret": 0.22640579710144929,
+       "first_fail": 0.2753623188405797,
+       "diff": -0.7348792270531401,
+       "diff_ci": [
+        -0.8885684380032205,
+        -0.5861942834138487
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 470,
+       "regret": 0.0,
+       "first_fail": 0.425531914893617,
+       "diff": -1.0248865248226948,
+       "diff_ci": [
+        -1.3259675531914896,
+        -0.7294381796690309
+       ]
+      }
+     },
+     "single_regret": 0.21176726726726727,
+     "single_regret_ci": [
+      0.13775884009009007,
+      0.2892375563063062
+     ],
+     "single_diff": -0.6680833333333334,
+     "single_diff_ci": [
+      -0.8039019331831833,
+      -0.5379118993993994
+     ],
+     "single_first_fail": 0.3310810810810811,
+     "single_usable": 0.6321790540540541,
+     "single_last_ok": 0.831081081081081,
+     "single_last_err": 0.6987,
+     "single_last_err_mean": 1.222649430894309,
+     "single_last_gap": 0.0006888138138138142,
+     "season_regret": 0.6629160000000001,
+     "season_regret_ci": [
+      0.6288224722222223,
+      0.6974915296296297
+     ],
+     "season_diff": -1.306223925925926,
+     "season_diff_ci": [
+      -1.3478922592592593,
+      -1.2633005157407406
+     ],
+     "season_first_fail": 0.3025555555555556,
+     "season_usable": 0.6094722222222222
+    },
+    "shipped+floor(slack 1)": {
+     "single_u_regret": 0.6073948948948948,
+     "single_u_diff": -0.20021921921921923,
+     "single_u_diff_ci": [
+      -0.2891606418918919,
+      -0.1219591216216216
+     ],
+     "season_u_regret": 1.6518454074074076,
+     "season_u_diff": -0.24457148148148147,
+     "season_u_diff_ci": [
+      -0.2779271861111111,
+      -0.21057519351851856
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 320,
+       "regret": 0.4912361111111112,
+       "first_fail": 0.3125,
+       "diff": 0.0,
+       "diff_ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 690,
+       "regret": 0.9612850241545895,
+       "first_fail": 0.5797101449275363,
+       "diff": 0.0,
+       "diff_ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 470,
+       "regret": 0.35228132387706856,
+       "first_fail": 0.7021276595744681,
+       "diff": -0.6726052009456264,
+       "diff_ci": [
+        -0.9176060874704492,
+        -0.47403345153664306
+       ]
+      }
+     },
+     "single_regret": 0.666253003003003,
+     "single_regret_ci": [
+      0.5414343843843845,
+      0.799730424174174
+     ],
+     "single_diff": -0.21359759759759758,
+     "single_diff_ci": [
+      -0.30436936936936937,
+      -0.13189138513513513
+     ],
+     "single_first_fail": 0.5608108108108109,
+     "single_usable": 0.6258445945945946,
+     "single_last_ok": 0.8317567567567568,
+     "single_last_err": 0.739,
+     "single_last_err_mean": 1.234781722177092,
+     "single_last_gap": 0.01829804804804805,
+     "season_regret": 1.717296777777778,
+     "season_regret_ci": [
+      1.6723363425925928,
+      1.7622361907407407
+     ],
+     "season_diff": -0.2518431481481481,
+     "season_diff_ci": [
+      -0.2853195972222222,
+      -0.2151306981481482
+     ],
+     "season_first_fail": 0.4848888888888888,
+     "season_usable": 0.5737222222222222
+    },
+    "shipped+floor+probe": {
+     "single_u_regret": 0.04613213213213218,
+     "single_u_diff": -0.761481981981982,
+     "single_u_diff_ci": [
+      -0.9011316066066066,
+      -0.6266375187687687
+     ],
+     "season_u_regret": 0.10297925925925934,
+     "season_u_diff": -1.79343762962963,
+     "season_u_diff_ci": [
+      -1.8303175814814812,
+      -1.7572501259259259
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 320,
+       "regret": 0.001861111111111119,
+       "first_fail": 0.0,
+       "diff": -0.48937500000000006,
+       "diff_ci": [
+        -0.764375,
+        -0.24500000000000002
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 690,
+       "regret": 0.0,
+       "first_fail": 0.06231884057971015,
+       "diff": -0.9612850241545895,
+       "diff_ci": [
+        -1.1563159822866345,
+        -0.7717413848631242
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 470,
+       "regret": 0.0,
+       "first_fail": 0.425531914893617,
+       "diff": -1.0248865248226948,
+       "diff_ci": [
+        -1.3252658392434986,
+        -0.7211280732860522
+       ]
+      }
+     },
+     "single_regret": 0.0004024024024024041,
+     "single_regret_ci": [
+      0.0,
+      0.0012072072072072122
+     ],
+     "single_diff": -0.8794481981981983,
+     "single_diff_ci": [
+      -1.0304547297297297,
+      -0.7330140953453456
+     ],
+     "single_first_fail": 0.16418918918918918,
+     "single_usable": 0.6516047297297297,
+     "single_last_ok": 0.8337837837837838,
+     "single_last_err": 0.8168,
+     "single_last_err_mean": 1.2638809562398705,
+     "single_last_gap": 5.030030030030051e-05,
+     "season_regret": 0.0005856296296296321,
+     "season_regret_ci": [
+      0.0004367407407407426,
+      0.0007345185185185216
+     ],
+     "season_diff": -1.9685542962962963,
+     "season_diff_ci": [
+      -2.007343410185186,
+      -1.9291284314814818
+     ],
+     "season_first_fail": 0.16522222222222221,
+     "season_usable": 0.651
+    },
+    "shipped+floor+probe(slack 1)": {
+     "single_u_regret": 0.4652612612612612,
+     "single_u_diff": -0.34235285285285283,
+     "single_u_diff_ci": [
+      -0.43734536411411407,
+      -0.25450242117117117
+     ],
+     "season_u_regret": 1.3765489629629628,
+     "season_u_diff": -0.5198679259259259,
+     "season_u_diff_ci": [
+      -0.55847005,
+      -0.4824128814814814
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 320,
+       "regret": 0.36873611111111104,
+       "first_fail": 0.3125,
+       "diff": -0.12250000000000001,
+       "diff_ci": [
+        -0.24500000000000002,
+        -0.030625000000000003
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 690,
+       "regret": 0.6982689210950082,
+       "first_fail": 0.4826086956521739,
+       "diff": -0.26301610305958134,
+       "diff_ci": [
+        -0.3798472624798712,
+        -0.16539702093397754
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 470,
+       "regret": 0.34043735224586286,
+       "first_fail": 0.6808510638297872,
+       "diff": -0.6844491725768321,
+       "diff_ci": [
+        -0.9147103427895983,
+        -0.47043723404255344
+       ]
+      }
+     },
+     "single_regret": 0.5133828828828829,
+     "single_regret_ci": [
+      0.4141803678678678,
+      0.6192927364864864
+     ],
+     "single_diff": -0.36646771771771774,
+     "single_diff_ci": [
+      -0.4612057432432433,
+      -0.27126370120120125
+     ],
+     "single_first_fail": 0.5087837837837837,
+     "single_usable": 0.6402027027027027,
+     "single_last_ok": 0.8337837837837838,
+     "single_last_err": 0.739,
+     "single_last_err_mean": 1.2487492706645056,
+     "single_last_gap": 0.018271021021021024,
+     "season_regret": 1.4275953333333333,
+     "season_regret_ci": [
+      1.3848444611111113,
+      1.4701731675925929
+     ],
+     "season_diff": -0.5415445925925926,
+     "season_diff_ci": [
+      -0.5838367046296297,
+      -0.5007462416666666
+     ],
+     "season_first_fail": 0.44411111111111107,
+     "season_usable": 0.5988888888888888
+    },
+    "shipped+skip-cost(0.05)": {
+     "single_u_regret": 0.8059189189189188,
+     "single_u_diff": -0.001695195195195195,
+     "single_u_diff_ci": [
+      -0.00885135135135135,
+      0.003765765765765764
+     ],
+     "season_u_regret": 1.8898344074074072,
+     "season_u_diff": -0.006582481481481496,
+     "season_u_diff_ci": [
+      -0.016406999074074086,
+      0.0031079814814814638
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 320,
+       "regret": 0.4912361111111112,
+       "first_fail": 0.3125,
+       "diff": 0.0,
+       "diff_ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 690,
+       "regret": 0.9585330112721419,
+       "first_fail": 0.5797101449275363,
+       "diff": -0.002752012882447665,
+       "diff_ci": [
+        -0.018985507246376807,
+        0.010700483091787434
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 470,
+       "regret": 1.0248865248226948,
+       "first_fail": 0.9148936170212766,
+       "diff": 0.0,
+       "diff_ci": [
+        0.0,
+        0.0
+       ]
+      }
+     },
+     "single_regret": 0.8785675675675677,
+     "single_regret_ci": [
+      0.734244406906907,
+      1.022275487987988
+     ],
+     "single_diff": -0.0012830330330330332,
+     "single_diff_ci": [
+      -0.008844594594594591,
+      0.004981981981981979
+     ],
+     "single_first_fail": 0.6283783783783784,
+     "single_usable": 0.6229729729729729,
+     "single_last_ok": 0.8243243243243243,
+     "single_last_err": 0.719,
+     "single_last_err_mean": 1.1842985245901638,
+     "single_last_gap": 0.025361861861861866,
+     "season_regret": 1.9660574444444445,
+     "season_regret_ci": [
+      1.9284754592592595,
+      2.006120175925926
+     ],
+     "season_diff": -0.0030824814814814807,
+     "season_diff_ci": [
+      -0.012850662037037035,
+      0.0070299842592592525
+     ],
+     "season_first_fail": 0.5335555555555554,
+     "season_usable": 0.5832222222222222
+    },
+    "shipped+floor+skip-cost(0.05)": {
+     "single_u_regret": 0.23701801801801808,
+     "single_u_diff": -0.5705960960960961,
+     "single_u_diff_ci": [
+      -0.6973190127627626,
+      -0.4538521771771771
+     ],
+     "season_u_regret": 0.7309803333333336,
+     "season_u_diff": -1.1654365555555555,
+     "season_u_diff_ci": [
+      -1.2052016962962961,
+      -1.1271172268518521
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 320,
+       "regret": 0.4912361111111112,
+       "first_fail": 0.3125,
+       "diff": 0.0,
+       "diff_ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 690,
+       "regret": 0.22363929146537842,
+       "first_fail": 0.2753623188405797,
+       "diff": -0.7376457326892111,
+       "diff_ci": [
+        -0.8901159822866346,
+        -0.5908417874396136
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 470,
+       "regret": 0.0,
+       "first_fail": 0.425531914893617,
+       "diff": -1.0248865248226948,
+       "diff_ci": [
+        -1.33243280141844,
+        -0.7309144208037825
+       ]
+      }
+     },
+     "single_regret": 0.21047747747747747,
+     "single_regret_ci": [
+      0.1403501313813814,
+      0.287183596096096
+     ],
+     "single_diff": -0.6693731231231231,
+     "single_diff_ci": [
+      -0.8036039789789791,
+      -0.5418909346846847
+     ],
+     "single_first_fail": 0.3310810810810811,
+     "single_usable": 0.6321790540540541,
+     "single_last_ok": 0.8317567567567568,
+     "single_last_err": 0.6987,
+     "single_last_err_mean": 1.2273264825345247,
+     "single_last_gap": 0.0006820570570570576,
+     "season_regret": 0.6745583703703704,
+     "season_regret_ci": [
+      0.6391761074074075,
+      0.710374112037037
+     ],
+     "season_diff": -1.2945815555555555,
+     "season_diff_ci": [
+      -1.3350661916666666,
+      -1.2511446925925929
+     ],
+     "season_first_fail": 0.307,
+     "season_usable": 0.6083888888888889
+    },
+    "tuned-beta (for reward)": {
+     "single_u_regret": 0.22640990990990995,
+     "single_u_diff": -0.5812042042042042,
+     "single_u_diff_ci": [
+      -0.7063807995495495,
+      -0.45374440690690687
+     ],
+     "season_u_regret": 0.5662673703703703,
+     "season_u_diff": -1.3301495185185184,
+     "season_u_diff_ci": [
+      -1.3647206879629628,
+      -1.294974512962963
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 320,
+       "regret": 0.45581944444444444,
+       "first_fail": 0.3125,
+       "diff": -0.035416666666666666,
+       "diff_ci": [
+        -0.10625,
+        0.0
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 690,
+       "regret": 0.21724557165861513,
+       "first_fail": 0.2753623188405797,
+       "diff": -0.7440394524959743,
+       "diff_ci": [
+        -0.8961722020933978,
+        -0.599604468599034
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 470,
+       "regret": 0.0,
+       "first_fail": 0.425531914893617,
+       "diff": -1.0248865248226948,
+       "diff_ci": [
+        -1.3296550236406617,
+        -0.7514117612293147
+       ]
+      }
+     },
+     "single_regret": 0.19983896396396394,
+     "single_regret_ci": [
+      0.1274652027027027,
+      0.2774862706456457
+     ],
+     "single_diff": -0.6800116366366367,
+     "single_diff_ci": [
+      -0.81491509009009,
+      -0.5453232920420421
+     ],
+     "single_first_fail": 0.3310810810810811,
+     "single_usable": 0.6321790540540541,
+     "single_last_ok": 0.827027027027027,
+     "single_last_err": 0.6987,
+     "single_last_err_mean": 1.1960042483660132,
+     "single_last_gap": 0.0023224474474474476,
+     "season_regret": 0.4865804074074075,
+     "season_regret_ci": [
+      0.4614242814814815,
+      0.5109494898148148
+     ],
+     "season_diff": -1.4825595185185187,
+     "season_diff_ci": [
+      -1.520420363888889,
+      -1.4443159564814818
+     ],
+     "season_first_fail": 0.30033333333333334,
+     "season_usable": 0.6192777777777778
+    },
+    "tuned-beta (for utility)": {
+     "single_u_regret": 0.22640990990990995,
+     "single_u_diff": -0.5812042042042042,
+     "single_u_diff_ci": [
+      -0.7118004316816815,
+      -0.45573003003003004
+     ],
+     "season_u_regret": 0.5662673703703703,
+     "season_u_diff": -1.3301495185185184,
+     "season_u_diff_ci": [
+      -1.367050261111111,
+      -1.2938088722222223
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 320,
+       "regret": 0.45581944444444444,
+       "first_fail": 0.3125,
+       "diff": -0.035416666666666666,
+       "diff_ci": [
+        -0.10625,
+        0.0
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 690,
+       "regret": 0.21724557165861513,
+       "first_fail": 0.2753623188405797,
+       "diff": -0.7440394524959743,
+       "diff_ci": [
+        -0.8864380837359097,
+        -0.5971304951690823
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 470,
+       "regret": 0.0,
+       "first_fail": 0.425531914893617,
+       "diff": -1.0248865248226948,
+       "diff_ci": [
+        -1.3258033096926714,
+        -0.7392423167848704
+       ]
+      }
+     },
+     "single_regret": 0.19983896396396394,
+     "single_regret_ci": [
+      0.13213746246246247,
+      0.27527073948948944
+     ],
+     "single_diff": -0.6800116366366367,
+     "single_diff_ci": [
+      -0.8203397053303302,
+      -0.5518533126876877
+     ],
+     "single_first_fail": 0.3310810810810811,
+     "single_usable": 0.6321790540540541,
+     "single_last_ok": 0.827027027027027,
+     "single_last_err": 0.6987,
+     "single_last_err_mean": 1.1960042483660132,
+     "single_last_gap": 0.0023224474474474476,
+     "season_regret": 0.4865804074074075,
+     "season_regret_ci": [
+      0.46249454259259254,
+      0.5119704277777778
+     ],
+     "season_diff": -1.4825595185185187,
+     "season_diff_ci": [
+      -1.5205404861111114,
+      -1.4440921731481484
+     ],
+     "season_first_fail": 0.30033333333333334,
+     "season_usable": 0.6192777777777778
+    },
+    "scene-posterior": {
+     "single_u_regret": 0.19978378378378397,
+     "single_u_diff": -0.6078303303303301,
+     "single_u_diff_ci": [
+      -0.7579712274774772,
+      -0.4635011824324322
+     ],
+     "season_u_regret": 0.2999936296296299,
+     "season_u_diff": -1.596423259259259,
+     "season_u_diff_ci": [
+      -1.6351392546296293,
+      -1.5569631879629628
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 320,
+       "regret": 0.0,
+       "first_fail": 0.0,
+       "diff": -0.4912361111111112,
+       "diff_ci": [
+        -0.7362361111111111,
+        -0.2487065972222223
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 690,
+       "regret": 0.0,
+       "first_fail": 0.06231884057971015,
+       "diff": -0.9612850241545895,
+       "diff_ci": [
+        -1.1597099838969405,
+        -0.7675457729468601
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 470,
+       "regret": 0.0,
+       "first_fail": 0.425531914893617,
+       "diff": -1.0248865248226948,
+       "diff_ci": [
+        -1.3310377068557921,
+        -0.7316608747044918
+       ]
+      }
+     },
+     "single_regret": 0.0,
+     "single_regret_ci": [
+      0.0,
+      0.0
+     ],
+     "single_diff": -0.8798506006006007,
+     "single_diff_ci": [
+      -1.0224797860360362,
+      -0.7381449887387386
+     ],
+     "single_first_fail": 0.16418918918918918,
+     "single_usable": 0.6516047297297297,
+     "single_last_ok": 0.8337837837837838,
+     "single_last_err": 1.4142,
+     "single_last_err_mean": 1.7235863857374392,
+     "single_last_gap": 0.0,
+     "season_regret": 0.0,
+     "season_regret_ci": [
+      0.0,
+      0.0
+     ],
+     "season_diff": -1.9691399259259261,
+     "season_diff_ci": [
+      -2.0100990842592594,
+      -1.9309520879629631
+     ],
+     "season_first_fail": 0.16522222222222221,
+     "season_usable": 0.651
+    },
+    "fitted-priors[bucket, n0=3]": {
+     "single_u_regret": 0.2037695195195197,
+     "single_u_diff": -0.6038445945945943,
+     "single_u_diff_ci": [
+      -0.7534983108108106,
+      -0.459808765015015
+     ],
+     "season_u_regret": 0.3084015555555558,
+     "season_u_diff": -1.5880153333333331,
+     "season_u_diff_ci": [
+      -1.625858811111111,
+      -1.5482817546296295
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 320,
+       "regret": 0.0,
+       "first_fail": 0.0,
+       "diff": -0.4912361111111112,
+       "diff_ci": [
+        -0.765,
+        -0.24872222222222223
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 690,
+       "regret": 0.0072689210950080485,
+       "first_fail": 0.06231884057971015,
+       "diff": -0.9540161030595814,
+       "diff_ci": [
+        -1.1545852254428344,
+        -0.7702299919484702
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 470,
+       "regret": 0.005921985815602835,
+       "first_fail": 0.425531914893617,
+       "diff": -1.018964539007092,
+       "diff_ci": [
+        -1.3173524822695037,
+        -0.7406080378250597
+       ]
+      }
+     },
+     "single_regret": 0.005269519519519517,
+     "single_regret_ci": [
+      0.0,
+      0.013860360360360355
+     ],
+     "single_diff": -0.8745810810810811,
+     "single_diff_ci": [
+      -1.0229840840840843,
+      -0.7289576013513512
+     ],
+     "single_first_fail": 0.16418918918918918,
+     "single_usable": 0.6516047297297297,
+     "single_last_ok": 0.8337837837837838,
+     "single_last_err": 1.4142,
+     "single_last_err_mean": 1.7235863857374392,
+     "single_last_gap": 0.0,
+     "season_regret": 0.011809592592592592,
+     "season_regret_ci": [
+      0.008761146296296294,
+      0.01559290833333333
+     ],
+     "season_diff": -1.9573303333333334,
+     "season_diff_ci": [
+      -1.9970844074074074,
+      -1.9169043083333335
+     ],
+     "season_first_fail": 0.16599999999999998,
+     "season_usable": 0.6510833333333333
+    },
+    "fitted-priors[bucket, n0=8]": {
+     "single_u_regret": 0.2037695195195197,
+     "single_u_diff": -0.6038445945945943,
+     "single_u_diff_ci": [
+      -0.7553640953453451,
+      -0.45877370495495484
+     ],
+     "season_u_regret": 0.3343095185185188,
+     "season_u_diff": -1.5621073703703703,
+     "season_u_diff_ci": [
+      -1.602718133333333,
+      -1.5252864287037033
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 320,
+       "regret": 0.0,
+       "first_fail": 0.0,
+       "diff": -0.4912361111111112,
+       "diff_ci": [
+        -0.7637499999999999,
+        -0.24809722222222225
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 690,
+       "regret": 0.007261674718196455,
+       "first_fail": 0.06231884057971015,
+       "diff": -0.9540233494363931,
+       "diff_ci": [
+        -1.1498145128824477,
+        -0.7501482689210951
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 470,
+       "regret": 0.005921985815602835,
+       "first_fail": 0.425531914893617,
+       "diff": -1.018964539007092,
+       "diff_ci": [
+        -1.3165648345153662,
+        -0.7284495271867613
+       ]
+      }
+     },
+     "single_regret": 0.00526614114114114,
+     "single_regret_ci": [
+      0.0,
+      0.013789414414414409
+     ],
+     "single_diff": -0.8745844594594596,
+     "single_diff_ci": [
+      -1.023152102102102,
+      -0.7332483295795796
+     ],
+     "single_first_fail": 0.16418918918918918,
+     "single_usable": 0.6516047297297297,
+     "single_last_ok": 0.8243243243243243,
+     "single_last_err": 1.4089,
+     "single_last_err_mean": 1.664848524590164,
+     "single_last_gap": 0.0016910660660660656,
+     "season_regret": 0.046427555555555555,
+     "season_regret_ci": [
+      0.03728916851851853,
+      0.05599339907407408
+     ],
+     "season_diff": -1.9227123703703703,
+     "season_diff_ci": [
+      -1.9632328935185186,
+      -1.8817726824074072
+     ],
+     "season_first_fail": 0.17177777777777775,
+     "season_usable": 0.6518055555555555
+    },
+    "fitted-priors[bucket+scale, n0=3]": {
+     "single_u_regret": 0.20229429429429446,
+     "single_u_diff": -0.6053198198198196,
+     "single_u_diff_ci": [
+      -0.7586356606606603,
+      -0.45973308933933926
+     ],
+     "season_u_regret": 0.3390153703703706,
+     "season_u_diff": -1.5574015185185182,
+     "season_u_diff_ci": [
+      -1.5979086037037036,
+      -1.5182303537037034
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 320,
+       "regret": 0.0,
+       "first_fail": 0.0,
+       "diff": -0.4912361111111112,
+       "diff_ci": [
+        -0.764375,
+        -0.24686111111111114
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 690,
+       "regret": 0.007334138486312396,
+       "first_fail": 0.06231884057971015,
+       "diff": -0.9539508856682771,
+       "diff_ci": [
+        -1.1470394323671498,
+        -0.76511519726248
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 470,
+       "regret": 0.0,
+       "first_fail": 0.425531914893617,
+       "diff": -1.0248865248226948,
+       "diff_ci": [
+        -1.3349216903073284,
+        -0.7279550827423172
+       ]
+      }
+     },
+     "single_regret": 0.0034192942942942927,
+     "single_regret_ci": [
+      0.0,
+      0.010257882882882877
+     ],
+     "single_diff": -0.8764313063063065,
+     "single_diff_ci": [
+      -1.0167879035285283,
+      -0.7387600131381381
+     ],
+     "single_first_fail": 0.16418918918918918,
+     "single_usable": 0.6516047297297297,
+     "single_last_ok": 0.8317567567567568,
+     "single_last_err": 1.4142,
+     "single_last_err_mean": 1.7107760357432984,
+     "single_last_gap": 3.0405405405405106e-05,
+     "season_regret": 0.05912007407407409,
+     "season_regret_ci": [
+      0.04753973611111112,
+      0.07081307314814812
+     ],
+     "season_diff": -1.910019851851852,
+     "season_diff_ci": [
+      -1.9506064787037036,
+      -1.8694878527777778
+     ],
+     "season_first_fail": 0.17055555555555554,
+     "season_usable": 0.6510277777777779
+    },
+    "fitted-priors[bucket+scale, n0=8]": {
+     "single_u_regret": 0.20229429429429446,
+     "single_u_diff": -0.6053198198198196,
+     "single_u_diff_ci": [
+      -0.7545927364864862,
+      -0.4590062499999997
+     ],
+     "season_u_regret": 0.3201846296296299,
+     "season_u_diff": -1.5762322592592588,
+     "season_u_diff_ci": [
+      -1.6158888092592592,
+      -1.5376468888888886
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 320,
+       "regret": 0.0,
+       "first_fail": 0.0,
+       "diff": -0.4912361111111112,
+       "diff_ci": [
+        -0.7374878472222223,
+        -0.24686111111111114
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 690,
+       "regret": 0.0072689210950080485,
+       "first_fail": 0.06231884057971015,
+       "diff": -0.9540161030595814,
+       "diff_ci": [
+        -1.1515041867954912,
+        -0.7585952495974237
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 470,
+       "regret": 0.0,
+       "first_fail": 0.425531914893617,
+       "diff": -1.0248865248226948,
+       "diff_ci": [
+        -1.3355281323877068,
+        -0.7293384751773054
+       ]
+      }
+     },
+     "single_regret": 0.0033888888888888875,
+     "single_regret_ci": [
+      0.0,
+      0.010310510510510087
+     ],
+     "single_diff": -0.8764617117117117,
+     "single_diff_ci": [
+      -1.0187360360360362,
+      -0.7346211711711711
+     ],
+     "single_first_fail": 0.16418918918918918,
+     "single_usable": 0.6516047297297297,
+     "single_last_ok": 0.827027027027027,
+     "single_last_err": 1.4103,
+     "single_last_err_mean": 1.6822186274509805,
+     "single_last_gap": 0.0016606606606606603,
+     "season_regret": 0.03100266666666667,
+     "season_regret_ci": [
+      0.023991005555555556,
+      0.03868974074074074
+     ],
+     "season_diff": -1.9381372592592592,
+     "season_diff_ci": [
+      -1.9788784592592594,
+      -1.8981075601851853
+     ],
+     "season_first_fail": 0.16755555555555554,
+     "season_usable": 0.6510833333333333
+    },
+    "q-learning": {
+     "single_u_regret": 0.34100750750750763,
+     "single_u_diff": -0.46660660660660647,
+     "single_u_diff_ci": [
+      -0.5992040540540539,
+      -0.33249448198198195
+     ],
+     "season_u_regret": 0.7239062962962965,
+     "season_u_diff": -1.1725105925925925,
+     "season_u_diff_ci": [
+      -1.2111029537037035,
+      -1.1341645916666665
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 320,
+       "regret": 0.0,
+       "first_fail": 0.0,
+       "diff": -0.4912361111111112,
+       "diff_ci": [
+        -0.765,
+        -0.24500000000000002
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 690,
+       "regret": 0.17605394524959742,
+       "first_fail": 0.18840579710144928,
+       "diff": -0.785231078904992,
+       "diff_ci": [
+        -0.95775328099839,
+        -0.6193921296296298
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 470,
+       "regret": 0.32710401891252955,
+       "first_fail": 0.723404255319149,
+       "diff": -0.6977825059101654,
+       "diff_ci": [
+        -0.9725543144208038,
+        -0.4628590425531915
+       ]
+      }
+     },
+     "single_regret": 0.18595683183183181,
+     "single_regret_ci": [
+      0.12060958145645648,
+      0.25752906343843834
+     ],
+     "single_diff": -0.6938937687687687,
+     "single_diff_ci": [
+      -0.8234648836336338,
+      -0.561159665915916
+     ],
+     "single_first_fail": 0.31756756756756754,
+     "single_usable": 0.6545608108108109,
+     "single_last_ok": 0.831081081081081,
+     "single_last_err": 1.3182,
+     "single_last_err_mean": 1.6240949593495932,
+     "single_last_gap": 0.0004358108108108109,
+     "season_regret": 0.5202993333333333,
+     "season_regret_ci": [
+      0.4939250527777778,
+      0.5482170749999999
+     ],
+     "season_diff": -1.4488405925925927,
+     "season_diff_ci": [
+      -1.488395090740741,
+      -1.4090815259259257
+     ],
+     "season_first_fail": 0.2984444444444444,
+     "season_usable": 0.6505555555555556
+    },
+    "oracle": {
+     "single_u_regret": 0.003567567567567571,
+     "single_u_diff": -0.8040465465465465,
+     "single_u_diff_ci": [
+      -0.9421538851351352,
+      -0.6686395833333333
+     ],
+     "season_u_regret": 0.005873629629629634,
+     "season_u_diff": -1.8905432592592595,
+     "season_u_diff_ci": [
+      -1.9278705675925925,
+      -1.8521271898148148
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 320,
+       "regret": 0.0,
+       "first_fail": 0.0,
+       "diff": -0.4912361111111112,
+       "diff_ci": [
+        -0.735626388888889,
+        -0.25239791666666694
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 690,
+       "regret": 0.0,
+       "first_fail": 0.06231884057971015,
+       "diff": -0.9612850241545895,
+       "diff_ci": [
+        -1.1593090982286631,
+        -0.7728418276972626
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 470,
+       "regret": 0.0,
+       "first_fail": 0.425531914893617,
+       "diff": -1.0248865248226948,
+       "diff_ci": [
+        -1.3307852245862883,
+        -0.7378990543735227
+       ]
+      }
+     },
+     "single_regret": 0.0,
+     "single_regret_ci": [
+      0.0,
+      0.0
+     ],
+     "single_diff": -0.8798506006006007,
+     "single_diff_ci": [
+      -1.0277798423423425,
+      -0.738003003003003
+     ],
+     "single_first_fail": 0.16418918918918918,
+     "single_usable": 0.671875,
+     "single_last_ok": 0.8337837837837838,
+     "single_last_err": 0.739,
+     "single_last_err_mean": 1.203751053484603,
+     "single_last_gap": 0.0,
+     "season_regret": 0.0,
+     "season_regret_ci": [
+      0.0,
+      0.0
+     ],
+     "season_diff": -1.9691399259259261,
+     "season_diff_ci": [
+      -2.008592965740741,
+      -1.9293883861111112
+     ],
+     "season_first_fail": 0.16522222222222221,
+     "season_usable": 0.6702222222222223
+    }
+   }
+  },
+  "heldout": {
+   "scenes": 89,
+   "skipped": 0,
+   "policies": {
+    "shipped": {
+     "single_u_regret": 0.90750936329588,
+     "single_u_diff": 0.0,
+     "single_u_diff_ci": [
+      0.0,
+      0.0
+     ],
+     "season_u_regret": 2.058921185185185,
+     "season_u_diff": 0.0,
+     "season_u_diff_ci": [
+      0.0,
+      0.0
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 230,
+       "regret": 0.8872850241545894,
+       "first_fail": 0.391304347826087,
+       "diff": 0.0,
+       "diff_ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 350,
+       "regret": 1.0399746031746033,
+       "first_fail": 0.6857142857142857,
+       "diff": 0.0,
+       "diff_ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 310,
+       "regret": 1.0144336917562724,
+       "first_fail": 0.8709677419354839,
+       "diff": 0.0,
+       "diff_ci": [
+        0.0,
+        0.0
+       ]
+      }
+     },
+     "single_regret": 0.9916192259675407,
+     "single_regret_ci": [
+      0.8064499375780275,
+      1.176671161048689
+     ],
+     "single_diff": 0.0,
+     "single_diff_ci": [
+      0.0,
+      0.0
+     ],
+     "single_first_fail": 0.6741573033707865,
+     "single_usable": 0.6053370786516854,
+     "single_last_ok": 0.8426966292134831,
+     "single_last_err": 0.8216,
+     "single_last_err_mean": 1.3301028,
+     "single_last_gap": 0.02048064918851436,
+     "season_regret": 2.1472881851851855,
+     "season_regret_ci": [
+      2.108273653703704,
+      2.185452405555556
+     ],
+     "season_diff": 0.0,
+     "season_diff_ci": [
+      0.0,
+      0.0
+     ],
+     "season_first_fail": 0.5453333333333333,
+     "season_usable": 0.5515
+    },
+    "always-standard": {
+     "single_u_regret": 3.9438501872659177,
+     "single_u_diff": 3.0363408239700376,
+     "single_u_diff_ci": [
+      2.445077028714107,
+      3.635838639200998
+     ],
+     "season_u_regret": 5.892237037037036,
+     "season_u_diff": 3.8333158518518515,
+     "season_u_diff_ci": [
+      3.7399153694444442,
+      3.926950094444443
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 230,
+       "regret": 3.6445217391304356,
+       "first_fail": 0.391304347826087,
+       "diff": 2.757236714975846,
+       "diff_ci": [
+        1.612339130434783,
+        4.015091787439613
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 350,
+       "regret": 4.580215873015875,
+       "first_fail": 0.6857142857142857,
+       "diff": 3.5402412698412706,
+       "diff_ci": [
+        2.561707936507937,
+        4.528155238095238
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 310,
+       "regret": 4.136028673835127,
+       "first_fail": 0.8709677419354839,
+       "diff": 3.1215949820788538,
+       "diff_ci": [
+        2.0610706093189965,
+        4.1635541218637995
+       ]
+      }
+     },
+     "single_regret": 4.183690387016231,
+     "single_regret_ci": [
+      3.4577992509363304,
+      4.945162047440699
+     ],
+     "single_diff": 3.19207116104869,
+     "single_diff_ci": [
+      2.5649997815230963,
+      3.8211908239700385
+     ],
+     "single_first_fail": 0.6741573033707865,
+     "single_usable": 0.3258426966292135,
+     "single_last_ok": 0.3258426966292135,
+     "single_last_err": 0.4718,
+     "single_last_err_mean": 0.5625020689655174,
+     "single_last_gap": 0.5229612983770289,
+     "season_regret": 6.251630518518519,
+     "season_regret_ci": [
+      6.138469425925928,
+      6.36444684814815
+     ],
+     "season_diff": 4.104342333333334,
+     "season_diff_ci": [
+      4.010416812037039,
+      4.202910651851853
+     ],
+     "season_first_fail": 0.6765555555555556,
+     "season_usable": 0.3234444444444445
+    },
+    "best-fixed (very_soft)": {
+     "single_u_regret": 0.17004744069912625,
+     "single_u_diff": -0.7374619225967538,
+     "single_u_diff_ci": [
+      -0.9249304931335829,
+      -0.534047565543071
+     ],
+     "season_u_regret": 0.25156651851851874,
+     "season_u_diff": -1.8073546666666662,
+     "season_u_diff_ci": [
+      -1.8449133787037035,
+      -1.7698974185185183
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 230,
+       "regret": 0.0,
+       "first_fail": 0.0,
+       "diff": -0.8872850241545894,
+       "diff_ci": [
+        -1.2633252415458938,
+        -0.507608212560387
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 350,
+       "regret": 0.0,
+       "first_fail": 0.05714285714285714,
+       "diff": -1.0399746031746033,
+       "diff_ci": [
+        -1.3187815873015873,
+        -0.7610052380952385
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 310,
+       "regret": 0.0,
+       "first_fail": 0.3548387096774194,
+       "diff": -1.0144336917562724,
+       "diff_ci": [
+        -1.3316730286738352,
+        -0.694413799283154
+       ]
+      }
+     },
+     "single_regret": 0.0,
+     "single_regret_ci": [
+      0.0,
+      0.0
+     ],
+     "single_diff": -0.9916192259675407,
+     "single_diff_ci": [
+      -1.177437702871411,
+      -0.8159876404494383
+     ],
+     "single_first_fail": 0.14606741573033707,
+     "single_usable": 0.6292134831460674,
+     "single_last_ok": 0.8539325842696629,
+     "single_last_err": 1.37,
+     "single_last_err_mean": 1.8907069736842106,
+     "single_last_gap": 0.0,
+     "season_regret": 0.0,
+     "season_regret_ci": [
+      0.0,
+      0.0
+     ],
+     "season_diff": -2.1472881851851855,
+     "season_diff_ci": [
+      -2.1854553222222224,
+      -2.107885294444445
+     ],
+     "season_first_fail": 0.1514444444444444,
+     "season_usable": 0.6258888888888888
+    },
+    "shipped+thompson": {
+     "single_u_regret": 1.392925593008739,
+     "single_u_diff": 0.48541622971285897,
+     "single_u_diff_ci": [
+      0.33490011235955075,
+      0.6261880149812727
+     ],
+     "season_u_regret": 2.486125962962963,
+     "season_u_diff": 0.4272047777777778,
+     "season_u_diff_ci": [
+      0.3818724555555556,
+      0.47237051574074074
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 230,
+       "regret": 1.2497062801932368,
+       "first_fail": 0.2608695652173913,
+       "diff": 0.3624212560386474,
+       "diff_ci": [
+        0.1335635144927537,
+        0.5944964855072464
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 350,
+       "regret": 1.623311428571429,
+       "first_fail": 0.5085714285714286,
+       "diff": 0.5833368253968254,
+       "diff_ci": [
+        0.31872492857142865,
+        0.8433540158730162
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 310,
+       "regret": 1.406469892473118,
+       "first_fail": 0.7193548387096774,
+       "diff": 0.3920362007168459,
+       "diff_ci": [
+        0.09655107526881719,
+        0.6767178853046596
+       ]
+      }
+     },
+     "single_regret": 1.4512327091136081,
+     "single_regret_ci": [
+      1.1577724032459424,
+      1.7452828027465668
+     ],
+     "single_diff": 0.4596134831460675,
+     "single_diff_ci": [
+      0.30666834269662924,
+      0.6082200499375781
+     ],
+     "single_first_fail": 0.5179775280898876,
+     "single_usable": 0.5578651685393259,
+     "single_last_ok": 0.7764044943820225,
+     "single_last_err": 0.9905,
+     "single_last_err_mean": 1.3328461649782921,
+     "single_last_gap": 0.06939038701622971,
+     "season_regret": 2.562825925925926,
+     "season_regret_ci": [
+      2.5099447944444444,
+      2.619411288888889
+     ],
+     "season_diff": 0.41553774074074085,
+     "season_diff_ci": [
+      0.3666532370370371,
+      0.4658841675925926
+     ],
+     "season_first_fail": 0.44011111111111106,
+     "season_usable": 0.5283055555555555
+    },
+    "shipped+ucb(1)": {
+     "single_u_regret": 0.8406786516853932,
+     "single_u_diff": -0.06683071161048688,
+     "single_u_diff_ci": [
+      -0.13062036828963794,
+      -0.014957627965043746
+     ],
+     "season_u_regret": 1.6669916296296294,
+     "season_u_diff": -0.3919295555555556,
+     "season_u_diff_ci": [
+      -0.4165191787037037,
+      -0.370284687962963
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 230,
+       "regret": 0.8178067632850242,
+       "first_fail": 0.391304347826087,
+       "diff": -0.06947826086956521,
+       "diff_ci": [
+        -0.17743478260869566,
+        0.0
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 350,
+       "regret": 1.0112368253968254,
+       "first_fail": 0.6857142857142857,
+       "diff": -0.028737777777777793,
+       "diff_ci": [
+        -0.08975238095238097,
+        0.0035390476190476187
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 310,
+       "regret": 0.9009462365591396,
+       "first_fail": 0.8709677419354839,
+       "diff": -0.11348745519713263,
+       "diff_ci": [
+        -0.2781935483870967,
+        0.0
+       ]
+      }
+     },
+     "single_regret": 0.9228334581772785,
+     "single_regret_ci": [
+      0.7532425093632961,
+      1.1006891011235955
+     ],
+     "single_diff": -0.06878576779026217,
+     "single_diff_ci": [
+      -0.1390855617977528,
+      -0.016459925093632963
+     ],
+     "single_first_fail": 0.6741573033707865,
+     "single_usable": 0.5969101123595506,
+     "single_last_ok": 0.8337078651685393,
+     "single_last_err": 0.8299,
+     "single_last_err_mean": 1.2931297843665768,
+     "single_last_gap": 0.015888639200998752,
+     "season_regret": 1.7221932592592593,
+     "season_regret_ci": [
+      1.6919179462962963,
+      1.7525691203703706
+     ],
+     "season_diff": -0.4250949259259259,
+     "season_diff_ci": [
+      -0.4497602064814815,
+      -0.40147567870370376
+     ],
+     "season_first_fail": 0.5113333333333333,
+     "season_usable": 0.5683888888888888
+    },
+    "shipped+discount(0.85)": {
+     "single_u_regret": 0.9335136079900124,
+     "single_u_diff": 0.026004244694132334,
+     "single_u_diff_ci": [
+      0.005897627965043694,
+      0.05096823345817727
+     ],
+     "season_u_regret": 2.0748225185185185,
+     "season_u_diff": 0.01590133333333331,
+     "season_u_diff_ci": [
+      -0.0019463574074074313,
+      0.032413737037036996
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 230,
+       "regret": 0.8872850241545894,
+       "first_fail": 0.391304347826087,
+       "diff": 0.0,
+       "diff_ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 350,
+       "regret": 1.0917314285714288,
+       "first_fail": 0.6857142857142857,
+       "diff": 0.0517568253968254,
+       "diff_ci": [
+        0.0,
+        0.11688963492063487
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 310,
+       "regret": 1.0401397849462368,
+       "first_fail": 0.8709677419354839,
+       "diff": 0.02570609318996416,
+       "diff_ci": [
+        0.0,
+        0.06583028673835124
+       ]
+      }
+     },
+     "single_regret": 1.02092684144819,
+     "single_regret_ci": [
+      0.8303543133583021,
+      1.2247745255930087
+     ],
+     "single_diff": 0.029307615480649186,
+     "single_diff_ci": [
+      0.007250905118601745,
+      0.05747718476903867
+     ],
+     "single_first_fail": 0.6741573033707865,
+     "single_usable": 0.6039325842696629,
+     "single_last_ok": 0.8280898876404494,
+     "single_last_err": 0.8212,
+     "single_last_err_mean": 1.2950396200814114,
+     "single_last_gap": 0.02963196004993758,
+     "season_regret": 2.179476,
+     "season_regret_ci": [
+      2.1393601444444448,
+      2.2173853194444444
+     ],
+     "season_diff": 0.03218781481481482,
+     "season_diff_ci": [
+      0.01300439722222223,
+      0.05066751018518519
+     ],
+     "season_first_fail": 0.5662222222222223,
+     "season_usable": 0.5513055555555556
+    },
+    "shipped+scale-kernel(0.3)": {
+     "single_u_regret": 0.90750936329588,
+     "single_u_diff": 0.0,
+     "single_u_diff_ci": [
+      0.0,
+      0.0
+     ],
+     "season_u_regret": 2.2381196296296295,
+     "season_u_diff": 0.1791984444444444,
+     "season_u_diff_ci": [
+      0.15346290370370363,
+      0.20459612777777772
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 230,
+       "regret": 0.8872850241545894,
+       "first_fail": 0.391304347826087,
+       "diff": 0.0,
+       "diff_ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 350,
+       "regret": 1.0399746031746033,
+       "first_fail": 0.6857142857142857,
+       "diff": 0.0,
+       "diff_ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 310,
+       "regret": 1.0144336917562724,
+       "first_fail": 0.8709677419354839,
+       "diff": 0.0,
+       "diff_ci": [
+        0.0,
+        0.0
+       ]
+      }
+     },
+     "single_regret": 0.9916192259675407,
+     "single_regret_ci": [
+      0.803836672908864,
+      1.1833911672908863
+     ],
+     "single_diff": 0.0,
+     "single_diff_ci": [
+      0.0,
+      0.0
+     ],
+     "single_first_fail": 0.6741573033707865,
+     "single_usable": 0.6053370786516854,
+     "single_last_ok": 0.8426966292134831,
+     "single_last_err": 0.8216,
+     "single_last_err_mean": 1.3301028,
+     "single_last_gap": 0.02048064918851436,
+     "season_regret": 2.3699631111111117,
+     "season_regret_ci": [
+      2.3286680212962967,
+      2.4150759379629627
+     ],
+     "season_diff": 0.22267492592592597,
+     "season_diff_ci": [
+      0.19380325833333334,
+      0.25266901481481474
+     ],
+     "season_first_fail": 0.6073333333333333,
+     "season_usable": 0.5462222222222223
+    },
+    "shipped+floor": {
+     "single_u_regret": 0.3953096129837704,
+     "single_u_diff": -0.5121997503121098,
+     "single_u_diff_ci": [
+      -0.6540395755305866,
+      -0.3741497815230961
+     ],
+     "season_u_regret": 1.0742043333333335,
+     "season_u_diff": -0.984716851851852,
+     "season_u_diff_ci": [
+      -1.0287146342592592,
+      -0.9423013796296297
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 230,
+       "regret": 0.8872850241545894,
+       "first_fail": 0.391304347826087,
+       "diff": 0.0,
+       "diff_ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 350,
+       "regret": 0.38830793650793655,
+       "first_fail": 0.42857142857142855,
+       "diff": -0.6516666666666666,
+       "diff_ci": [
+        -0.8107832539682541,
+        -0.4816246825396827
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 310,
+       "regret": 0.0,
+       "first_fail": 0.3548387096774194,
+       "diff": -1.0144336917562724,
+       "diff_ci": [
+        -1.3460469534050181,
+        -0.6916345878136201
+       ]
+      }
+     },
+     "single_regret": 0.3820037453183521,
+     "single_regret_ci": [
+      0.24916626092384517,
+      0.5240155742821473
+     ],
+     "single_diff": -0.6096154806491886,
+     "single_diff_ci": [
+      -0.765798720349563,
+      -0.4609392946317104
+     ],
+     "single_first_fail": 0.39325842696629215,
+     "single_usable": 0.6025280898876404,
+     "single_last_ok": 0.8539325842696629,
+     "single_last_err": 1.03,
+     "single_last_err_mean": 1.5618955263157894,
+     "single_last_gap": 0.006403245942571788,
+     "season_regret": 1.033488925925926,
+     "season_regret_ci": [
+      0.9901500027777779,
+      1.0785188666666667
+     ],
+     "season_diff": -1.1137992592592594,
+     "season_diff_ci": [
+      -1.1590030064814816,
+      -1.0666528527777779
+     ],
+     "season_first_fail": 0.3385555555555555,
+     "season_usable": 0.5736666666666667
+    },
+    "shipped+floor(slack 1)": {
+     "single_u_regret": 0.6708988764044944,
+     "single_u_diff": -0.23661048689138575,
+     "single_u_diff_ci": [
+      -0.35588177278401995,
+      -0.14335717852684152
+     ],
+     "season_u_regret": 1.7849804814814816,
+     "season_u_diff": -0.2739407037037037,
+     "season_u_diff_ci": [
+      -0.3092229777777778,
+      -0.24041472037037048
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 230,
+       "regret": 0.8872850241545894,
+       "first_fail": 0.391304347826087,
+       "diff": 0.0,
+       "diff_ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 350,
+       "regret": 1.0399746031746033,
+       "first_fail": 0.6857142857142857,
+       "diff": 0.0,
+       "diff_ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 310,
+       "regret": 0.28287455197132616,
+       "first_fail": 0.6451612903225806,
+       "diff": -0.7315591397849462,
+       "diff_ci": [
+        -1.0209164874551973,
+        -0.481664068100359
+       ]
+      }
+     },
+     "single_regret": 0.7368064918851437,
+     "single_regret_ci": [
+      0.5742029962546816,
+      0.9185682272159799
+     ],
+     "single_diff": -0.254812734082397,
+     "single_diff_ci": [
+      -0.380883770287141,
+      -0.15222690387016244
+     ],
+     "single_first_fail": 0.5955056179775281,
+     "single_usable": 0.601123595505618,
+     "single_last_ok": 0.8426966292134831,
+     "single_last_err": 0.8216,
+     "single_last_err_mean": 1.3477359999999998,
+     "single_last_gap": 0.012943820224719103,
+     "season_regret": 1.862123962962963,
+     "season_regret_ci": [
+      1.817682987037037,
+      1.9077370351851852
+     ],
+     "season_diff": -0.28516422222222226,
+     "season_diff_ci": [
+      -0.3209864305555556,
+      -0.24935165462962963
+     ],
+     "season_first_fail": 0.4974444444444444,
+     "season_usable": 0.5456944444444444
+    },
+    "shipped+floor+probe": {
+     "single_u_regret": 0.04853932584269667,
+     "single_u_diff": -0.8589700374531835,
+     "single_u_diff_ci": [
+      -1.032054556803995,
+      -0.685713108614232
+     ],
+     "season_u_regret": 0.10832296296296307,
+     "season_u_diff": -1.950598222222222,
+     "season_u_diff_ci": [
+      -1.9864401046296296,
+      -1.9140581055555557
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 230,
+       "regret": 0.0,
+       "first_fail": 0.0,
+       "diff": -0.8872850241545894,
+       "diff_ci": [
+        -1.2989897342995174,
+        -0.5195144927536233
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 350,
+       "regret": 0.006450793650793634,
+       "first_fail": 0.05714285714285714,
+       "diff": -1.0335238095238097,
+       "diff_ci": [
+        -1.3065284126984127,
+        -0.7554522222222222
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 310,
+       "regret": 0.0,
+       "first_fail": 0.3548387096774194,
+       "diff": -1.0144336917562724,
+       "diff_ci": [
+        -1.327711917562724,
+        -0.698279301075269
+       ]
+      }
+     },
+     "single_regret": 0.0025368289637952494,
+     "single_regret_ci": [
+      0.0,
+      0.007610486891385748
+     ],
+     "single_diff": -0.9890823970037456,
+     "single_diff_ci": [
+      -1.16903177278402,
+      -0.7944470973782776
+     ],
+     "single_first_fail": 0.14606741573033707,
+     "single_usable": 0.6292134831460674,
+     "single_last_ok": 0.8539325842696629,
+     "single_last_err": 1.0196,
+     "single_last_err_mean": 1.5603748684210526,
+     "single_last_gap": 0.0003171036204744062,
+     "season_regret": 0.0025964444444444377,
+     "season_regret_ci": [
+      0.001994370370370365,
+      0.0031985185185185103
+     ],
+     "season_diff": -2.144691740740741,
+     "season_diff_ci": [
+      -2.1835447796296297,
+      -2.1069139120370375
+     ],
+     "season_first_fail": 0.1514444444444444,
+     "season_usable": 0.6258888888888888
+    },
+    "shipped+floor+probe(slack 1)": {
+     "single_u_regret": 0.4509450686641698,
+     "single_u_diff": -0.45656429463171033,
+     "single_u_diff_ci": [
+      -0.5797079900124844,
+      -0.34558848314606755
+     ],
+     "season_u_regret": 1.3729449629629629,
+     "season_u_diff": -0.6859762222222222,
+     "season_u_diff_ci": [
+      -0.723344826851852,
+      -0.6463947287037038
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 230,
+       "regret": 0.5546714975845412,
+       "first_fail": 0.30434782608695654,
+       "diff": -0.33261352657004833,
+       "diff_ci": [
+        -0.5330579710144928,
+        -0.16348309178743964
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 350,
+       "regret": 0.6607809523809525,
+       "first_fail": 0.5714285714285714,
+       "diff": -0.37919365079365075,
+       "diff_ci": [
+        -0.5476819047619048,
+        -0.23026952380952403
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 310,
+       "regret": 0.2691971326164875,
+       "first_fail": 0.6129032258064516,
+       "diff": -0.7452365591397849,
+       "diff_ci": [
+        -1.021682437275986,
+        -0.5041825268817208
+       ]
+      }
+     },
+     "single_regret": 0.4969650436953808,
+     "single_regret_ci": [
+      0.37796891385767795,
+      0.6204381086142322
+     ],
+     "single_diff": -0.49465418227215985,
+     "single_diff_ci": [
+      -0.6211953807740324,
+      -0.37574413233458187
+     ],
+     "single_first_fail": 0.5168539325842697,
+     "single_usable": 0.6207865168539326,
+     "single_last_ok": 0.8539325842696629,
+     "single_last_err": 0.8299,
+     "single_last_err_mean": 1.4296664473684209,
+     "single_last_gap": 0.011922596754057432,
+     "season_regret": 1.423890111111111,
+     "season_regret_ci": [
+      1.3823466574074073,
+      1.4675179185185188
+     ],
+     "season_diff": -0.7233980740740741,
+     "season_diff_ci": [
+      -0.7670393092592593,
+      -0.681458661111111
+     ],
+     "season_first_fail": 0.43966666666666665,
+     "season_usable": 0.57775
+    },
+    "shipped+skip-cost(0.05)": {
+     "single_u_regret": 0.9222828963795255,
+     "single_u_diff": 0.014773533083645441,
+     "single_u_diff_ci": [
+      0.0017078651685393264,
+      0.03247588014981273
+     ],
+     "season_u_regret": 2.0733099629629628,
+     "season_u_diff": 0.01438877777777776,
+     "season_u_diff_ci": [
+      0.004608210185185172,
+      0.024565119444444408
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 230,
+       "regret": 0.8872850241545894,
+       "first_fail": 0.391304347826087,
+       "diff": 0.0,
+       "diff_ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 350,
+       "regret": 1.0635733333333335,
+       "first_fail": 0.6857142857142857,
+       "diff": 0.02359873015873016,
+       "diff_ci": [
+        0.0,
+        0.060985396825396825
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 310,
+       "regret": 1.0377526881720431,
+       "first_fail": 0.8709677419354839,
+       "diff": 0.023318996415770617,
+       "diff_ci": [
+        0.0,
+        0.05627956989247314
+       ]
+      }
+     },
+     "single_regret": 1.0090219725343321,
+     "single_regret_ci": [
+      0.8219341448189762,
+      1.1928818851435705
+     ],
+     "single_diff": 0.017402746566791513,
+     "single_diff_ci": [
+      0.0025862671660424478,
+      0.03698383270911361
+     ],
+     "single_first_fail": 0.6741573033707865,
+     "single_usable": 0.6053370786516854,
+     "single_last_ok": 0.8224719101123595,
+     "single_last_err": 0.8212,
+     "single_last_err_mean": 1.2369207650273224,
+     "single_last_gap": 0.030509238451935084,
+     "season_regret": 2.167586962962963,
+     "season_regret_ci": [
+      2.1313766370370373,
+      2.2062226324074072
+     ],
+     "season_diff": 0.02029877777777778,
+     "season_diff_ci": [
+      0.008521681481481486,
+      0.03164029814814815
+     ],
+     "season_first_fail": 0.5545555555555555,
+     "season_usable": 0.5512222222222223
+    },
+    "shipped+floor+skip-cost(0.05)": {
+     "single_u_regret": 0.39962172284644204,
+     "single_u_diff": -0.5078876404494381,
+     "single_u_diff_ci": [
+      -0.6547817415730337,
+      -0.37362053682896373
+     ],
+     "season_u_regret": 1.1011528148148149,
+     "season_u_diff": -0.9577683703703703,
+     "season_u_diff_ci": [
+      -0.9993631166666667,
+      -0.9125601342592592
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 230,
+       "regret": 0.8872850241545894,
+       "first_fail": 0.391304347826087,
+       "diff": 0.0,
+       "diff_ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 350,
+       "regret": 0.4027015873015874,
+       "first_fail": 0.42857142857142855,
+       "diff": -0.6372730158730159,
+       "diff_ci": [
+        -0.7913272222222222,
+        -0.48526158730158736
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 310,
+       "regret": 0.0,
+       "first_fail": 0.3548387096774194,
+       "diff": -1.0144336917562724,
+       "diff_ci": [
+        -1.3383988351254483,
+        -0.6863593189964159
+       ]
+      }
+     },
+     "single_regret": 0.38766416978776536,
+     "single_regret_ci": [
+      0.25165639825218483,
+      0.5289184144818976
+     ],
+     "single_diff": -0.6039550561797753,
+     "single_diff_ci": [
+      -0.7623095505617978,
+      -0.4524043071161049
+     ],
+     "single_first_fail": 0.39325842696629215,
+     "single_usable": 0.6025280898876404,
+     "single_last_ok": 0.8426966292134831,
+     "single_last_err": 1.0196,
+     "single_last_err_mean": 1.4817281333333334,
+     "single_last_gap": 0.007424469413233461,
+     "season_regret": 1.0692274074074075,
+     "season_regret_ci": [
+      1.0217107092592592,
+      1.1170209000000002
+     ],
+     "season_diff": -1.0780607777777778,
+     "season_diff_ci": [
+      -1.123494887037037,
+      -1.0295423166666666
+     ],
+     "season_first_fail": 0.34544444444444444,
+     "season_usable": 0.5719444444444445
+    },
+    "tuned-beta (for reward)": {
+     "single_u_regret": 0.38677153558052435,
+     "single_u_diff": -0.5207378277153557,
+     "single_u_diff_ci": [
+      -0.6587154494382021,
+      -0.38153645443196016
+     ],
+     "season_u_regret": 0.8590321851851853,
+     "season_u_diff": -1.1998889999999998,
+     "season_u_diff_ci": [
+      -1.2391213925925928,
+      -1.1615308592592593
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 230,
+       "regret": 0.8178067632850242,
+       "first_fail": 0.391304347826087,
+       "diff": -0.06947826086956521,
+       "diff_ci": [
+        -0.17743478260869563,
+        0.0
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 350,
+       "regret": 0.41568253968253976,
+       "first_fail": 0.42857142857142855,
+       "diff": -0.6242920634920635,
+       "diff_ci": [
+        -0.7900479365079367,
+        -0.46645142857142863
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 310,
+       "regret": 0.0,
+       "first_fail": 0.3548387096774194,
+       "diff": -1.0144336917562724,
+       "diff_ci": [
+        -1.3409416666666671,
+        -0.7038528673835127
+       ]
+      }
+     },
+     "single_regret": 0.37481398252184767,
+     "single_regret_ci": [
+      0.24367475031210986,
+      0.518568601747815
+     ],
+     "single_diff": -0.6168052434456929,
+     "single_diff_ci": [
+      -0.7748278401997503,
+      -0.4683836142322098
+     ],
+     "single_first_fail": 0.39325842696629215,
+     "single_usable": 0.6025280898876404,
+     "single_last_ok": 0.8539325842696629,
+     "single_last_err": 1.03,
+     "single_last_err_mean": 1.5618955263157894,
+     "single_last_gap": 0.006403245942571788,
+     "season_regret": 0.8049256666666667,
+     "season_regret_ci": [
+      0.7686635203703703,
+      0.8389830259259259
+     ],
+     "season_diff": -1.3423625185185186,
+     "season_diff_ci": [
+      -1.3800203787037035,
+      -1.3009414175925926
+     ],
+     "season_first_fail": 0.33888888888888885,
+     "season_usable": 0.5841388888888889
+    },
+    "tuned-beta (for utility)": {
+     "single_u_regret": 0.38677153558052435,
+     "single_u_diff": -0.5207378277153557,
+     "single_u_diff_ci": [
+      -0.6578281523096129,
+      -0.383246847690387
+     ],
+     "season_u_regret": 0.8590321851851853,
+     "season_u_diff": -1.1998889999999998,
+     "season_u_diff_ci": [
+      -1.2380992435185185,
+      -1.1621156287037036
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 230,
+       "regret": 0.8178067632850242,
+       "first_fail": 0.391304347826087,
+       "diff": -0.06947826086956521,
+       "diff_ci": [
+        -0.16995652173913045,
+        0.0
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 350,
+       "regret": 0.41568253968253976,
+       "first_fail": 0.42857142857142855,
+       "diff": -0.6242920634920635,
+       "diff_ci": [
+        -0.781066507936508,
+        -0.4654238095238096
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 310,
+       "regret": 0.0,
+       "first_fail": 0.3548387096774194,
+       "diff": -1.0144336917562724,
+       "diff_ci": [
+        -1.3561662186379932,
+        -0.700535483870968
+       ]
+      }
+     },
+     "single_regret": 0.37481398252184767,
+     "single_regret_ci": [
+      0.2456245630461923,
+      0.5216457553058675
+     ],
+     "single_diff": -0.6168052434456929,
+     "single_diff_ci": [
+      -0.7658930711610487,
+      -0.46404765917603
+     ],
+     "single_first_fail": 0.39325842696629215,
+     "single_usable": 0.6025280898876404,
+     "single_last_ok": 0.8539325842696629,
+     "single_last_err": 1.03,
+     "single_last_err_mean": 1.5618955263157894,
+     "single_last_gap": 0.006403245942571788,
+     "season_regret": 0.8049256666666667,
+     "season_regret_ci": [
+      0.7690844037037036,
+      0.8416850796296296
+     ],
+     "season_diff": -1.3423625185185186,
+     "season_diff_ci": [
+      -1.3835007157407408,
+      -1.3004247796296298
+     ],
+     "season_first_fail": 0.33888888888888885,
+     "season_usable": 0.5841388888888889
+    },
+    "scene-posterior": {
+     "single_u_regret": 0.17004744069912625,
+     "single_u_diff": -0.7374619225967538,
+     "single_u_diff_ci": [
+      -0.9348978776529335,
+      -0.5513991573033705
+     ],
+     "season_u_regret": 0.25156651851851874,
+     "season_u_diff": -1.8073546666666662,
+     "season_u_diff_ci": [
+      -1.844960521296296,
+      -1.7701147157407402
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 230,
+       "regret": 0.0,
+       "first_fail": 0.0,
+       "diff": -0.8872850241545894,
+       "diff_ci": [
+        -1.2761547101449275,
+        -0.5067155797101452
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 350,
+       "regret": 0.0,
+       "first_fail": 0.05714285714285714,
+       "diff": -1.0399746031746033,
+       "diff_ci": [
+        -1.3189825396825399,
+        -0.77479126984127
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 310,
+       "regret": 0.0,
+       "first_fail": 0.3548387096774194,
+       "diff": -1.0144336917562724,
+       "diff_ci": [
+        -1.3227979390681006,
+        -0.7009603046594982
+       ]
+      }
+     },
+     "single_regret": 0.0,
+     "single_regret_ci": [
+      0.0,
+      0.0
+     ],
+     "single_diff": -0.9916192259675407,
+     "single_diff_ci": [
+      -1.179219881398252,
+      -0.8139696317103622
+     ],
+     "single_first_fail": 0.14606741573033707,
+     "single_usable": 0.6292134831460674,
+     "single_last_ok": 0.8539325842696629,
+     "single_last_err": 1.37,
+     "single_last_err_mean": 1.8907069736842106,
+     "single_last_gap": 0.0,
+     "season_regret": 0.0,
+     "season_regret_ci": [
+      0.0,
+      0.0
+     ],
+     "season_diff": -2.1472881851851855,
+     "season_diff_ci": [
+      -2.1871283435185185,
+      -2.109957117592593
+     ],
+     "season_first_fail": 0.1514444444444444,
+     "season_usable": 0.6258888888888888
+    },
+    "fitted-priors[bucket, n0=3]": {
+     "single_u_regret": 0.18318851435705386,
+     "single_u_diff": -0.7243208489388262,
+     "single_u_diff_ci": [
+      -0.9278345817727838,
+      -0.5203155118601746
+     ],
+     "season_u_regret": 0.2685794814814817,
+     "season_u_diff": -1.7903417037037035,
+     "season_u_diff_ci": [
+      -1.82794937037037,
+      -1.7520883620370369
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 230,
+       "regret": 0.0,
+       "first_fail": 0.0,
+       "diff": -0.8872850241545894,
+       "diff_ci": [
+        -1.2581806763285028,
+        -0.49244601449275466
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 350,
+       "regret": 0.01699047619047619,
+       "first_fail": 0.05714285714285714,
+       "diff": -1.022984126984127,
+       "diff_ci": [
+        -1.3076957142857144,
+        -0.7440819047619052
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 310,
+       "regret": 0.030157706093189962,
+       "first_fail": 0.3548387096774194,
+       "diff": -0.9842759856630826,
+       "diff_ci": [
+        -1.3206943548387098,
+        -0.6533483870967743
+       ]
+      }
+     },
+     "single_regret": 0.01718601747815231,
+     "single_regret_ci": [
+      0.002042446941323346,
+      0.03599250936329588
+     ],
+     "single_diff": -0.9744332084893884,
+     "single_diff_ci": [
+      -1.1622312421972534,
+      -0.7883005930087392
+     ],
+     "single_first_fail": 0.14606741573033707,
+     "single_usable": 0.6292134831460674,
+     "single_last_ok": 0.8460674157303371,
+     "single_last_err": 1.3699,
+     "single_last_err_mean": 1.8611462151394422,
+     "single_last_gap": 0.0016674157303370786,
+     "season_regret": 0.02182296296296296,
+     "season_regret_ci": [
+      0.01834011851851852,
+      0.02527515185185185
+     ],
+     "season_diff": -2.1254652222222226,
+     "season_diff_ci": [
+      -2.164494875,
+      -2.0862607351851854
+     ],
+     "season_first_fail": 0.15255555555555556,
+     "season_usable": 0.6257222222222222
+    },
+    "fitted-priors[bucket, n0=8]": {
+     "single_u_regret": 0.17295605493133598,
+     "single_u_diff": -0.734553308364544,
+     "single_u_diff_ci": [
+      -0.9334450624219724,
+      -0.5453359300873905
+     ],
+     "season_u_regret": 0.28485988888888913,
+     "season_u_diff": -1.7740612962962963,
+     "season_u_diff_ci": [
+      -1.8133010685185185,
+      -1.7350185824074074
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 230,
+       "regret": 0.0,
+       "first_fail": 0.0,
+       "diff": -0.8872850241545894,
+       "diff_ci": [
+        -1.2768609903381645,
+        -0.5134782608695652
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 350,
+       "regret": 0.005193650793650793,
+       "first_fail": 0.05714285714285714,
+       "diff": -1.0347809523809526,
+       "diff_ci": [
+        -1.317311111111111,
+        -0.7498293650793653
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 310,
+       "regret": 0.00848673835125448,
+       "first_fail": 0.3548387096774194,
+       "diff": -1.0059469534050178,
+       "diff_ci": [
+        -1.3378414874551974,
+        -0.6751045519713263
+       ]
+      }
+     },
+     "single_regret": 0.004998501872659176,
+     "single_regret_ci": [
+      0.0,
+      0.012039450686641697
+     ],
+     "single_diff": -0.9866207240948816,
+     "single_diff_ci": [
+      -1.1775101560549315,
+      -0.7990092946317104
+     ],
+     "single_first_fail": 0.14606741573033707,
+     "single_usable": 0.6292134831460674,
+     "single_last_ok": 0.8415730337078652,
+     "single_last_err": 1.3666,
+     "single_last_err_mean": 1.8116431241655542,
+     "single_last_gap": 0.0015952559300873906,
+     "season_regret": 0.044308000000000014,
+     "season_regret_ci": [
+      0.03597384351851852,
+      0.052667587962962954
+     ],
+     "season_diff": -2.1029801851851855,
+     "season_diff_ci": [
+      -2.1418880851851854,
+      -2.0634843407407413
+     ],
+     "season_first_fail": 0.15788888888888888,
+     "season_usable": 0.6263611111111111
+    },
+    "fitted-priors[bucket+scale, n0=3]": {
+     "single_u_regret": 0.1818664169787767,
+     "single_u_diff": -0.7256429463171035,
+     "single_u_diff_ci": [
+      -0.923837172284644,
+      -0.528466011235955
+     ],
+     "season_u_regret": 0.32897900000000024,
+     "season_u_diff": -1.7299421851851848,
+     "season_u_diff_ci": [
+      -1.772150072222222,
+      -1.6909604222222219
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 230,
+       "regret": 0.0,
+       "first_fail": 0.0,
+       "diff": -0.8872850241545894,
+       "diff_ci": [
+        -1.273915096618358,
+        -0.5083219806763287
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 350,
+       "regret": 0.032568253968253975,
+       "first_fail": 0.05714285714285714,
+       "diff": -1.0074063492063492,
+       "diff_ci": [
+        -1.3002233333333333,
+        -0.7248364285714287
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 310,
+       "regret": 0.006838709677419355,
+       "first_fail": 0.3548387096774194,
+       "diff": -1.007594982078853,
+       "diff_ci": [
+        -1.3567172939068104,
+        -0.682274283154122
+       ]
+      }
+     },
+     "single_regret": 0.015189762796504374,
+     "single_regret_ci": [
+      0.002042446941323346,
+      0.03299138576779019
+     ],
+     "single_diff": -0.9764294631710364,
+     "single_diff_ci": [
+      -1.1670206304619224,
+      -0.7936429151061175
+     ],
+     "single_first_fail": 0.14606741573033707,
+     "single_usable": 0.6292134831460674,
+     "single_last_ok": 0.8539325842696629,
+     "single_last_err": 1.37,
+     "single_last_err_mean": 1.8907069736842106,
+     "single_last_gap": 0.0,
+     "season_regret": 0.09792174074074077,
+     "season_regret_ci": [
+      0.08299718240740742,
+      0.11279661574074075
+     ],
+     "season_diff": -2.0493664444444444,
+     "season_diff_ci": [
+      -2.0907678842592596,
+      -2.007630476851852
+     ],
+     "season_first_fail": 0.16255555555555554,
+     "season_usable": 0.6241388888888888
+    },
+    "fitted-priors[bucket+scale, n0=8]": {
+     "single_u_regret": 0.18015855181023738,
+     "single_u_diff": -0.7273508114856427,
+     "single_u_diff_ci": [
+      -0.924769319600499,
+      -0.5289897315855179
+     ],
+     "season_u_regret": 0.28228322222222246,
+     "season_u_diff": -1.7766379629629627,
+     "season_u_diff_ci": [
+      -1.8166760666666664,
+      -1.739176361111111
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 230,
+       "regret": 0.0,
+       "first_fail": 0.0,
+       "diff": -0.8872850241545894,
+       "diff_ci": [
+        -1.2691006038647346,
+        -0.4985217391304348
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 350,
+       "regret": 0.032568253968253975,
+       "first_fail": 0.05714285714285714,
+       "diff": -1.0074063492063492,
+       "diff_ci": [
+        -1.2943380952380956,
+        -0.7107385714285716
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 310,
+       "regret": 0.0,
+       "first_fail": 0.3548387096774194,
+       "diff": -1.0144336917562724,
+       "diff_ci": [
+        -1.3281984767025095,
+        -0.6816970430107527
+       ]
+      }
+     },
+     "single_regret": 0.01280774032459426,
+     "single_regret_ci": [
+      0.0,
+      0.030254681647940075
+     ],
+     "single_diff": -0.9788114856429465,
+     "single_diff_ci": [
+      -1.1676149500624218,
+      -0.7926458177278406
+     ],
+     "single_first_fail": 0.14606741573033707,
+     "single_usable": 0.6292134831460674,
+     "single_last_ok": 0.8415730337078652,
+     "single_last_err": 1.3666,
+     "single_last_err_mean": 1.8267176234979972,
+     "single_last_gap": 0.006228214731585518,
+     "season_regret": 0.040846518518518525,
+     "season_regret_ci": [
+      0.03282237685185185,
+      0.0499989175925926
+     ],
+     "season_diff": -2.106441666666667,
+     "season_diff_ci": [
+      -2.147404083333334,
+      -2.065137153703704
+     ],
+     "season_first_fail": 0.15699999999999997,
+     "season_usable": 0.6257222222222222
+    },
+    "q-learning": {
+     "single_u_regret": 0.4119488139825219,
+     "single_u_diff": -0.4955605493133581,
+     "single_u_diff_ci": [
+      -0.6874154494382021,
+      -0.31948189762796514
+     ],
+     "season_u_regret": 1.001840888888889,
+     "season_u_diff": -1.0570802962962962,
+     "season_u_diff_ci": [
+      -1.1038433490740738,
+      -1.0119740379629627
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 230,
+       "regret": 0.0,
+       "first_fail": 0.0,
+       "diff": -0.8872850241545894,
+       "diff_ci": [
+        -1.2513807971014497,
+        -0.5067155797101452
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 350,
+       "regret": 0.31209523809523815,
+       "first_fail": 0.3142857142857143,
+       "diff": -0.7278793650793651,
+       "diff_ci": [
+        -0.9656844444444448,
+        -0.5058092063492065
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 310,
+       "regret": 0.47117562724014334,
+       "first_fail": 0.6451612903225806,
+       "diff": -0.5432580645161291,
+       "diff_ci": [
+        -0.882963888888889,
+        -0.22822544802867395
+       ]
+      }
+     },
+     "single_regret": 0.2868514357053683,
+     "single_regret_ci": [
+      0.1662727215980025,
+      0.42664547440699124
+     ],
+     "single_diff": -0.7047677902621723,
+     "single_diff_ci": [
+      -0.8889613607990012,
+      -0.5257648252184769
+     ],
+     "single_first_fail": 0.34831460674157305,
+     "single_usable": 0.6179775280898876,
+     "single_last_ok": 0.8539325842696629,
+     "single_last_err": 1.3329,
+     "single_last_err_mean": 1.8302669736842105,
+     "single_last_gap": 0.0,
+     "season_regret": 0.8579115925925925,
+     "season_regret_ci": [
+      0.817251937037037,
+      0.9008043194444445
+     ],
+     "season_diff": -1.2893765925925926,
+     "season_diff_ci": [
+      -1.3405738685185187,
+      -1.239662126851852
+     ],
+     "season_first_fail": 0.3401111111111111,
+     "season_usable": 0.6024722222222223
+    },
+    "oracle": {
+     "single_u_regret": 0.00015980024968789916,
+     "single_u_diff": -0.9073495630461921,
+     "single_u_diff_ci": [
+      -1.0808362671660425,
+      -0.73938854556804
+     ],
+     "season_u_regret": 0.0002465185185185324,
+     "season_u_diff": -2.0586746666666667,
+     "season_u_diff_ci": [
+      -2.0954024555555555,
+      -2.0212613111111115
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 230,
+       "regret": 0.0,
+       "first_fail": 0.0,
+       "diff": -0.8872850241545894,
+       "diff_ci": [
+        -1.2857432367149761,
+        -0.4985217391304348
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 350,
+       "regret": 0.0,
+       "first_fail": 0.05714285714285714,
+       "diff": -1.0399746031746033,
+       "diff_ci": [
+        -1.3169750793650798,
+        -0.7575846031746035
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 310,
+       "regret": 0.0,
+       "first_fail": 0.3548387096774194,
+       "diff": -1.0144336917562724,
+       "diff_ci": [
+        -1.3627543010752694,
+        -0.7000026881720433
+       ]
+      }
+     },
+     "single_regret": 0.0,
+     "single_regret_ci": [
+      0.0,
+      0.0
+     ],
+     "single_diff": -0.9916192259675407,
+     "single_diff_ci": [
+      -1.1793809612983768,
+      -0.81300836454432
+     ],
+     "single_first_fail": 0.14606741573033707,
+     "single_usable": 0.651685393258427,
+     "single_last_ok": 0.8539325842696629,
+     "single_last_err": 0.87105,
+     "single_last_err_mean": 1.4316372368421053,
+     "single_last_gap": 0.0,
+     "season_regret": 0.0,
+     "season_regret_ci": [
+      0.0,
+      0.0
+     ],
+     "season_diff": -2.1472881851851855,
+     "season_diff_ci": [
+      -2.184174737037037,
+      -2.107253427777778
+     ],
+     "season_first_fail": 0.1514444444444444,
+     "season_usable": 0.6468888888888888
+    }
+   }
+  },
+  "shifted": {
+   "scenes": 85,
+   "skipped": 0,
+   "policies": {
+    "shipped": {
+     "single_u_regret": 1.1985797385620913,
+     "single_u_diff": 0.0,
+     "single_u_diff_ci": [
+      0.0,
+      0.0
+     ],
+     "season_u_regret": 2.3571583333333335,
+     "season_u_diff": 0.0,
+     "season_u_diff_ci": [
+      0.0,
+      0.0
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 140,
+       "regret": 1.4591150793650798,
+       "first_fail": 0.7857142857142857,
+       "diff": 0.0,
+       "diff_ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 370,
+       "regret": 1.1991951951951954,
+       "first_fail": 0.6216216216216216,
+       "diff": 0.0,
+       "diff_ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 340,
+       "regret": 1.485503267973856,
+       "first_fail": 0.8529411764705882,
+       "diff": 0.0,
+       "diff_ci": [
+        0.0,
+        0.0
+       ]
+      }
+     },
+     "single_regret": 1.3565287581699348,
+     "single_regret_ci": [
+      1.1258828267973857,
+      1.591570604575163
+     ],
+     "single_diff": 0.0,
+     "single_diff_ci": [
+      0.0,
+      0.0
+     ],
+     "single_first_fail": 0.7411764705882353,
+     "single_usable": 0.5147058823529411,
+     "single_last_ok": 0.8352941176470589,
+     "single_last_err": 0.9794499999999999,
+     "single_last_err_mean": 1.6459904225352113,
+     "single_last_gap": 0.05101830065359478,
+     "season_regret": 2.5566203333333335,
+     "season_regret_ci": [
+      2.5142652962962964,
+      2.603837797222222
+     ],
+     "season_diff": 0.0,
+     "season_diff_ci": [
+      0.0,
+      0.0
+     ],
+     "season_first_fail": 0.5893333333333334,
+     "season_usable": 0.46227777777777773
+    },
+    "always-standard": {
+     "single_u_regret": 4.1964026143790845,
+     "single_u_diff": 2.9978228758169934,
+     "single_u_diff_ci": [
+      2.4079026797385614,
+      3.563918627450979
+     ],
+     "season_u_regret": 6.283222814814813,
+     "season_u_diff": 3.926064481481481,
+     "season_u_diff_ci": [
+      3.835122082407407,
+      4.019355000925925
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 140,
+       "regret": 6.047746031746033,
+       "first_fail": 0.7857142857142857,
+       "diff": 4.588630952380954,
+       "diff_ci": [
+        3.1090252976190484,
+        5.782739186507938
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 370,
+       "regret": 4.063183183183185,
+       "first_fail": 0.6216216216216216,
+       "diff": 2.8639879879879886,
+       "diff_ci": [
+        1.9301778528528533,
+        3.798151276276275
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 340,
+       "regret": 4.351058823529412,
+       "first_fail": 0.8529411764705882,
+       "diff": 2.8655555555555554,
+       "diff_ci": [
+        2.0105082516339867,
+        3.708141503267974
+       ]
+      }
+     },
+     "single_regret": 4.505202614379085,
+     "single_regret_ci": [
+      3.7574985620915036,
+      5.226795032679738
+     ],
+     "single_diff": 3.1486738562091507,
+     "single_diff_ci": [
+      2.5518582189542482,
+      3.752733382352942
+     ],
+     "single_first_fail": 0.7411764705882353,
+     "single_usable": 0.25882352941176473,
+     "single_last_ok": 0.25882352941176473,
+     "single_last_err": 0.5682,
+     "single_last_err_mean": 0.6893027272727271,
+     "single_last_gap": 0.5631503267973856,
+     "season_regret": 6.749575851851852,
+     "season_regret_ci": [
+      6.63904145925926,
+      6.85182105925926
+     ],
+     "season_diff": 4.192955518518518,
+     "season_diff_ci": [
+      4.093372155555556,
+      4.2890807768518515
+     ],
+     "season_first_fail": 0.7355555555555555,
+     "season_usable": 0.2644444444444445
+    },
+    "best-fixed (very_soft)": {
+     "single_u_regret": 0.08990326797385628,
+     "single_u_diff": -1.108676470588235,
+     "single_u_diff_ci": [
+      -1.3477652287581696,
+      -0.8790442156862747
+     ],
+     "season_u_regret": 0.13480177777777788,
+     "season_u_diff": -2.2223565555555553,
+     "season_u_diff_ci": [
+      -2.265705522222222,
+      -2.177366539814815
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 140,
+       "regret": 0.0,
+       "first_fail": 0.0,
+       "diff": -1.4591150793650798,
+       "diff_ci": [
+        -1.9825803571428573,
+        -0.9069230158730163
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 370,
+       "regret": 0.0004564564564564942,
+       "first_fail": 0.13513513513513514,
+       "diff": -1.198738738738739,
+       "diff_ci": [
+        -1.5344192192192194,
+        -0.9039555555555556
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 340,
+       "regret": 0.0,
+       "first_fail": 0.2647058823529412,
+       "diff": -1.485503267973856,
+       "diff_ci": [
+        -1.8946353758169936,
+        -1.10491568627451
+       ]
+      }
+     },
+     "single_regret": 0.00019869281045753278,
+     "single_regret_ci": [
+      0.0,
+      0.0005960784313725983
+     ],
+     "single_diff": -1.3563300653594772,
+     "single_diff_ci": [
+      -1.5947107843137251,
+      -1.1317312091503269
+     ],
+     "single_first_fail": 0.16470588235294117,
+     "single_usable": 0.4470588235294118,
+     "single_last_ok": 0.8352941176470589,
+     "single_last_err": 1.9444,
+     "single_last_err_mean": 2.2363959154929574,
+     "single_last_gap": 2.4836601307191597e-05,
+     "season_regret": 0.0002899259259259499,
+     "season_regret_ci": [
+      0.00023637407407409362,
+      0.00034622222222225083
+     ],
+     "season_diff": -2.556330407407408,
+     "season_diff_ci": [
+      -2.6021025425925925,
+      -2.5092019444444444
+     ],
+     "season_first_fail": 0.16,
+     "season_usable": 0.44466666666666665
+    },
+    "shipped+thompson": {
+     "single_u_regret": 1.5114807843137255,
+     "single_u_diff": 0.312901045751634,
+     "single_u_diff_ci": [
+      0.16972976143790852,
+      0.4634645555555555
+     ],
+     "season_u_regret": 2.532048074074074,
+     "season_u_diff": 0.17488974074074076,
+     "season_u_diff_ci": [
+      0.13143140370370374,
+      0.22291051666666667
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 140,
+       "regret": 1.7014650793650796,
+       "first_fail": 0.4357142857142857,
+       "diff": 0.24234999999999995,
+       "diff_ci": [
+        -0.03667994047619059,
+        0.5388205357142855
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 370,
+       "regret": 1.4875024024024024,
+       "first_fail": 0.46756756756756757,
+       "diff": 0.2883072072072071,
+       "diff_ci": [
+        0.02663354354354343,
+        0.5416320720720718
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 340,
+       "regret": 1.7821787581699344,
+       "first_fail": 0.6705882352941176,
+       "diff": 0.2966754901960784,
+       "diff_ci": [
+        0.03859769607843128,
+        0.5713029084967323
+       ]
+      }
+     },
+     "single_regret": 1.6406138562091503,
+     "single_regret_ci": [
+      1.34534277124183,
+      1.9379692418300656
+     ],
+     "single_diff": 0.28408509803921567,
+     "single_diff_ci": [
+      0.11352901633986921,
+      0.44253176470588246
+     ],
+     "single_first_fail": 0.5435294117647059,
+     "single_usable": 0.47205882352941175,
+     "single_last_ok": 0.7494117647058823,
+     "single_last_err": 1.1359,
+     "single_last_err_mean": 1.504438775510204,
+     "single_last_gap": 0.09733189542483661,
+     "season_regret": 2.7137365185185187,
+     "season_regret_ci": [
+      2.6616979814814816,
+      2.765638963888889
+     ],
+     "season_diff": 0.15711618518518522,
+     "season_diff_ci": [
+      0.10848951759259265,
+      0.2055187824074074
+     ],
+     "season_first_fail": 0.44811111111111107,
+     "season_usable": 0.44866666666666666
+    },
+    "shipped+ucb(1)": {
+     "single_u_regret": 1.053201699346405,
+     "single_u_diff": -0.14537803921568626,
+     "single_u_diff_ci": [
+      -0.23169189215686278,
+      -0.07218138888888892
+     ],
+     "season_u_regret": 1.8920245925925925,
+     "season_u_diff": -0.46513374074074076,
+     "season_u_diff_ci": [
+      -0.4910250694444444,
+      -0.44001262962962956
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 140,
+       "regret": 1.2642142857142857,
+       "first_fail": 0.7857142857142857,
+       "diff": -0.19490079365079374,
+       "diff_ci": [
+        -0.4353256944444446,
+        0.0
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 370,
+       "regret": 1.0645294294294296,
+       "first_fail": 0.6216216216216216,
+       "diff": -0.13466576576576578,
+       "diff_ci": [
+        -0.2733188888888889,
+        -0.02604204204204204
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 340,
+       "regret": 1.3224771241830062,
+       "first_fail": 0.8529411764705882,
+       "diff": -0.16302614379084973,
+       "diff_ci": [
+        -0.31397434640522887,
+        -0.04240522875816997
+       ]
+      }
+     },
+     "single_regret": 1.2005977777777779,
+     "single_regret_ci": [
+      0.9947753594771243,
+      1.4073184673202612
+     ],
+     "single_diff": -0.15593098039215691,
+     "single_diff_ci": [
+      -0.24739155228758178,
+      -0.07719469934640527
+     ],
+     "single_first_fail": 0.7411764705882353,
+     "single_usable": 0.5117647058823529,
+     "single_last_ok": 0.8235294117647058,
+     "single_last_err": 0.93115,
+     "single_last_err_mean": 1.564423142857143,
+     "single_last_gap": 0.023928496732026155,
+     "season_regret": 2.053062037037037,
+     "season_regret_ci": [
+      2.014009219444444,
+      2.0904847953703705
+     ],
+     "season_diff": -0.5035582962962963,
+     "season_diff_ci": [
+      -0.5295079259259259,
+      -0.4766806916666666
+     ],
+     "season_first_fail": 0.538,
+     "season_usable": 0.4721111111111111
+    },
+    "shipped+discount(0.85)": {
+     "single_u_regret": 1.3348750326797383,
+     "single_u_diff": 0.13629529411764701,
+     "single_u_diff_ci": [
+      0.07605393464052286,
+      0.2061885522875816
+     ],
+     "season_u_regret": 2.503340555555555,
+     "season_u_diff": 0.1461822222222222,
+     "season_u_diff_ci": [
+      0.12576261296296296,
+      0.16602082499999996
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 140,
+       "regret": 1.671646825396826,
+       "first_fail": 0.7857142857142857,
+       "diff": 0.21253174603174604,
+       "diff_ci": [
+        0.0,
+        0.4752460317460316
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 370,
+       "regret": 1.2887171171171172,
+       "first_fail": 0.6216216216216216,
+       "diff": 0.08952192192192189,
+       "diff_ci": [
+        0.023543543543543526,
+        0.17342154654654646
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 340,
+       "regret": 1.6601343137254905,
+       "first_fail": 0.8529411764705882,
+       "diff": 0.17463104575163396,
+       "diff_ci": [
+        0.0669568545751634,
+        0.2818997549019606
+       ]
+      }
+     },
+     "single_regret": 1.5003547712418304,
+     "single_regret_ci": [
+      1.2322198071895425,
+      1.7905784052287579
+     ],
+     "single_diff": 0.1438260130718954,
+     "single_diff_ci": [
+      0.0773846633986928,
+      0.21592383333333323
+     ],
+     "single_first_fail": 0.7411764705882353,
+     "single_usable": 0.5073529411764706,
+     "single_last_ok": 0.8105882352941176,
+     "single_last_err": 0.9924,
+     "single_last_err_mean": 1.5569021770682145,
+     "single_last_gap": 0.07242039215686276,
+     "season_regret": 2.7261640740740742,
+     "season_regret_ci": [
+      2.6777245657407405,
+      2.7777961879629633
+     ],
+     "season_diff": 0.16954374074074077,
+     "season_diff_ci": [
+      0.14844680648148148,
+      0.19019298240740742
+     ],
+     "season_first_fail": 0.6104444444444445,
+     "season_usable": 0.4628333333333333
+    },
+    "shipped+scale-kernel(0.3)": {
+     "single_u_regret": 1.1985797385620913,
+     "single_u_diff": 0.0,
+     "single_u_diff_ci": [
+      0.0,
+      0.0
+     ],
+     "season_u_regret": 2.623797074074074,
+     "season_u_diff": 0.26663874074074073,
+     "season_u_diff_ci": [
+      0.24175979444444443,
+      0.2932806361111111
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 140,
+       "regret": 1.4591150793650798,
+       "first_fail": 0.7857142857142857,
+       "diff": 0.0,
+       "diff_ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 370,
+       "regret": 1.1991951951951954,
+       "first_fail": 0.6216216216216216,
+       "diff": 0.0,
+       "diff_ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 340,
+       "regret": 1.485503267973856,
+       "first_fail": 0.8529411764705882,
+       "diff": 0.0,
+       "diff_ci": [
+        0.0,
+        0.0
+       ]
+      }
+     },
+     "single_regret": 1.3565287581699348,
+     "single_regret_ci": [
+      1.1331481045751635,
+      1.5815570588235295
+     ],
+     "single_diff": 0.0,
+     "single_diff_ci": [
+      0.0,
+      0.0
+     ],
+     "single_first_fail": 0.7411764705882353,
+     "single_usable": 0.5147058823529411,
+     "single_last_ok": 0.8352941176470589,
+     "single_last_err": 0.9794499999999999,
+     "single_last_err_mean": 1.6459904225352113,
+     "single_last_gap": 0.05101830065359478,
+     "season_regret": 2.8707427777777776,
+     "season_regret_ci": [
+      2.8207238824074077,
+      2.9210099814814816
+     ],
+     "season_diff": 0.3141224444444444,
+     "season_diff_ci": [
+      0.2873624962962963,
+      0.34398570925925925
+     ],
+     "season_first_fail": 0.6567777777777778,
+     "season_usable": 0.46508333333333335
+    },
+    "shipped+floor": {
+     "single_u_regret": 0.3856006535947712,
+     "single_u_diff": -0.8129790849673203,
+     "single_u_diff_ci": [
+      -1.035382614379085,
+      -0.6212967973856209
+     ],
+     "season_u_regret": 0.9363042222222223,
+     "season_u_diff": -1.420854111111111,
+     "season_u_diff_ci": [
+      -1.4732906074074072,
+      -1.3697197083333335
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 140,
+       "regret": 1.4591150793650798,
+       "first_fail": 0.7857142857142857,
+       "diff": 0.0,
+       "diff_ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 370,
+       "regret": 0.40658258258258256,
+       "first_fail": 0.3783783783783784,
+       "diff": -0.7926126126126128,
+       "diff_ci": [
+        -1.0126860360360361,
+        -0.5837405405405408
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 340,
+       "regret": 0.0,
+       "first_fail": 0.2647058823529412,
+       "diff": -1.485503267973856,
+       "diff_ci": [
+        -1.8763657679738566,
+        -1.0935675653594774
+       ]
+      }
+     },
+     "single_regret": 0.41730784313725494,
+     "single_regret_ci": [
+      0.2670673856209151,
+      0.5749475
+     ],
+     "single_diff": -0.9392209150326799,
+     "single_diff_ci": [
+      -1.1611516666666668,
+      -0.732605653594771
+     ],
+     "single_first_fail": 0.4,
+     "single_usable": 0.5088235294117647,
+     "single_last_ok": 0.8352941176470589,
+     "single_last_err": 1.2739,
+     "single_last_err_mean": 1.756854366197183,
+     "single_last_gap": 0.013896732026143794,
+     "season_regret": 0.9623023703703704,
+     "season_regret_ci": [
+      0.9220688398148148,
+      1.0037434972222223
+     ],
+     "season_diff": -1.5943179629629631,
+     "season_diff_ci": [
+      -1.6502341814814814,
+      -1.5379760888888891
+     ],
+     "season_first_fail": 0.3407777777777778,
+     "season_usable": 0.46880555555555553
+    },
+    "shipped+floor(slack 1)": {
+     "single_u_regret": 0.8764411764705883,
+     "single_u_diff": -0.3221385620915032,
+     "single_u_diff_ci": [
+      -0.44824947712418295,
+      -0.21087382352941178
+     ],
+     "season_u_regret": 1.9765770740740742,
+     "season_u_diff": -0.38058125925925923,
+     "season_u_diff_ci": [
+      -0.4178121768518518,
+      -0.34428193518518524
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 140,
+       "regret": 1.4591150793650798,
+       "first_fail": 0.7857142857142857,
+       "diff": 0.0,
+       "diff_ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 370,
+       "regret": 1.1991951951951954,
+       "first_fail": 0.6216216216216216,
+       "diff": 0.0,
+       "diff_ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 340,
+       "regret": 0.6156035947712419,
+       "first_fail": 0.5882352941176471,
+       "diff": -0.8698996732026143,
+       "diff_ci": [
+        -1.1053538398692808,
+        -0.6300908251633986
+       ]
+      }
+     },
+     "single_regret": 1.008568888888889,
+     "single_regret_ci": [
+      0.8028720620915035,
+      1.2116793300653594
+     ],
+     "single_diff": -0.3479598692810457,
+     "single_diff_ci": [
+      -0.4882061143790849,
+      -0.2225429183006536
+     ],
+     "single_first_fail": 0.6352941176470588,
+     "single_usable": 0.5205882352941177,
+     "single_last_ok": 0.8341176470588235,
+     "single_last_err": 0.9665,
+     "single_last_err_mean": 1.6393234132581098,
+     "single_last_gap": 0.042413986928104594,
+     "season_regret": 2.1539235555555556,
+     "season_regret_ci": [
+      2.1113906555555557,
+      2.199673389814815
+     ],
+     "season_diff": -0.4026967777777777,
+     "season_diff_ci": [
+      -0.4408408888888888,
+      -0.36259238148148143
+     ],
+     "season_first_fail": 0.5253333333333333,
+     "season_usable": 0.4686944444444444
+    },
+    "shipped+floor+probe": {
+     "single_u_regret": 0.04291764705882353,
+     "single_u_diff": -1.1556620915032678,
+     "single_u_diff_ci": [
+      -1.372501323529412,
+      -0.9503555718954247
+     ],
+     "season_u_regret": 0.08223718518518522,
+     "season_u_diff": -2.2749211481481484,
+     "season_u_diff_ci": [
+      -2.3202323212962965,
+      -2.2322060296296296
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 140,
+       "regret": 0.12095238095238095,
+       "first_fail": 0.0,
+       "diff": -1.3381626984126986,
+       "diff_ci": [
+        -1.8799962301587307,
+        -0.8179371031746033
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 370,
+       "regret": 0.0543183183183183,
+       "first_fail": 0.13513513513513514,
+       "diff": -1.1448768768768771,
+       "diff_ci": [
+        -1.459920495495496,
+        -0.8350355105105112
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 340,
+       "regret": 0.0,
+       "first_fail": 0.2647058823529412,
+       "diff": -1.485503267973856,
+       "diff_ci": [
+        -1.8795873366013074,
+        -1.0742876633986929
+       ]
+      }
+     },
+     "single_regret": 0.043566013071895414,
+     "single_regret_ci": [
+      0.012893856209150309,
+      0.09312862745098038
+     ],
+     "single_diff": -1.3129627450980392,
+     "single_diff_ci": [
+      -1.555102091503268,
+      -1.0842510294117649
+     ],
+     "single_first_fail": 0.16470588235294117,
+     "single_usable": 0.5294117647058824,
+     "single_last_ok": 0.8352941176470589,
+     "single_last_err": 1.4624000000000001,
+     "single_last_err_mean": 1.7785695774647887,
+     "single_last_gap": 0.005445751633986927,
+     "season_regret": 0.047865333333333336,
+     "season_regret_ci": [
+      0.042699937037037033,
+      0.05298237777777777
+     ],
+     "season_diff": -2.508755,
+     "season_diff_ci": [
+      -2.5557835361111114,
+      -2.464949410185185
+     ],
+     "season_first_fail": 0.16,
+     "season_usable": 0.5042222222222222
+    },
+    "shipped+floor+probe(slack 1)": {
+     "single_u_regret": 0.674324183006536,
+     "single_u_diff": -0.5242555555555555,
+     "single_u_diff_ci": [
+      -0.660166928104575,
+      -0.3990025816993463
+     ],
+     "season_u_regret": 1.6404866296296294,
+     "season_u_diff": -0.7166717037037036,
+     "season_u_diff_ci": [
+      -0.7565719972222221,
+      -0.6764655777777777
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 140,
+       "regret": 1.1005,
+       "first_fail": 0.6428571428571429,
+       "diff": -0.35861507936507947,
+       "diff_ci": [
+        -0.6393594246031747,
+        -0.12035882936507944
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 370,
+       "regret": 0.8617117117117118,
+       "first_fail": 0.5405405405405406,
+       "diff": -0.33748348348348345,
+       "diff_ci": [
+        -0.5031938438438439,
+        -0.18237192192192198
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 340,
+       "regret": 0.5952375816993464,
+       "first_fail": 0.5588235294117647,
+       "diff": -0.8902656862745099,
+       "diff_ci": [
+        -1.1366191666666665,
+        -0.6655289787581699
+       ]
+      }
+     },
+     "single_regret": 0.7944518954248369,
+     "single_regret_ci": [
+      0.6438233300653597,
+      0.9560773758169935
+     ],
+     "single_diff": -0.5620768627450979,
+     "single_diff_ci": [
+      -0.7045486797385621,
+      -0.4250846895424837
+     ],
+     "single_first_fail": 0.5647058823529412,
+     "single_usable": 0.5352941176470588,
+     "single_last_ok": 0.8341176470588235,
+     "single_last_err": 0.9665,
+     "single_last_err_mean": 1.6393234132581098,
+     "single_last_gap": 0.042413986928104594,
+     "season_regret": 1.8066083333333336,
+     "season_regret_ci": [
+      1.7652237712962966,
+      1.8506804564814818
+     ],
+     "season_diff": -0.750012,
+     "season_diff_ci": [
+      -0.7953031407407406,
+      -0.7046221685185184
+     ],
+     "season_first_fail": 0.4746666666666667,
+     "season_usable": 0.4964444444444444
+    },
+    "shipped+skip-cost(0.05)": {
+     "single_u_regret": 1.1840444444444445,
+     "single_u_diff": -0.014535294117647068,
+     "single_u_diff_ci": [
+      -0.06740684640522879,
+      0.022562336601307017
+     ],
+     "season_u_regret": 2.3636695185185186,
+     "season_u_diff": 0.006511185185185182,
+     "season_u_diff_ci": [
+      -0.0033542509259259293,
+      0.01651761018518518
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 140,
+       "regret": 1.3988650793650794,
+       "first_fail": 0.7857142857142857,
+       "diff": -0.06024999999999999,
+       "diff_ci": [
+        -0.18074999999999997,
+        0.0
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 370,
+       "regret": 1.2155525525525528,
+       "first_fail": 0.6216216216216216,
+       "diff": 0.016357357357357362,
+       "diff_ci": [
+        0.0,
+        0.04907207207207208
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 340,
+       "regret": 1.4580588235294119,
+       "first_fail": 0.8529411764705882,
+       "diff": -0.027444444444444487,
+       "diff_ci": [
+        -0.14639215686274523,
+        0.05336928104575165
+       ]
+      }
+     },
+     "single_regret": 1.342747712418301,
+     "single_regret_ci": [
+      1.1080535947712418,
+      1.5643826470588234
+     ],
+     "single_diff": -0.013781045751633999,
+     "single_diff_ci": [
+      -0.071283660130719,
+      0.027947712418300654
+     ],
+     "single_first_fail": 0.7411764705882353,
+     "single_usable": 0.5147058823529411,
+     "single_last_ok": 0.8117647058823529,
+     "single_last_err": 0.951,
+     "single_last_err_mean": 1.4960684057971014,
+     "single_last_gap": 0.05113202614379086,
+     "season_regret": 2.567272481481482,
+     "season_regret_ci": [
+      2.523035214814815,
+      2.6124101166666667
+     ],
+     "season_diff": 0.010652148148148155,
+     "season_diff_ci": [
+      0.0003317074074074104,
+      0.02160666388888889
+     ],
+     "season_first_fail": 0.5952222222222222,
+     "season_usable": 0.46361111111111114
+    },
+    "shipped+floor+skip-cost(0.05)": {
+     "single_u_regret": 0.3756771241830065,
+     "single_u_diff": -0.8229026143790851,
+     "single_u_diff_ci": [
+      -1.029330702614379,
+      -0.6293658986928108
+     ],
+     "season_u_regret": 0.9542276296296295,
+     "season_u_diff": -1.4029307037037035,
+     "season_u_diff_ci": [
+      -1.4549371925925922,
+      -1.3547124916666666
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 140,
+       "regret": 1.3988650793650794,
+       "first_fail": 0.7857142857142857,
+       "diff": -0.06024999999999999,
+       "diff_ci": [
+        -0.18074999999999997,
+        0.0
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 370,
+       "regret": 0.40658258258258256,
+       "first_fail": 0.3783783783783784,
+       "diff": -0.7926126126126128,
+       "diff_ci": [
+        -1.0248814564564566,
+        -0.5682939939939942
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 340,
+       "regret": 0.0,
+       "first_fail": 0.2647058823529412,
+       "diff": -1.485503267973856,
+       "diff_ci": [
+        -1.897600816993464,
+        -1.1242661764705886
+       ]
+      }
+     },
+     "single_regret": 0.4073843137254902,
+     "single_regret_ci": [
+      0.2638341176470589,
+      0.5588403921568627
+     ],
+     "single_diff": -0.9491444444444447,
+     "single_diff_ci": [
+      -1.1773276470588234,
+      -0.7465992973856211
+     ],
+     "single_first_fail": 0.4,
+     "single_usable": 0.5088235294117647,
+     "single_last_ok": 0.8352941176470589,
+     "single_last_err": 1.2739,
+     "single_last_err_mean": 1.756854366197183,
+     "single_last_gap": 0.013896732026143794,
+     "season_regret": 0.9862057777777778,
+     "season_regret_ci": [
+      0.9449390972222222,
+      1.0251511870370371
+     ],
+     "season_diff": -1.5704145555555558,
+     "season_diff_ci": [
+      -1.6282619666666667,
+      -1.5173989305555555
+     ],
+     "season_first_fail": 0.35022222222222216,
+     "season_usable": 0.4701666666666667
+    },
+    "tuned-beta (for reward)": {
+     "single_u_regret": 0.3961137254901961,
+     "single_u_diff": -0.8024660130718954,
+     "single_u_diff_ci": [
+      -1.0093163071895423,
+      -0.6030253104575166
+     ],
+     "season_u_regret": 0.7795347777777779,
+     "season_u_diff": -1.5776235555555553,
+     "season_u_diff_ci": [
+      -1.6234946833333332,
+      -1.5303481453703704
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 140,
+       "regret": 1.5183174603174605,
+       "first_fail": 0.7857142857142857,
+       "diff": 0.05920238095238091,
+       "diff_ci": [
+        -0.2289246031746032,
+        0.3069322420634919
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 370,
+       "regret": 0.41238738738738734,
+       "first_fail": 0.3783783783783784,
+       "diff": -0.7868078078078079,
+       "diff_ci": [
+        -1.007534684684685,
+        -0.5701546546546546
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 340,
+       "regret": 0.0,
+       "first_fail": 0.2647058823529412,
+       "diff": -1.485503267973856,
+       "diff_ci": [
+        -1.875012254901961,
+        -1.0958117647058823
+       ]
+      }
+     },
+     "single_regret": 0.4295856209150327,
+     "single_regret_ci": [
+      0.2780940522875817,
+      0.6031381699346406
+     ],
+     "single_diff": -0.9269431372549021,
+     "single_diff_ci": [
+      -1.1495436437908497,
+      -0.7131255228758173
+     ],
+     "single_first_fail": 0.4,
+     "single_usable": 0.5044117647058823,
+     "single_last_ok": 0.8117647058823529,
+     "single_last_err": 1.2739,
+     "single_last_err_mean": 1.7130782608695652,
+     "single_last_gap": 0.030094117647058827,
+     "season_regret": 0.798612925925926,
+     "season_regret_ci": [
+      0.765867826851852,
+      0.8310024740740741
+     ],
+     "season_diff": -1.7580074074074072,
+     "season_diff_ci": [
+      -1.8106873944444446,
+      -1.7096938361111114
+     ],
+     "season_first_fail": 0.3323333333333333,
+     "season_usable": 0.47908333333333336
+    },
+    "tuned-beta (for utility)": {
+     "single_u_regret": 0.3961137254901961,
+     "single_u_diff": -0.8024660130718954,
+     "single_u_diff_ci": [
+      -1.0216640686274507,
+      -0.6098805392156863
+     ],
+     "season_u_regret": 0.7795347777777779,
+     "season_u_diff": -1.5776235555555553,
+     "season_u_diff_ci": [
+      -1.6240818518518518,
+      -1.5323285296296294
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 140,
+       "regret": 1.5183174603174605,
+       "first_fail": 0.7857142857142857,
+       "diff": 0.05920238095238091,
+       "diff_ci": [
+        -0.19010753968253963,
+        0.3077619047619047
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 370,
+       "regret": 0.41238738738738734,
+       "first_fail": 0.3783783783783784,
+       "diff": -0.7868078078078079,
+       "diff_ci": [
+        -1.025557657657658,
+        -0.5665875375375377
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 340,
+       "regret": 0.0,
+       "first_fail": 0.2647058823529412,
+       "diff": -1.485503267973856,
+       "diff_ci": [
+        -1.8786934640522877,
+        -1.111606617647059
+       ]
+      }
+     },
+     "single_regret": 0.4295856209150327,
+     "single_regret_ci": [
+      0.27037098039215685,
+      0.614241862745098
+     ],
+     "single_diff": -0.9269431372549021,
+     "single_diff_ci": [
+      -1.1474698692810459,
+      -0.7049041339869283
+     ],
+     "single_first_fail": 0.4,
+     "single_usable": 0.5044117647058823,
+     "single_last_ok": 0.8117647058823529,
+     "single_last_err": 1.2739,
+     "single_last_err_mean": 1.7130782608695652,
+     "single_last_gap": 0.030094117647058827,
+     "season_regret": 0.798612925925926,
+     "season_regret_ci": [
+      0.7647715870370371,
+      0.8316879805555555
+     ],
+     "season_diff": -1.7580074074074072,
+     "season_diff_ci": [
+      -1.805686087962963,
+      -1.7048690592592597
+     ],
+     "season_first_fail": 0.3323333333333333,
+     "season_usable": 0.47908333333333336
+    },
+    "scene-posterior": {
+     "single_u_regret": 0.08990326797385628,
+     "single_u_diff": -1.108676470588235,
+     "single_u_diff_ci": [
+      -1.3346583169934643,
+      -0.8820762908496734
+     ],
+     "season_u_regret": 0.13480177777777788,
+     "season_u_diff": -2.2223565555555553,
+     "season_u_diff_ci": [
+      -2.2678426462962964,
+      -2.1792349157407402
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 140,
+       "regret": 0.0,
+       "first_fail": 0.0,
+       "diff": -1.4591150793650798,
+       "diff_ci": [
+        -2.0184346230158736,
+        -0.9379054563492069
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 370,
+       "regret": 0.0004564564564564942,
+       "first_fail": 0.13513513513513514,
+       "diff": -1.198738738738739,
+       "diff_ci": [
+        -1.5334186936936938,
+        -0.8824335585585587
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 340,
+       "regret": 0.0,
+       "first_fail": 0.2647058823529412,
+       "diff": -1.485503267973856,
+       "diff_ci": [
+        -1.8650559640522877,
+        -1.0781971405228759
+       ]
+      }
+     },
+     "single_regret": 0.00019869281045753278,
+     "single_regret_ci": [
+      0.0,
+      0.0005960784313725983
+     ],
+     "single_diff": -1.3563300653594772,
+     "single_diff_ci": [
+      -1.573554656862745,
+      -1.1304033823529414
+     ],
+     "single_first_fail": 0.16470588235294117,
+     "single_usable": 0.4470588235294118,
+     "single_last_ok": 0.8352941176470589,
+     "single_last_err": 1.9444,
+     "single_last_err_mean": 2.2363959154929574,
+     "single_last_gap": 2.4836601307191597e-05,
+     "season_regret": 0.0002899259259259499,
+     "season_regret_ci": [
+      0.00023362962962964894,
+      0.00034622222222225083
+     ],
+     "season_diff": -2.556330407407408,
+     "season_diff_ci": [
+      -2.604701312962963,
+      -2.505496713888889
+     ],
+     "season_first_fail": 0.16,
+     "season_usable": 0.44466666666666665
+    },
+    "fitted-priors[bucket, n0=3]": {
+     "single_u_regret": 0.10750588235294126,
+     "single_u_diff": -1.0910738562091502,
+     "single_u_diff_ci": [
+      -1.319116241830065,
+      -0.8674058823529412
+     ],
+     "season_u_regret": 0.1612457037037038,
+     "season_u_diff": -2.1959126296296296,
+     "season_u_diff_ci": [
+      -2.2431620962962957,
+      -2.1507881342592596
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 140,
+       "regret": 0.0,
+       "first_fail": 0.0,
+       "diff": -1.4591150793650798,
+       "diff_ci": [
+        -2.004861408730159,
+        -0.9082937500000003
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 370,
+       "regret": 0.01681381381381385,
+       "first_fail": 0.13513513513513514,
+       "diff": -1.1823813813813813,
+       "diff_ci": [
+        -1.4898701951951947,
+        -0.8832745495495496
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 340,
+       "regret": 0.035271241830065365,
+       "first_fail": 0.2647058823529412,
+       "diff": -1.4502320261437907,
+       "diff_ci": [
+        -1.8553173202614377,
+        -1.070325980392157
+       ]
+      }
+     },
+     "single_regret": 0.021427450980392174,
+     "single_regret_ci": [
+      0.0008026143790849694,
+      0.046697156862745094
+     ],
+     "single_diff": -1.3351013071895426,
+     "single_diff_ci": [
+      -1.5732655228758172,
+      -1.1064824346405229
+     ],
+     "single_first_fail": 0.16470588235294117,
+     "single_usable": 0.4470588235294118,
+     "single_last_ok": 0.8352941176470589,
+     "single_last_err": 1.9444,
+     "single_last_err_mean": 2.2363959154929574,
+     "single_last_gap": 2.4836601307191597e-05,
+     "season_regret": 0.03404429629629632,
+     "season_regret_ci": [
+      0.028194141666666693,
+      0.040824431481481495
+     ],
+     "season_diff": -2.5225760370370374,
+     "season_diff_ci": [
+      -2.5705327916666665,
+      -2.475878087962963
+     ],
+     "season_first_fail": 0.16344444444444445,
+     "season_usable": 0.44719444444444434
+    },
+    "fitted-priors[bucket, n0=8]": {
+     "single_u_regret": 0.09624052287581708,
+     "single_u_diff": -1.1023392156862744,
+     "single_u_diff_ci": [
+      -1.347024003267974,
+      -0.8725245588235293
+     ],
+     "season_u_regret": 0.1829961851851853,
+     "season_u_diff": -2.174162148148148,
+     "season_u_diff_ci": [
+      -2.2213866407407403,
+      -2.1296503546296295
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 140,
+       "regret": 0.0,
+       "first_fail": 0.0,
+       "diff": -1.4591150793650798,
+       "diff_ci": [
+        -2.003687400793651,
+        -0.9626677579365085
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 370,
+       "regret": 0.0004564564564564942,
+       "first_fail": 0.13513513513513514,
+       "diff": -1.198738738738739,
+       "diff_ci": [
+        -1.5200084834834835,
+        -0.8983759759759761
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 340,
+       "regret": 0.021379084967320265,
+       "first_fail": 0.2647058823529412,
+       "diff": -1.464124183006536,
+       "diff_ci": [
+        -1.856311683006536,
+        -1.0643285947712424
+       ]
+      }
+     },
+     "single_regret": 0.00875032679738564,
+     "single_regret_ci": [
+      0.0,
+      0.025055947712418297
+     ],
+     "single_diff": -1.3477784313725494,
+     "single_diff_ci": [
+      -1.579975620915033,
+      -1.129298986928105
+     ],
+     "single_first_fail": 0.16470588235294117,
+     "single_usable": 0.4470588235294118,
+     "single_last_ok": 0.8352941176470589,
+     "single_last_err": 1.9444,
+     "single_last_err_mean": 2.2363959154929574,
+     "single_last_gap": 2.4836601307191597e-05,
+     "season_regret": 0.06380437037037041,
+     "season_regret_ci": [
+      0.055442391666666715,
+      0.07324889351851856
+     ],
+     "season_diff": -2.492815962962963,
+     "season_diff_ci": [
+      -2.539393232407407,
+      -2.4430565546296297
+     ],
+     "season_first_fail": 0.1693333333333333,
+     "season_usable": 0.45408333333333334
+    },
+    "fitted-priors[bucket+scale, n0=3]": {
+     "single_u_regret": 0.10265490196078439,
+     "single_u_diff": -1.095924836601307,
+     "single_u_diff_ci": [
+      -1.315339738562091,
+      -0.8650270424836602
+     ],
+     "season_u_regret": 0.19941700000000015,
+     "season_u_diff": -2.157741333333333,
+     "season_u_diff_ci": [
+      -2.2022594027777775,
+      -2.110958793518518
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 140,
+       "regret": 0.0,
+       "first_fail": 0.0,
+       "diff": -1.4591150793650798,
+       "diff_ci": [
+        -1.979336408730159,
+        -0.9124388888888894
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 370,
+       "regret": 0.01681381381381385,
+       "first_fail": 0.13513513513513514,
+       "diff": -1.1823813813813813,
+       "diff_ci": [
+        -1.4963833333333336,
+        -0.8806975225225228
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 340,
+       "regret": 0.021379084967320265,
+       "first_fail": 0.2647058823529412,
+       "diff": -1.464124183006536,
+       "diff_ci": [
+        -1.845721977124183,
+        -1.09375547385621
+       ]
+      }
+     },
+     "single_regret": 0.015870588235294136,
+     "single_regret_ci": [
+      0.00019869281045753278,
+      0.03851683006535949
+     ],
+     "single_diff": -1.3406581699346407,
+     "single_diff_ci": [
+      -1.5824479575163397,
+      -1.109940294117647
+     ],
+     "single_first_fail": 0.16470588235294117,
+     "single_usable": 0.4470588235294118,
+     "single_last_ok": 0.8341176470588235,
+     "single_last_err": 1.9444,
+     "single_last_err_mean": 2.232141466854725,
+     "single_last_gap": 0.0007368627450980411,
+     "season_regret": 0.08493559259259263,
+     "season_regret_ci": [
+      0.07243166944444447,
+      0.09725961111111112
+     ],
+     "season_diff": -2.4716847407407405,
+     "season_diff_ci": [
+      -2.522021152777778,
+      -2.425822457407407
+     ],
+     "season_first_fail": 0.17077777777777775,
+     "season_usable": 0.4539166666666667
+    },
+    "fitted-priors[bucket+scale, n0=8]": {
+     "single_u_regret": 0.09624052287581708,
+     "single_u_diff": -1.1023392156862744,
+     "single_u_diff_ci": [
+      -1.343272875816993,
+      -0.8804381209150329
+     ],
+     "season_u_regret": 0.15761344444444456,
+     "season_u_diff": -2.1995448888888887,
+     "season_u_diff_ci": [
+      -2.2427143629629627,
+      -2.1536695277777778
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 140,
+       "regret": 0.0,
+       "first_fail": 0.0,
+       "diff": -1.4591150793650798,
+       "diff_ci": [
+        -1.983411805555556,
+        -0.912404265873016
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 370,
+       "regret": 0.0004564564564564942,
+       "first_fail": 0.13513513513513514,
+       "diff": -1.198738738738739,
+       "diff_ci": [
+        -1.5367807057057061,
+        -0.8794385135135144
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 340,
+       "regret": 0.020375816993464052,
+       "first_fail": 0.2647058823529412,
+       "diff": -1.4651274509803922,
+       "diff_ci": [
+        -1.8657507352941176,
+        -1.0979191176470586
+       ]
+      }
+     },
+     "single_regret": 0.008349019607843153,
+     "single_regret_ci": [
+      0.0,
+      0.024455751633986913
+     ],
+     "single_diff": -1.3481797385620917,
+     "single_diff_ci": [
+      -1.5705284967320263,
+      -1.1201776307189544
+     ],
+     "single_first_fail": 0.16470588235294117,
+     "single_usable": 0.4470588235294118,
+     "single_last_ok": 0.8352941176470589,
+     "single_last_err": 1.9444,
+     "single_last_err_mean": 2.2363959154929574,
+     "single_last_gap": 2.4836601307191597e-05,
+     "season_regret": 0.03300981481481485,
+     "season_regret_ci": [
+      0.02694620092592596,
+      0.039879507407407436
+     ],
+     "season_diff": -2.5236105185185185,
+     "season_diff_ci": [
+      -2.5715537462962965,
+      -2.4787380555555556
+     ],
+     "season_first_fail": 0.16366666666666665,
+     "season_usable": 0.4505555555555555
+    },
+    "q-learning": {
+     "single_u_regret": 0.4860326797385622,
+     "single_u_diff": -0.7125470588235294,
+     "single_u_diff_ci": [
+      -0.9173170915032679,
+      -0.524075588235294
+     ],
+     "season_u_regret": 1.0654157407407407,
+     "season_u_diff": -1.2917425925925925,
+     "season_u_diff_ci": [
+      -1.3328971249999997,
+      -1.248737473148148
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 140,
+       "regret": 0.302468253968254,
+       "first_fail": 0.14285714285714285,
+       "diff": -1.1566468253968256,
+       "diff_ci": [
+        -1.7182936507936513,
+        -0.5966458333333335
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 370,
+       "regret": 0.3113603603603604,
+       "first_fail": 0.2702702702702703,
+       "diff": -0.8878348348348348,
+       "diff_ci": [
+        -1.1869380630630635,
+        -0.595922897897898
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 340,
+       "regret": 0.6837385620915032,
+       "first_fail": 0.6764705882352942,
+       "diff": -0.8017647058823528,
+       "diff_ci": [
+        -1.089642565359477,
+        -0.518362908496732
+       ]
+      }
+     },
+     "single_regret": 0.45884705882352944,
+     "single_regret_ci": [
+      0.3106955882352941,
+      0.6299827777777777
+     ],
+     "single_diff": -0.8976816993464053,
+     "single_diff_ci": [
+      -1.0994833496732026,
+      -0.7009753267973856
+     ],
+     "single_first_fail": 0.4117647058823529,
+     "single_usable": 0.4602941176470588,
+     "single_last_ok": 0.8352941176470589,
+     "single_last_err": 1.8145,
+     "single_last_err_mean": 2.1019430985915495,
+     "single_last_gap": 0.00923006535947713,
+     "season_regret": 1.0501187407407406,
+     "season_regret_ci": [
+      1.0165729962962964,
+      1.0856473074074073
+     ],
+     "season_diff": -1.5065015925925924,
+     "season_diff_ci": [
+      -1.5537024111111108,
+      -1.4609242879629627
+     ],
+     "season_first_fail": 0.3922222222222222,
+     "season_usable": 0.4551111111111112
+    },
+    "oracle": {
+     "single_u_regret": 0.021939869281045767,
+     "single_u_diff": -1.1766398692810458,
+     "single_u_diff_ci": [
+      -1.406094477124183,
+      -0.9651866666666669
+     ],
+     "season_u_regret": 0.032231851851851866,
+     "season_u_diff": -2.3249264814814814,
+     "season_u_diff_ci": [
+      -2.3707075981481482,
+      -2.283064473148148
+     ],
+     "strata": {
+      "fine (skip 2 readable)": {
+       "episodes": 140,
+       "regret": 0.0,
+       "first_fail": 0.0,
+       "diff": -1.4591150793650798,
+       "diff_ci": [
+        -2.0377082341269848,
+        -0.9388932539682542
+       ]
+      },
+      "needs skip 3": {
+       "episodes": 370,
+       "regret": 0.0,
+       "first_fail": 0.13513513513513514,
+       "diff": -1.1991951951951954,
+       "diff_ci": [
+        -1.5103399399399402,
+        -0.8914575825825828
+       ]
+      },
+      "needs skip 4+": {
+       "episodes": 340,
+       "regret": 0.0,
+       "first_fail": 0.2647058823529412,
+       "diff": -1.485503267973856,
+       "diff_ci": [
+        -1.874905637254902,
+        -1.0970567810457519
+       ]
+      }
+     },
+     "single_regret": 0.0,
+     "single_regret_ci": [
+      0.0,
+      0.0
+     ],
+     "single_diff": -1.3565287581699348,
+     "single_diff_ci": [
+      -1.5748097549019606,
+      -1.1314711764705885
+     ],
+     "single_first_fail": 0.16470588235294117,
+     "single_usable": 0.47058823529411764,
+     "single_last_ok": 0.8352941176470589,
+     "single_last_err": 1.8438,
+     "single_last_err_mean": 2.01411338028169,
+     "single_last_gap": 0.0,
+     "season_regret": 0.0,
+     "season_regret_ci": [
+      0.0,
+      0.0
+     ],
+     "season_diff": -2.5566203333333335,
+     "season_diff_ci": [
+      -2.5996607787037034,
+      -2.510298532407407
+     ],
+     "season_first_fail": 0.16,
+     "season_usable": 0.46622222222222215
+    }
+   }
+  }
+ }
+}
