@@ -124,9 +124,23 @@ def scan_once(es: EvalScene, strategy: Strategy) -> tuple[ScanRecord | None, flo
             recs = advisor.memory.records()
             return (recs[-1] if recs else None), None
         rec = advisor.memory.records()[-1]
-        truth = np.array(scene.feature_quad_proj("garage_door"), dtype=np.float64)
         p2c = np.load(Path(tmp) / "calibration" / cal.id / "p2c.npy")
-        return rec, _map_corner_error(p2c, scene.h_p2c, truth)
+        truth = door_corners_in_frame(scene)
+        return rec, (_map_corner_error(p2c, scene.h_p2c, truth) if len(truth) else None)
+
+
+def door_corners_in_frame(scene: SimScene) -> np.ndarray:
+    """Door corners (projector px) that the projector can actually light.
+
+    `make_scenes` shifts the door by up to 60 px, which puts its lower corners below the
+    projector frame in some scenes. The map does not exist there: `_map_corner_error` would
+    compare an extrapolation with the truth and report 9-18 px for a map that is accurate to
+    a fraction of a pixel everywhere it was measured (AUDIT-02 follow-up, docs/07).
+    """
+    w, h = scene.proj_size
+    quad = np.array(scene.feature_quad_proj("garage_door"), dtype=np.float64)
+    inside = (quad[:, 0] >= 0) & (quad[:, 0] <= w) & (quad[:, 1] >= 0) & (quad[:, 1] <= h)
+    return np.asarray(quad[inside])
 
 
 def outcome_table(
@@ -157,6 +171,13 @@ def outcome_table(
             errs[s.id] = hit["err"]  # type: ignore[assignment]
         table.append((recs, errs))
     return table
+
+
+def _cell(rec: ScanRecord | None, err: float | None) -> str:
+    """Report cell: coverage / door-corner error; "-" when no door corner is in the frame."""
+    if rec is None or not rec.ok:
+        return "FAIL"
+    return f"{rec.coverage:.2f}/" + ("-" if err is None else f"{err:.1f}px")
 
 
 def best_reward(recs: Outcome) -> float:
@@ -224,7 +245,7 @@ def far_report(
         cells = []
         for s in STRATEGIES:
             r, e = recs[s.id], errs[s.id]
-            cells.append("FAIL" if r is None or not r.ok else f"{r.coverage:.2f}/{e:.1f}px")
+            cells.append(_cell(r, e))
         ref = next((r for r in recs.values() if r is not None), None)
         scale = (ref.scale if ref else None) or "-"
         print(f"{es.name:15s} {scale:>6s} | " + " ".join(f"{c:>14}" for c in cells))
@@ -287,7 +308,7 @@ def report(
             cells = []
             for s in STRATEGIES:
                 r, e = recs[s.id], errs[s.id]
-                cells.append("FAIL" if r is None or not r.ok else f"{r.coverage:.2f}/{e:.1f}px")
+                cells.append(_cell(r, e))
             sc = es.scene
             print(
                 f"{es.seed:5d} {sc.blur_sigma:4.1f} {sc.noise_sigma:4.0f} {sc.ambient:5.2f} "

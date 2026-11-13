@@ -92,3 +92,25 @@ def test_moving_far_away_unlearns_faster_with_scale() -> None:
     best = best_reward(_far())
     regret = {k: sum(best - r for _, r in v) for k, v in (("no", without), ("yes", with_scale))}
     assert regret["yes"] < regret["no"]
+
+
+def test_door_corners_outside_the_projector_frame_are_not_scored() -> None:
+    """Scenes 1005, 1007 and 1008 have a door that reaches below the projector frame. Scoring
+    the map there reported 9-18 px for strategies whose map is accurate where it exists."""
+    from facadekit.calib.learn import get_strategy
+    from facadekit.sim.learn_eval import _cell, door_corners_in_frame, make_scenes, scan_once
+
+    scenes = {es.seed: es for es in make_scenes(18)}
+    counts = {seed: len(door_corners_in_frame(es.scene)) for seed, es in scenes.items()}
+    assert counts[1005] == 2 and counts[1007] == 3 and counts[1008] == 3
+    assert counts[1000] == 4 and counts[1003] == 4
+    w, h = scenes[1005].scene.proj_size
+    inside = door_corners_in_frame(scenes[1005].scene)
+    assert ((inside >= 0) & (inside <= [w, h])).all()
+
+    soft = get_strategy("soft_focus")
+    assert soft is not None
+    rec, err = scan_once(scenes[1005], soft)
+    assert rec is not None and rec.ok and rec.coverage == 1.0
+    assert err is not None and err < 1.5  # was 9-18 px with the out-of-frame corners
+    assert _cell(rec, None) == "1.00/-" and _cell(None, None) == "FAIL"
