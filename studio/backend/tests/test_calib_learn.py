@@ -387,3 +387,45 @@ def test_concurrent_writers_lose_nothing(tmp_path: Path) -> None:
         t.join()
     assert len(mems[0].records()) == 40
     assert _leftovers(tmp_path, log) == []
+
+
+def test_scale_floor_sets_unreadable_strategies_aside() -> None:
+    """docs/09: with an empty log a small picture starts on a strategy it can resolve."""
+    from facadekit.calib.learn import allowed_strategies, scale_floor
+
+    assert scale_floor(None) is None
+    assert [scale_floor(s) for s in (0.9, 0.375, 0.3, 0.15, 0.05)] == [1, 2, 3, 4, 5]
+    assert allowed_strategies(None) == STRATEGIES and allowed_strategies(2) == STRATEGIES
+    assert [s.id for s in allowed_strategies(3)] == ["soft_focus", "low_light_soft", "very_soft"]
+    assert [s.id for s in allowed_strategies(4)] == ["very_soft"]
+    assert [s.id for s in allowed_strategies(6)] == ["very_soft"]  # nothing fits: the coarsest
+
+    assert choose([], "cam", "high").id == "standard"
+    assert choose([], "cam", "high", floor=2).id == "standard"  # large picture: no change
+    assert choose([], "cam", "high", floor=3).id == "soft_focus"
+    assert choose([], "cam", "high", floor=4).id == "very_soft"
+    # the log still decides among what is allowed
+    history = [_rec("soft_focus", ok=False)]
+    assert choose(history, "cam", "high", floor=3).id == "very_soft"
+    # and a finer strategy never comes back while the picture stays small
+    good = [_rec("standard", coverage=1.0)] * 5
+    assert choose(good, "cam", "high", floor=3).id == "soft_focus"
+    assert choose(good, "cam", "high").id == "standard"
+
+
+def test_advisor_uses_and_logs_the_picture_scale(tmp_path: Path) -> None:
+    advisor = ScanAdvisor(ScanMemory(tmp_path / "scans.jsonl"))
+    small = {"median_contrast": 90.0, "lit_fraction": 0.2, "px_per_proj_px": 0.25}
+    large = {"median_contrast": 90.0, "lit_fraction": 0.6, "px_per_proj_px": 0.6}
+    assert advisor.choose("cam", small).id == "soft_focus"
+    assert advisor.choose("cam", large).id == "standard"
+    assert advisor.choose("cam", {"median_contrast": 90.0, "lit_fraction": 0.6}).id == "standard"
+    advisor.failed("cam", small, advisor.choose("cam", small), "SCAN_FAILED")
+    (rec,) = advisor.memory.records()
+    assert rec.px_per_proj_px == 0.25 and rec.scale == "coarse"
+    assert advisor.choose("cam", small).id == "very_soft"
+    # an old-format line (no px_per_proj_px) still loads, and a record without it omits the key
+    old = ScanRecord.model_validate_json(rec.to_json_line()).model_copy(
+        update={"px_per_proj_px": None}
+    )
+    assert "px_per_proj_px" not in old.to_json_line()

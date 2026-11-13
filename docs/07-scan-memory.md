@@ -211,6 +211,35 @@ Verdict: the scale context helps in one case of six, and only after a long histo
 
 No thresholds were changed for these numbers. Test: `test_moving_far_away_unlearns_faster_with_scale` (`tests/test_sim_learn_eval.py`) checks the 3 -> 2 failure case on synthetic records.
 
+## Scale floor (2026-11-13)
+
+Before the bandit picks, strategies whose stripes the camera cannot resolve are set aside. This is a measurement, not something learned.
+
+- The pre-check already measures `px_per_proj_px`, the number of camera pixels one projector pixel covers. `quality.finest_readable_skip` turns it into the finest `skip_lsb` whose stripes still span `STRIPE_MIN_CAM_PX = 3` camera pixels.
+- `learn.allowed_strategies(floor)` keeps the strategies with `skip_lsb >= floor` (the coarsest ones if none qualify). `learn.choose(..., floor=)` computes the posterior exactly as before and picks only among those. `ScanAdvisor.choose` passes `scale_floor(pre["px_per_proj_px"])`.
+- No floor when the scale was not measured, so Pi-driven and phone scans (`remembered_strategy`) behave as before.
+- `ScanRecord` gains the optional `px_per_proj_px` (left out of the log line when unknown, like `scale`).
+- The wizard's note under a finished scan now says the strategy was chosen "because the picture is small in the camera view or earlier scans with this camera had trouble", and knows `very_soft`.
+
+Why: `docs/09-rl-simulation.md`. On 89 scenes held out from all tuning, regret per 8 scans at one site falls from 0.992 to 0.382 (difference −0.610, 95 % interval −0.766 to −0.461) and first-scan failures from 67 % to 39 %; on 85 scenes from a different distribution, −0.939 (−1.161 to −0.733) and 74 % to 40 %. A test (`test_sim_rl.py`) checks that the simulated floor and this code make the same choice on 400 random histories.
+
+The harness of this document, which was not used in that simulation (`learn_eval --n 18`, outcomes rescanned 2026-11-13):
+
+| | Before | With the scale floor |
+|---|---|---|
+| Tuning regret (12 scenes) | 0.490 | 0.490 |
+| Held-out regret (6 scenes) | 1.143 | 1.143 |
+| First scan ok (tuning / held-out) | 7/12, 1/6 | 7/12, 1/6 |
+| Far/phone group, mean regret per scene | 0.456 | 0.000 |
+| `far_marginal` first pick | `standard` (92 % coverage) | `soft_focus` (100 %) |
+| `far_too_coarse` first pick | `standard` (fails) | `very_soft` (100 %) |
+| Mean regret after a move, 2 scans before | 0.516 | 0.000 |
+| Mean regret after a move, 8 scans before | 0.829 | 0.000 |
+
+The 18 old scenes do not change because the picture fills the frame in all of them (floor 2, nothing is set aside); their failures come from blur, which the scale cannot see. The six camera moves, where the two-class scale context helped once, all reach zero regret: the floor is recomputed from the new picture on every scan, so there is nothing to unlearn. The scale-class discount (`DIFFERENT_SCALE`) is left in place; with the floor it no longer changes any of these numbers.
+
+Cost: the floor trusts the 3-pixel rule. Where a finer strategy would still have worked (for example `standard` at 92 % coverage in `far_marginal`), the scan now starts one step coarser. In the simulation the final map of the held-out scenes is 1.03 px off (95th percentile, median over scenes) with the floor against 0.82 px without it.
+
 ## Bug fixed on the way
 
 `build_maps` used an 8 px grid for any `skip_lsb`. With `skip_lsb=3` every decoded block centre fell exactly halfway between two grid nodes and three nodes in four stayed empty (coverage 25 %). The grid step now defaults to `max(8, 2 × block)` and must be a multiple of two blocks.

@@ -31,6 +31,7 @@ from facadekit.calib.learn import (
     Strategy,
     choose,
     reward,
+    scale_floor,
 )
 from facadekit.calib.pipeline import run_calibration
 from facadekit.errors import FkError
@@ -169,6 +170,7 @@ def replay(
     *,
     prior: list[ScanRecord] | None = None,
     use_scale: bool = False,
+    use_floor: bool = False,
 ) -> list[tuple[str, float]]:
     """Scan the same scene `scans` times with the real policy; returns (strategy, reward).
 
@@ -179,10 +181,12 @@ def replay(
     if ref is None:
         return []
     scale = ref.scale if use_scale else None
+    # With `use_floor` the policy also gets the scale floor, as the wizard does since docs/09.
+    floor = scale_floor(ref.px_per_proj_px) if use_floor else None
     history: list[ScanRecord] = list(prior or [])
     out: list[tuple[str, float]] = []
     for _ in range(scans):
-        s = choose(history, ref.camera_id, ref.bucket, scale)
+        s = choose(history, ref.camera_id, ref.bucket, scale, floor=floor)
         rec = recs.get(s.id)
         if rec is None:  # pre-check abort never reaches the policy
             break
@@ -283,6 +287,7 @@ def report(
         print(f"\n== {label} ({len(rows)} scenes) ==")
         print("scene  blur noise  amb  gain | " + " ".join(f"{s.id[:10]:>14}" for s in STRATEGIES))
         regret_total, first_ok, final_gap = 0.0, 0, 0.0
+        floor_regret, floor_first_ok = 0.0, 0
         for es, (recs, errs) in rows:
             cells = []
             for s in STRATEGIES:
@@ -296,6 +301,9 @@ def report(
             seq = replay(recs, scans)
             best = best_reward(recs)
             regret_total += sum(best - r for _, r in seq)
+            floor_seq = replay(recs, scans, use_scale=True, use_floor=True)
+            floor_regret += sum(best - r for _, r in floor_seq)
+            floor_first_ok += 1 if floor_seq and floor_seq[0][1] > 0 else 0
             first_ok += 1 if seq and seq[0][1] > 0 else 0
             final_gap += best - (seq[-1][1] if seq else 0.0)
         n = len(rows)
@@ -303,6 +311,12 @@ def report(
             f"mean regret/{scans} scans {regret_total / n:.3f}  first scan ok {first_ok}/{n}  "
             f"final-scan gap {final_gap / n:.3f}"
         )
+        print(
+            f"with the scale floor: mean regret {floor_regret / n:.3f}  "
+            f"first scan ok {floor_first_ok}/{n}"
+        )
+        summary[f"{label}_regret_floor"] = floor_regret / n
+        summary[f"{label}_first_ok_floor"] = floor_first_ok / n
         summary[f"{label}_regret"] = regret_total / n
         summary[f"{label}_first_ok"] = first_ok / n
         summary[f"{label}_final_gap"] = final_gap / n

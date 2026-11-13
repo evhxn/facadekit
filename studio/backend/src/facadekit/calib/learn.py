@@ -6,7 +6,9 @@ so a failed or rejected scan makes the wizard try something different next time,
 strategy that worked is remembered for the same camera and similar lighting.
 
 This is a contextual bandit with a Beta posterior per strategy and a greedy policy over
-optimistic priors. It is deterministic on purpose: the same history always gives the same
+optimistic priors. Before it picks, strategies whose stripes the pre-check says the camera
+cannot resolve are set aside (`allowed_strategies`): that part is measured, not learned. It is
+deterministic on purpose: the same history and the same measurement always give the same
 choice. Nothing leaves the computer.
 """
 
@@ -107,10 +109,13 @@ class ScanRecord(BaseModel):
     calibration_id: str | None = None
     verdict: Verdict | None = None
     scale: Scale | None = None  # absent in records written before T-205
+    px_per_proj_px: float | None = None  # the measured picture scale itself (docs/09)
 
     def to_json_line(self) -> str:
-        """Compact JSON; ``scale`` is left out when None so older releases read the line."""
-        return self.model_dump_json(exclude={"scale"} if self.scale is None else None)
+        """Compact JSON; newer optional fields are left out when None so older releases read
+        the line."""
+        skip = {name for name in ("scale", "px_per_proj_px") if getattr(self, name) is None}
+        return self.model_dump_json(exclude=skip or None)
 
 
 def reward(record: ScanRecord) -> float:
@@ -173,14 +178,48 @@ def posterior(
     return out
 
 
+def scale_floor(px_per_proj_px: float | None) -> int | None:
+    """Finest skip_lsb whose stripes the camera can resolve at this picture scale; None when
+    the scale was not measured."""
+    return None if px_per_proj_px is None else finest_readable_skip(px_per_proj_px)
+
+
+def allowed_strategies(floor: int | None) -> tuple[Strategy, ...]:
+    """Strategies worth trying when stripes finer than `floor` cannot be resolved.
+
+    A strategy with `skip_lsb` below the floor projects stripes narrower than
+    `quality.STRIPE_MIN_CAM_PX` camera pixels: the scan would fail or measure little, and the
+    log would need a wasted scan to learn what the pre-check already measured. If the floor
+    is beyond every strategy, the coarsest ones remain. `None` allows everything.
+    """
+    if floor is None:
+        return STRATEGIES
+    fit = tuple(s for s in STRATEGIES if s.skip_lsb >= floor)
+    if fit:
+        return fit
+    coarsest = max(s.skip_lsb for s in STRATEGIES)
+    return tuple(s for s in STRATEGIES if s.skip_lsb == coarsest)
+
+
 def choose(
-    records: list[ScanRecord], camera_id: str, bucket: Bucket, scale: Scale | None = None
+    records: list[ScanRecord],
+    camera_id: str,
+    bucket: Bucket,
+    scale: Scale | None = None,
+    *,
+    floor: int | None = None,
 ) -> Strategy:
-    """The strategy with the highest expected reward; ties go to the earlier strategy."""
+    """The strategy with the highest expected reward; ties go to the earlier strategy.
+
+    `floor` (see `allowed_strategies`) limits the candidates to what the camera can resolve.
+    It is a measurement, not something learned: the posterior is computed as before and only
+    the pick is restricted (docs/09 has the evidence).
+    """
     post = posterior(records, camera_id, bucket, scale)
-    best = STRATEGIES[0]
+    candidates = allowed_strategies(floor)
+    best = candidates[0]
     best_mean = -1.0
-    for s in STRATEGIES:
+    for s in candidates:
         a, b = post[s.id]
         mean = a / (a + b)
         if mean > best_mean + 1e-9:
@@ -250,6 +289,7 @@ class ScanAdvisor:
             camera_id,
             contrast_bucket(pre["median_contrast"]),
             scale_class(pre.get("px_per_proj_px")),
+            floor=scale_floor(pre.get("px_per_proj_px")),
         )
 
     def remembered_strategy(self, camera_id: str) -> Strategy | None:
@@ -275,6 +315,7 @@ class ScanAdvisor:
                 "lit_fraction": pre["lit_fraction"],
                 "strategy": strategy.id,
                 "scale": scale_class(pre.get("px_per_proj_px")),
+                "px_per_proj_px": pre.get("px_per_proj_px"),
                 **fields,
             }
         )
