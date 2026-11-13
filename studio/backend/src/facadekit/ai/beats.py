@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from facadekit.errors import AI_UNAVAILABLE, FkError
-from facadekit.media.ffmpeg import run_ffmpeg
+from facadekit.media.ffmpeg import local_input, run_ffmpeg
 from facadekit.models.project import Marker
 
 ONSET_BEAT_GUARD_MS = 40
@@ -36,8 +36,7 @@ def analyze_beats(
         run_ffmpeg(
             [
                 "-y",
-                "-i",
-                str(audio_path),
+                *local_input(audio_path),
                 "-t",
                 str(MAX_ANALYSIS_SECONDS),
                 "-ac",

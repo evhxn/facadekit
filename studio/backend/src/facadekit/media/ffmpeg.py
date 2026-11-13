@@ -13,6 +13,17 @@ def ffmpeg_exe() -> str:
     return exe
 
 
+def local_input(path: Path) -> list[str]:
+    """ffmpeg arguments that open `path` as an input, as a local file and nothing else.
+
+    Every input that came from a user (uploads, project media) must be opened through this.
+    Without it a crafted file (a playlist or a concat script with a media extension) can make
+    ffmpeg fetch URLs or open other protocols. ``file:`` also stops a name containing ``:``
+    from being read as a protocol. Input options such as ``-ss`` go before these arguments.
+    """
+    return ["-protocol_whitelist", "file", "-i", f"file:{path.resolve()}"]
+
+
 def _tail(data: bytes) -> str:
     return data.decode("utf-8", errors="replace").strip()[-500:]
 
@@ -34,15 +45,7 @@ def ffmpeg_info(path: Path) -> str:
     """Return the stderr of `ffmpeg -i <path>` (exits non-zero by design)."""
     try:
         proc = subprocess.run(
-            [
-                ffmpeg_exe(),
-                "-hide_banner",
-                "-nostdin",
-                "-protocol_whitelist",
-                "file",
-                "-i",
-                f"file:{path.resolve()}",
-            ],
+            [ffmpeg_exe(), "-hide_banner", "-nostdin", *local_input(path)],
             capture_output=True,
             timeout=30,
         )

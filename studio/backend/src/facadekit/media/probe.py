@@ -6,7 +6,7 @@ from pathlib import Path
 import cv2
 
 from facadekit.errors import BAD_REQUEST, UNSUPPORTED_MEDIA, FkError
-from facadekit.media.ffmpeg import ffmpeg_info, run_ffmpeg
+from facadekit.media.ffmpeg import ffmpeg_info, local_input, run_ffmpeg
 from facadekit.models.project import Asset
 
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
@@ -161,8 +161,7 @@ def make_thumbnail(path: Path, kind: str, out_path: Path) -> None:
                     "-y",
                     "-ss",
                     seek,
-                    "-i",
-                    str(path),
+                    *local_input(path),
                     "-frames:v",
                     "1",
                     "-vf",

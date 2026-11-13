@@ -8,7 +8,7 @@ from typing import IO
 import numpy as np
 
 from facadekit.errors import BAD_IMAGE_SIZE, BAD_REQUEST, FFMPEG_FAILED, FkError
-from facadekit.media.ffmpeg import ffmpeg_exe
+from facadekit.media.ffmpeg import ffmpeg_exe, local_input
 from facadekit.render.presets import Preset
 
 # Convert BGR to YUV with the BT.709 matrix (limited range) and tag the stream as BT.709, so
@@ -50,7 +50,7 @@ class Encoder:
             "-r", str(fps), "-i", "-",
         ]  # fmt: skip
         if audio_path is not None:
-            cmd += ["-ss", f"{audio_offset_ms / 1000}", "-i", str(audio_path)]
+            cmd += ["-ss", f"{audio_offset_ms / 1000}", *local_input(audio_path)]
         else:
             cmd += ["-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo"]
         cmd += ["-map", "0:v:0", "-map", "1:a:0"]

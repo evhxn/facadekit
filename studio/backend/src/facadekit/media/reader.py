@@ -8,7 +8,7 @@ from types import TracebackType
 import cv2
 import numpy as np
 
-from facadekit.media.ffmpeg import ffmpeg_exe
+from facadekit.media.ffmpeg import ffmpeg_exe, local_input
 from facadekit.models.project import Asset
 
 
@@ -29,8 +29,7 @@ class VideoReader:
                 "-nostdin",
                 "-ss",
                 f"{start_ms / 1000:.3f}",
-                "-i",
-                str(path),
+                *local_input(path),
                 "-an",
                 "-vf",
                 f"fps={fps},scale={width}:{height}",
