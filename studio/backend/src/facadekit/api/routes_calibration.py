@@ -101,12 +101,40 @@ def _advisor(state: AppState, body: CalibrationRequest) -> ScanAdvisor | None:
     return ScanAdvisor(state.scan_memory)
 
 
-def _check_resolution(display_size: tuple[int, int], project_size: tuple[int, int]) -> None:
+STANDARD_SIZES = {
+    (800, 600), (1024, 768), (1280, 720), (1280, 800), (1366, 768), (1600, 900),
+    (1920, 1080), (1920, 1200), (2560, 1440), (3840, 2160),
+}  # fmt: skip
+
+
+def resolution_hint(window: tuple[int, int], project: tuple[int, int], dpr: float | None) -> str:
+    """The most likely reason the projector window has the wrong number of pixels."""
+    if dpr is not None and abs(dpr - 1.0) > 0.01:
+        return (
+            f"The computer scales this display by {dpr:g}. In the display settings, set the "
+            f"projector to {project[0]}x{project[1]} with scaling off (100 %), and set the "
+            "browser zoom of the projector window to 100 %."
+        )
+    if window[0] < project[0] and window[1] < project[1] and window not in STANDARD_SIZES:
+        return (
+            "The projector window is probably not full screen, or is still on the laptop "
+            "screen. Drag it onto the projector, then click it to go full screen."
+        )
+    return (
+        f"Set the projector display to {project[0]}x{project[1]}, or make a project that is "
+        f"{window[0]}x{window[1]}."
+    )
+
+
+def _check_resolution(
+    display_size: tuple[int, int], project_size: tuple[int, int], dpr: float | None = None
+) -> None:
     if display_size != project_size:
         raise FkError(
             "RESOLUTION_MISMATCH",
             f"Projector window is {display_size[0]}x{display_size[1]} but the project expects "
-            f"{project_size[0]}x{project_size[1]}.",
+            f"{project_size[0]}x{project_size[1]}. "
+            + resolution_hint(display_size, project_size, dpr),
         )
 
 
@@ -123,13 +151,27 @@ def _attach_calibration(state: AppState, project_id: str, calibration_id: str) -
     raise FkError(REVISION_CONFLICT, f"project {project_id!r} kept changing")  # pragma: no cover
 
 
-def _scan_display(state: AppState) -> ProjectorDisplay:
+def _scan_display(state: AppState, project_size: tuple[int, int]) -> ProjectorDisplay:
+    """The projector to scan with, checked against the project's resolution."""
     if state.sim:
-        assert state.sim_display is not None
+        assert state.sim_display is not None and state.sim_scene is not None
+        if state.sim_display.size != project_size:
+            # The simulated projector has no native resolution: it takes the project's.
+            # (It used to stay 1920x1080 and refuse every other project.)
+            if state.cameras.busy():
+                raise FkError(
+                    BAD_REQUEST, "The simulator is busy with another scan. Wait for it to end."
+                )
+            state.sim_scene.proj_size = project_size
+            state.sim_display.current = None
+            state.projector.set_sim_size(project_size)
         return state.sim_display
-    if not state.projector.status().connected:
+    status = state.projector.status()
+    if not status.connected:
         raise FkError(PROJECTOR_NOT_CONNECTED, "no projector page is connected")
-    return WsDisplay(state.projector)
+    display = WsDisplay(state.projector)
+    _check_resolution(display.size, project_size, status.dpr)
+    return display
 
 
 @router.post("/projects/{pid}/calibrations", status_code=202)
@@ -161,8 +203,7 @@ def start_calibration(pid: str, body: CalibrationRequest, state: State) -> dict[
             )
         }
 
-    display = _scan_display(state)
-    _check_resolution(display.size, project_size)
+    display = _scan_display(state, project_size)
     sleep: Callable[[float], None] = (lambda _s: None) if state.sim else time.sleep
     advisor = _advisor(state, body)
 
@@ -463,8 +504,7 @@ def start_camera_check(
     project = state.store.load(pid)
     project_size = (project.projector.width, project.projector.height)
     state.cameras.validate(body.camera_id)
-    display = _scan_display(state)
-    _check_resolution(display.size, project_size)
+    display = _scan_display(state, project_size)
     sleep: Callable[[float], None] = (lambda _s: None) if state.sim else time.sleep
     camera_id = body.camera_id
     try:
@@ -668,8 +708,7 @@ def start_phone_scan(
     project = state.store.load(pid)
     project_dir = state.store.project_dir(pid)
     proj_size = (project.projector.width, project.projector.height)
-    display = _scan_display(state)
-    _check_resolution(display.size, proj_size)
+    display = _scan_display(state, proj_size)
 
     settings = CalibSettings()
     strategy_id: str | None = None

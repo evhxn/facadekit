@@ -106,13 +106,81 @@ def test_scan_requires_camera(sim_client: TestClient) -> None:
     assert resp.json()["error"]["code"] == "BAD_REQUEST"
 
 
-def test_resolution_mismatch(sim_client: TestClient) -> None:
+def test_sim_projector_takes_the_project_resolution(sim_client: TestClient) -> None:
+    """The simulator used to stay 1920x1080 and answer every other project with a 500
+    RESOLUTION_MISMATCH that nothing could fix (first hardware test, items E and H)."""
     project = _project(sim_client, {"width": 1280, "height": 720, "fps": 30})
+    status = sim_client.get(f"{API}/projector/status").json()
+    assert (status["width"], status["height"]) == (1920, 1080)
+    resp = sim_client.post(
+        f"{API}/projects/{project['id']}/camera-check", json={"camera_id": "sim"}
+    )
+    assert resp.status_code == 202
+    job = _wait(sim_client, resp.json()["job_id"])
+    assert job["state"] == "succeeded", job
+    status = sim_client.get(f"{API}/projector/status").json()
+    assert (status["width"], status["height"]) == (1280, 720)
+
     resp = sim_client.post(
         f"{API}/projects/{project['id']}/calibrations",
-        json={"mode": "scan", "camera_id": "sim"},
+        json={"mode": "scan", "camera_id": "sim", "settings": {"settle_ms": 300}},
     )
-    assert resp.json()["error"]["code"] == "RESOLUTION_MISMATCH"
+    assert resp.status_code == 202
+    job = _wait(sim_client, resp.json()["job_id"])
+    assert job["state"] == "succeeded", job
+    cal = sim_client.get(
+        f"{API}/projects/{project['id']}/calibrations/{job['result']['calibration_id']}"
+    ).json()
+    assert cal["quality"]["coverage"] > 0.9
+
+
+def test_sim_projector_is_not_resized_under_a_running_scan(sim_client: TestClient) -> None:
+    small = _project(sim_client, {"width": 1280, "height": 720, "fps": 30})
+    cameras = sim_client.app.state.fk.cameras  # type: ignore[attr-defined]
+    cameras.acquire("sim")  # a scan of a 1920x1080 project is running
+    try:
+        resp = sim_client.post(
+            f"{API}/projects/{small['id']}/camera-check", json={"camera_id": "sim"}
+        )
+        assert resp.status_code == 422
+        assert "simulator is busy" in resp.json()["error"]["message"]
+        status = sim_client.get(f"{API}/projector/status").json()
+        assert (status["width"], status["height"]) == (1920, 1080)
+    finally:
+        cameras.release("sim")
+
+
+@pytest.mark.parametrize(
+    ("hello", "needle"),
+    [
+        # A laptop screen at 2x: the window was never moved to the projector.
+        ({"width": 756, "height": 491, "dpr": 2}, "scales this display by 2"),
+        # Right display, but windowed.
+        ({"width": 800, "height": 600 - 37, "dpr": 1}, "not full screen"),
+        # Full screen on a projector running at another resolution.
+        ({"width": 1280, "height": 720, "dpr": 1}, "Set the projector display to 1920x1080"),
+    ],
+)
+def test_resolution_mismatch_says_what_to_change(
+    client: TestClient, hello: dict[str, float], needle: str
+) -> None:
+    project = _project(client)
+    with client.websocket_connect("/ws/projector") as ws:
+        ws.send_json({"type": "hello", **hello})
+        deadline = time.monotonic() + 5
+        while not client.get(f"{API}/projector/status").json()["connected"]:
+            assert time.monotonic() < deadline
+            time.sleep(0.01)
+        for path, body in (
+            ("camera-check", {"camera_id": "0"}),
+            ("calibrations", {"mode": "scan", "camera_id": "0"}),
+            ("phone-scans", {}),
+        ):
+            resp = client.post(f"{API}/projects/{project['id']}/{path}", json=body)
+            error = resp.json()["error"]
+            assert error["code"] == "RESOLUTION_MISMATCH", (path, error)
+            assert "the project expects 1920x1080" in error["message"]
+            assert needle in error["message"], error["message"]
 
 
 def test_projector_not_connected(client: TestClient) -> None:

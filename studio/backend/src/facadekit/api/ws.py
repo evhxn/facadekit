@@ -128,6 +128,14 @@ class ProjectorHub:
                 connected=False, width=None, height=None, dpr=None, mode=self._mode
             )
 
+    def set_sim_size(self, size: tuple[int, int]) -> None:
+        """Simulator only: the pretend projector now has this many pixels."""
+        with self._lock:
+            if self._sim_size is None or self._sim_size == size:
+                return
+            self._sim_size = size
+        self._publish_status()
+
     def set_mode(self, mode: str) -> None:
         with self._lock:
             changed = mode != self._mode
