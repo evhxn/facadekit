@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -10,7 +11,7 @@ from fastapi import APIRouter, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
 
-from facadekit import __version__
+from facadekit import __version__, logs
 from facadekit.api import (
     origin_guard,
     remote_auth,
@@ -18,6 +19,7 @@ from facadekit.api import (
     routes_assets,
     routes_calibration,
     routes_devices,
+    routes_diagnostics,
     routes_fpp,
     routes_jobs,
     routes_learning,
@@ -31,11 +33,13 @@ from facadekit.api.routes_devices import CameraManager
 from facadekit.calib.learn import ScanMemory
 from facadekit.calib.learn_align import AlignMemory
 from facadekit.config import projects_dir
-from facadekit.errors import BAD_REQUEST, NOT_FOUND, FkError, http_status
+from facadekit.errors import BAD_REQUEST, INTERNAL, NOT_FOUND, FkError, http_status
 from facadekit.jobs.runner import JobRunner
 from facadekit.sim.devices import SimCamera, SimDisplay
 from facadekit.sim.scene import SimScene, default_scene
 from facadekit.store.project_store import ProjectStore
+
+log = logging.getLogger(__name__)
 
 WEBDIST = Path(__file__).resolve().parent.parent / "webdist"
 NO_UI_MESSAGE = (
@@ -56,6 +60,7 @@ def create_app(
     client_addr_override: Callable[[], str] | None = None,
     testing: bool = False,
     sim_scene: SimScene | None = None,
+    log_file: Path | None = None,
 ) -> FastAPI:
     root = data_dir / "projects" if data_dir is not None else projects_dir()
     events = ws_module.EventHub()
@@ -81,6 +86,7 @@ def create_app(
         sim_display=sim_display,
         scan_memory=ScanMemory(root.parent / "learning" / "scans.jsonl"),
         align_memory=AlignMemory(root.parent / "learning" / "realign.jsonl"),
+        log_file=log_file,
     )
 
     @asynccontextmanager
@@ -106,13 +112,28 @@ def create_app(
     guard_hosts = origin_guard.allowed_hostnames(lan=lan, extra=("testserver",) if testing else ())
     app.add_middleware(origin_guard.OriginGuardMiddleware, hostnames=guard_hosts)
 
+    # Outermost, so the id also covers requests the two guards below refuse.
+    app.add_middleware(logs.RequestLogMiddleware)
+
     @app.exception_handler(FkError)
-    async def _fk_error(_request: Request, exc: Exception) -> JSONResponse:
+    async def _fk_error(request: Request, exc: Exception) -> JSONResponse:
         assert isinstance(exc, FkError)
-        return _error(http_status(exc.code), exc.code, exc.message)
+        status = http_status(exc.code)
+        # Nothing else explains these in the log: say which error it was, and for the ones
+        # that are FacadeKit's own fault (INTERNAL) where it came from.
+        log.log(
+            logging.ERROR if status >= 500 else logging.WARNING,
+            "%s %s refused: %s: %s",
+            request.method,
+            request.url.path,
+            exc.code,
+            exc.message,
+            exc_info=exc if exc.code == INTERNAL else None,
+        )
+        return _error(status, exc.code, exc.message)
 
     @app.exception_handler(RequestValidationError)
-    async def _validation_error(_request: Request, exc: Exception) -> JSONResponse:
+    async def _validation_error(request: Request, exc: Exception) -> JSONResponse:
         assert isinstance(exc, RequestValidationError)
         errors = exc.errors()
         if errors:
@@ -121,6 +142,7 @@ def create_app(
             message = f"{location}: {first['msg']}"
         else:
             message = "invalid request"
+        log.warning("%s %s refused: %s: %s", request.method, request.url.path, BAD_REQUEST, message)
         return _error(422, BAD_REQUEST, message)
 
     api = APIRouter(prefix="/api/v1")
@@ -132,6 +154,7 @@ def create_app(
     api.include_router(routes_projects.router)
     api.include_router(routes_assets.router)
     api.include_router(routes_devices.router)
+    api.include_router(routes_diagnostics.router)
     api.include_router(routes_calibration.router)
     api.include_router(routes_learning.router)
     api.include_router(routes_jobs.router)

@@ -58,6 +58,7 @@ def build_parser() -> argparse.ArgumentParser:
             sp.add_argument("--start", action="store_true")
         elif name == "doctor":
             sp.add_argument("--no-cameras", action="store_true")
+            sp.add_argument("--bundle", default=None, metavar="ZIP")
         elif name == "sim":
             sim_sub = sp.add_subparsers(dest="sim_command", required=True)
             e2e = sim_sub.add_parser("e2e")
@@ -120,7 +121,15 @@ def _cmd_serve(args: argparse.Namespace) -> int:
         timer = threading.Timer(1.0, webbrowser.open, args=(url,))
         timer.daemon = True
         timer.start()
-    app = create_app(sim=args.sim, lan=args.lan)
+    from facadekit import logs
+    from facadekit.config import data_dir
+
+    log_file = logs.setup_logging(data_dir())
+    print(f"Log file: {log_file}", flush=True)
+    logs.log.info(
+        "FacadeKit %s starting on port %d (sim=%s, lan=%s)", __version__, port, args.sim, args.lan
+    )
+    app = create_app(sim=args.sim, lan=args.lan, log_file=log_file)
     if args.lan:
         from facadekit.api.remote_auth import lan_addresses
 
@@ -246,26 +255,33 @@ def _cmd_publish(args: argparse.Namespace) -> int:
 def _cmd_doctor(args: argparse.Namespace) -> int:
     import cv2
 
+    from facadekit import logs
     from facadekit.config import data_dir, load_overrides
     from facadekit.media.ffmpeg import ffmpeg_exe
 
-    print(f"facadekit {__version__}")
-    print(f"python {platform.python_version()}")
-    print(f"opencv {cv2.__version__}")
+    lines: list[str] = []
+
+    def say(text: str) -> None:
+        print(text)
+        lines.append(text)
+
+    say(f"facadekit {__version__}")
+    say(f"python {platform.python_version()}")
+    say(f"opencv {cv2.__version__}")
     exe = ffmpeg_exe()
-    print(f"ffmpeg: {exe}")
+    say(f"ffmpeg: {exe}")
     try:
         first = subprocess.run(
             [exe, "-version"], capture_output=True, text=True, timeout=30
         ).stdout.splitlines()
-        print(first[0] if first else "")
+        say(first[0] if first else "")
     except (OSError, subprocess.SubprocessError):
-        print("ffmpeg -version failed")
-    print(f"data dir: {data_dir()}")
+        say("ffmpeg -version failed")
+    say(f"data dir: {data_dir()}")
     overrides = load_overrides()
-    print(f"config.json overrides: {len(overrides)}")
+    say(f"config.json overrides: {len(overrides)}")
     for key in sorted(overrides):
-        print(f"  {key} = {overrides[key]!r}")
+        say(f"  {key} = {overrides[key]!r}")
     if not args.no_cameras:
         from facadekit.devices.camera_opencv import list_cameras
 
@@ -273,10 +289,33 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
             cams = list_cameras()
         except Exception:
             cams = []
-        print(f"cameras: {len(cams)}")
+        say(f"cameras: {len(cams)}")
         for cam in cams:
-            print(f"  {cam.id}: {cam.name} {cam.width}x{cam.height}")
+            say(f"  {cam.id}: {cam.name} {cam.width}x{cam.height}")
+    log_file = logs.log_path(data_dir())
+    say(f"log file: {log_file}" + ("" if log_file.is_file() else " (not written yet)"))
+    if args.bundle:
+        bundle = _write_bundle(Path(args.bundle), report="\n".join(lines) + "\n")
+        print(f"diagnostic bundle: {bundle}")
     return 0
+
+
+def _write_bundle(path: Path, *, report: str) -> Path:
+    """Zip the doctor report and the log files, with the home directory written as `~`."""
+    import zipfile
+
+    from facadekit import logs
+    from facadekit.config import data_dir
+
+    if path.suffix != ".zip":
+        raise FkError(BAD_REQUEST, "--bundle: the file name must end with .zip")
+    log_file = logs.log_path(data_dir())
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as bundle:
+        bundle.writestr("doctor.txt", logs.redact(report))
+        for candidate in sorted(log_file.parent.glob(logs.LOG_NAME + "*")):
+            text = candidate.read_text(encoding="utf-8", errors="replace")
+            bundle.writestr(f"logs/{candidate.name}", logs.redact(text))
+    return path
 
 
 def _cmd_sim(args: argparse.Namespace) -> int:
