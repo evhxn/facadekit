@@ -16,6 +16,8 @@ vi.mock("../api/client", async (orig) => ({
   projectorStatus: vi.fn(),
   projectorShow: vi.fn(),
   listCameras: vi.fn(),
+  cameraAccess: vi.fn(),
+  fetchSnapshot: vi.fn(),
   cameraSnapshotUrl: vi.fn((cid: string) => `/snap/${cid}.jpg`),
   setCameraControls: vi.fn(),
   startCalibration: vi.fn(),
@@ -73,6 +75,11 @@ beforeEach(() => {
   useProjectStore.setState({ project, dirty: false });
   m.getProject.mockResolvedValue(project);
   m.health.mockResolvedValue({ status: "ok", version: "0", sim: false });
+  m.cameraAccess.mockResolvedValue({ status: "authorized", message: null });
+  m.fetchSnapshot.mockImplementation(async () => new Blob(["jpeg"]));
+  let frames = 0;
+  URL.createObjectURL = vi.fn(() => `blob:frame-${++frames}`);
+  URL.revokeObjectURL = vi.fn();
   m.projectorShow.mockResolvedValue({
     connected: true,
     width: 1920,
@@ -252,8 +259,51 @@ describe("Step 2 - camera", () => {
     const { rerender } = render(<StepCamera {...cameraProps({ onCameraChange: onChange })} />);
     await waitFor(() => expect(onChange).toHaveBeenCalledWith("cam0"));
     rerender(<StepCamera {...cameraProps({ cameraId: "cam0", onCameraChange: onChange })} />);
-    const img = screen.getByAltText("Live camera view") as HTMLImageElement;
-    expect(img.getAttribute("src")).toMatch(/^\/snap\/cam0\.jpg\?t=\d+$/);
+    const img = (await screen.findByAltText("Live camera view")) as HTMLImageElement;
+    expect(img.getAttribute("src")).toBe("blob:frame-1");
+    expect(m.fetchSnapshot.mock.calls[0]?.[0]).toBe("cam0");
+  });
+
+  it("names the camera, and says what kind it is when that matters", async () => {
+    m.listCameras.mockResolvedValue([
+      { id: "0", name: "MacBook Pro Camera", width: 1280, height: 720, kind: "built_in" },
+      { id: "1", name: "Sam’s iPhone Camera", width: 1280, height: 720, kind: "phone" },
+      { id: "2", name: "Logi C920", width: 1280, height: 720, kind: "external" },
+    ]);
+    render(<StepCamera {...cameraProps()} />);
+    await screen.findByRole("option", { name: "MacBook Pro Camera (built in)" });
+    expect(screen.getByRole("option", { name: "Sam’s iPhone Camera" })).toBeTruthy();
+    expect(screen.getByRole("option", { name: "Logi C920" })).toBeTruthy();
+  });
+
+  it("shows why the system refuses the camera", async () => {
+    m.listCameras.mockResolvedValue([{ id: "0", name: "Cam", width: 1280, height: 720 }]);
+    m.cameraAccess.mockResolvedValue({
+      status: "denied",
+      message: "macOS is blocking the camera for Terminal. Open System Settings.",
+    });
+    render(<StepCamera {...cameraProps()} />);
+    expect((await screen.findByRole("alert")).textContent).toContain("macOS is blocking");
+  });
+
+  it("drops a camera the server no longer knows and looks again", async () => {
+    m.listCameras.mockResolvedValue([{ id: "0", name: "Cam", width: 1280, height: 720 }]);
+    m.fetchSnapshot.mockRejectedValue(new client.ApiError("NOT_FOUND", "camera not found", 404));
+    const onChange = vi.fn();
+    render(<StepCamera {...cameraProps({ cameraId: "sim", onCameraChange: onChange })} />);
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith(null));
+    expect(m.fetchSnapshot).toHaveBeenCalledTimes(1);
+    expect(m.listCameras.mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("says so when the camera list cannot be loaded, and Refresh looks again", async () => {
+    m.listCameras.mockRejectedValue(new client.ApiError("INTERNAL", "listing broke", 500));
+    render(<StepCamera {...cameraProps()} />);
+    expect((await screen.findByRole("alert")).textContent).toContain("listing broke");
+    m.listCameras.mockResolvedValue([]);
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    expect(await screen.findByText(/No camera found/)).toBeTruthy();
+    expect(m.listCameras).toHaveBeenLastCalledWith(true);
   });
 });
 
@@ -288,16 +338,18 @@ describe("Step 2 - camera check", () => {
       m.startCameraCheck.mockResolvedValue({ job_id: "jc" });
       ev.waitForJob.mockReturnValue(new Promise<Job>(() => {}));
       render(<StepCamera {...cameraProps({ cameraId: "cam0" })} />);
-      const img = screen.getByAltText("Live camera view") as HTMLImageElement;
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+      expect(m.fetchSnapshot.mock.calls.length).toBeGreaterThan(2); // live before the check
       await act(async () => {
         fireEvent.click(screen.getByRole("button", { name: "Check the camera view" }));
       });
-      const before = img.getAttribute("src");
-      fireEvent.load(img);
+      const before = m.fetchSnapshot.mock.calls.length;
       await act(async () => {
         await vi.advanceTimersByTimeAsync(2000);
       });
-      expect(img.getAttribute("src")).toBe(before);
+      expect(m.fetchSnapshot.mock.calls.length).toBe(before);
     } finally {
       vi.useRealTimers();
     }

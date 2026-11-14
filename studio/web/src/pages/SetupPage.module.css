@@ -223,3 +223,12 @@
 .steps2 li + li {
   margin-top: var(--space-2);
 }
+
+.livePlaceholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 16 / 9;
+  background: var(--surface);
+  color: var(--muted);
+}

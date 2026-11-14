@@ -129,6 +129,14 @@ def _cmd_serve(args: argparse.Namespace) -> int:
     logs.log.info(
         "FacadeKit %s starting on port %d (sim=%s, lan=%s)", __version__, port, args.sim, args.lan
     )
+    if not args.sim:
+        from facadekit.devices.camera_opencv import prepare_camera_access
+
+        # Must happen here, on the main thread, before the server threads exist.
+        problem = prepare_camera_access()
+        if problem is not None:
+            print(f"Camera: {problem}", flush=True)
+            logs.log.warning("camera access: %s", problem)
     app = create_app(sim=args.sim, lan=args.lan, log_file=log_file)
     if args.lan:
         from facadekit.api.remote_auth import lan_addresses
@@ -283,15 +291,21 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
     for key in sorted(overrides):
         say(f"  {key} = {overrides[key]!r}")
     if not args.no_cameras:
-        from facadekit.devices.camera_opencv import list_cameras
+        from facadekit.config import camera_size
+        from facadekit.devices.camera_opencv import access_problem, named_cameras, probe_cameras
 
         try:
-            cams = list_cameras()
+            named = named_cameras(camera_size())  # opens no camera where the system lists them
+            cams = named if named is not None else probe_cameras()
         except Exception:
-            cams = []
+            named, cams = None, []
         say(f"cameras: {len(cams)}")
         for cam in cams:
-            say(f"  {cam.id}: {cam.name} {cam.width}x{cam.height}")
+            size = "" if named is not None else f" {cam.width}x{cam.height}"
+            say(f"  {cam.id}: {cam.name} ({cam.kind}){size}")
+        problem = access_problem()
+        if problem is not None:
+            say(f"camera access: {problem}")
     log_file = logs.log_path(data_dir())
     say(f"log file: {log_file}" + ("" if log_file.is_file() else " (not written yet)"))
     if args.bundle:

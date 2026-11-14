@@ -196,7 +196,36 @@ export const deleteAsset = (pid: string, aid: string) =>
 export const getLearning = () => request<LearningSummary>("GET", "/learning/scans");
 export const forgetLearning = () => request<void>("DELETE", "/learning/scans");
 
-export const listCameras = () => request<CameraInfo[]>("GET", "/devices/cameras");
+/** `refresh` asks a system that can only find cameras by opening them to look again. */
+export const listCameras = (refresh = false) =>
+  request<CameraInfo[]>("GET", `/devices/cameras${refresh ? "?refresh=true" : ""}`);
+export interface CameraAccess {
+  status: "authorized" | "denied" | "restricted" | "not_determined" | "unknown";
+  /** What to do about it; null when nothing is wrong. */
+  message: string | null;
+}
+export const cameraAccess = () => request<CameraAccess>("GET", "/devices/cameras/access");
+/** One camera picture. Unlike an <img> this reports why a picture did not come. */
+export async function fetchSnapshot(cid: string, signal?: AbortSignal): Promise<Blob> {
+  const path = `/devices/cameras/${enc(cid)}/snapshot.jpg`;
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}?t=${Date.now()}`, { signal });
+  } catch (e) {
+    if (signal?.aborted) throw e;
+    throw remember(
+      `GET ${path}`,
+      new ApiError("NETWORK", e instanceof Error ? e.message : "Network error", 0),
+    );
+  }
+  if (!res.ok) {
+    throw remember(
+      `GET ${path}`,
+      errorFromBody(res.status, await res.text(), res.headers?.get("X-Request-ID") ?? null),
+    );
+  }
+  return res.blob();
+}
 export const cameraSnapshotUrl = (
   cid: string,
   crop?: { x: number; y: number; w: number; h: number },
