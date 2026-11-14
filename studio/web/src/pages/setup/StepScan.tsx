@@ -6,6 +6,7 @@ import {
   getCalibration,
   measuredMaskUrl,
   projViewUrl,
+  reasonsUrl,
   sendScanFeedback,
   startCalibration,
 } from "../../api/client";
@@ -16,6 +17,7 @@ import ErrorBanner from "../../components/ErrorBanner";
 import JobProgress from "../../components/JobProgress";
 import { COPY, isPictureSizeMessage } from "./cameraCopy";
 import LearningPanel from "./LearningPanel";
+import ScanResultView from "./ScanResultView";
 import PhoneScanPanel from "./PhoneScanPanel";
 import { useProjectStore } from "../../state/projectStore";
 import styles from "../SetupPage.module.css";
@@ -33,43 +35,6 @@ interface Props {
   phone?: boolean;
   /** Go to the camera step (shown when a scan is asked for without a camera). */
   onChooseCamera?: () => void;
-}
-
-/** Projector-view photo; where the measured mask is black, a red tint is laid over it. */
-function TintedView({ photoUrl, maskUrl }: { photoUrl: string; maskUrl?: string }) {
-  const canvas = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    if (!maskUrl) return;
-    const img = new Image();
-    img.onload = () => {
-      const el = canvas.current;
-      const ctx = el?.getContext("2d");
-      if (!el || !ctx) return;
-      el.width = img.naturalWidth;
-      el.height = img.naturalHeight;
-      ctx.drawImage(img, 0, 0);
-      const data = ctx.getImageData(0, 0, el.width, el.height);
-      const px = data.data;
-      for (let i = 0; i < px.length; i += 4) {
-        const lum = ((px[i] ?? 0) + (px[i + 1] ?? 0) + (px[i + 2] ?? 0)) / 3;
-        const unmeasured = lum < 128;
-        px[i] = 255;
-        px[i + 1] = 0;
-        px[i + 2] = 0;
-        px[i + 3] = unmeasured ? Math.round(0.35 * 255) : 0;
-      }
-      ctx.putImageData(data, 0, 0);
-    };
-    img.src = maskUrl;
-  }, [maskUrl]);
-
-  return (
-    <div className={styles.viewWrap}>
-      <img className={styles.view} src={photoUrl} alt="Projector view of the house" />
-      {maskUrl ? <canvas ref={canvas} className={styles.overlay} aria-hidden="true" /> : null}
-    </div>
-  );
 }
 
 /** Plain-language names for the strategies scan memory can pick (backend calib/learn.py). */
@@ -229,15 +194,18 @@ export default function StepScan({
     const warnings = calibration.warnings;
     const low = warnings.includes("LOW_COVERAGE");
     const coverage = calibration.quality ? Math.round(calibration.quality.coverage * 100) : null;
+    const hasReasons = Boolean(calibration.quality?.unmeasured);
     const strategyNote = calibration.strategy ? STRATEGY_NOTES[calibration.strategy] : undefined;
     // Feedback is best effort: the wizard works the same when it cannot be stored.
     const feedback = (verdict: "good" | "bad") =>
       void sendScanFeedback(pid, calibration.id, verdict).catch(() => {});
     return (
       <section>
-        <TintedView
+        <ScanResultView
           photoUrl={projViewUrl(pid, calibration.id)}
-          maskUrl={low ? measuredMaskUrl(pid, calibration.id) : undefined}
+          reasonsUrl={hasReasons ? reasonsUrl(pid, calibration.id) : undefined}
+          maskUrl={low && !hasReasons ? measuredMaskUrl(pid, calibration.id) : undefined}
+          unmeasured={calibration.quality?.unmeasured}
         />
         {coverage !== null ? <p>Measured {coverage}% of the projection.</p> : null}
         {strategyNote ? (
@@ -246,8 +214,14 @@ export default function StepScan({
             camera view or earlier scans with this camera had trouble.
           </p>
         ) : null}
-        {low ? (
+        {low && !hasReasons ? (
           <p>The camera could not see the red areas. Surfaces there may need manual alignment.</p>
+        ) : null}
+        {low && hasReasons ? (
+          <p>
+            A large part was not measured. Surfaces in the coloured areas are placed by estimate
+            and may need manual alignment.
+          </p>
         ) : null}
         {calibration.quality?.verdict === "marginal" ||
         calibration.quality?.verdict === "too_coarse" ? (
@@ -255,7 +229,11 @@ export default function StepScan({
         ) : null}
         {warnings.includes("CROP_TOO_TIGHT") ? <p>{COPY.cropTight}</p> : null}
         {warnings.includes("NON_PLANAR") ? (
-          <p>This wall is not flat. That is OK, but check alignment carefully.</p>
+          <p>
+            This wall is not flat: something sticks out or steps back (a ledge, a box, a book).
+            That is OK. A four-corner surface is flat, so on such a part draw a separate surface
+            for each flat face, or bend one surface with the mesh editor on the Surfaces page.
+          </p>
         ) : null}
         {warnings.includes("CAMERA_CONTROLS_UNAVAILABLE") ? (
           <p className={styles.note}>
@@ -287,6 +265,25 @@ export default function StepScan({
           </button>
         </div>
         {noCameraBanner}
+        <details>
+          <summary>Projecting from the side or at an angle?</summary>
+          <ul>
+            <li>
+              The scan handles an angled projector by itself; keystone on the projector must stay
+              off.
+            </li>
+            <li>
+              Put the camera as close to the projector lens as you can, looking the same way. The
+              further apart they are, the more the camera sees surfaces edge-on that the projector
+              lights well, and the more is left unmeasured.
+            </li>
+            <li>
+              At a steep angle the far side of the picture is dimmer and its pixels are stretched.
+              Moving the projector to face the wall more squarely gives a brighter, sharper show.
+            </li>
+            <li>The whole projection has to be inside the camera picture, with a little room around.</li>
+          </ul>
+        </details>
         <p className={styles.note}>
           FacadeKit remembers which scans worked on this computer and adapts the next one.
         </p>

@@ -341,6 +341,12 @@ def measured_mask(pid: str, cid: str, state: State) -> FileResponse:
     return _image(state, pid, cid, "measured_mask.png")
 
 
+@router.get("/projects/{pid}/calibrations/{cid}/reasons.png")
+def reasons_image(pid: str, cid: str, state: State) -> FileResponse:
+    """Why each projector pixel was not measured: gray value = reason code * 50."""
+    return _image(state, pid, cid, "reasons.png")
+
+
 class RealignRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

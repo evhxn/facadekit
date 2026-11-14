@@ -232,3 +232,20 @@
   background: var(--surface);
   color: var(--muted);
 }
+
+.legend ul {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-2) 0;
+  display: grid;
+  gap: var(--space-2);
+  max-width: 70ch;
+}
+.swatch {
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  border-radius: 2px;
+  margin-right: var(--space-2);
+  vertical-align: baseline;
+}

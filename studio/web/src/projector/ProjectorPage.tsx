@@ -8,6 +8,7 @@ import {
   type ServerMessage,
   type TransportMessage,
 } from "./projectorSocket";
+import { canListScreens, describeScreen, likelyProjector, listScreens, type ScreenInfo } from "./screens";
 import styles from "./ProjectorPage.module.css";
 
 export interface LiveRenderer {
@@ -160,9 +161,19 @@ export default function ProjectorPage() {
     };
   }, [render, resizeAndHello]);
 
-  const goFullscreen = () => {
-    void document.documentElement.requestFullscreen();
+  const goFullscreen = (screen?: ScreenInfo) => {
+    const options = screen ? ({ screen: screen.handle } as FullscreenOptions) : undefined;
+    void document.documentElement.requestFullscreen(options).catch(() => {
+      // Refused (for example no click yet): the instructions stay on screen.
+    });
   };
+  const [screens, setScreens] = useState<ScreenInfo[] | null>(null);
+  const [screensAsked, setScreensAsked] = useState(false);
+  const findScreens = async () => {
+    setScreensAsked(true);
+    setScreens(await listScreens());
+  };
+  const projectorScreen = screens ? likelyProjector(screens) : null;
 
   if (takenOver) {
     return <div className={styles.message}>Another projector window is active</div>;
@@ -178,9 +189,38 @@ export default function ProjectorPage() {
         <div className={styles.overlay}>
           <h1>Projector</h1>
           <p>Drag this window to the projector, then click here</p>
-          <button type="button" className={styles.button} onClick={goFullscreen}>
+          <button type="button" className={styles.button} onClick={() => goFullscreen()}>
             Go fullscreen
           </button>
+          {canListScreens() && !screens ? (
+            <p>
+              <button type="button" className={styles.button} onClick={() => void findScreens()}>
+                Find the projector for me
+              </button>
+              {screensAsked ? " The browser did not share the list of screens." : null}
+            </p>
+          ) : null}
+          {screens ? (
+            <div>
+              <p>
+                This window is on:{" "}
+                {screens.filter((s) => s.current).map(describeScreen).join(", ") || "unknown"}
+              </p>
+              {screens
+                .filter((s) => !s.current)
+                .map((s) => (
+                  <p key={s.label}>
+                    <button type="button" className={styles.button} onClick={() => goFullscreen(s)}>
+                      {s === projectorScreen ? "Show on the projector: " : "Show on: "}
+                      {describeScreen(s)}
+                    </button>
+                  </p>
+                ))}
+              {screens.length === 1 ? (
+                <p>No second screen found. Connect the projector and set it to extend the desktop.</p>
+              ) : null}
+            </div>
+          ) : null}
           <p>
             {size.w} × {size.h} (scale {size.dpr})
           </p>

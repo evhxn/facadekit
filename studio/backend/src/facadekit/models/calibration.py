@@ -69,6 +69,9 @@ class CalibQuality(BaseModel):
     px_per_proj_px: float | None = None
     snr: float | None = None
     verdict: Literal["good", "marginal", "too_coarse"] | None = None
+    # Share of the projector picture that was not measured, by reason (calib/reasons.py):
+    # keys "dark", "bright", "outside", "unclear". None on scans made before this existed.
+    unmeasured: dict[str, float] | None = None
 
 
 class Calibration(BaseModel):
