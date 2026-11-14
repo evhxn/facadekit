@@ -40,9 +40,16 @@ def _shoot(
     image: np.ndarray,
     settings: CalibSettings,
     sleep: Callable[[float], None],
+    *,
+    stripes: bool = False,
 ) -> tuple[np.ndarray, np.ndarray]:
+    """Show `image`, wait, and photograph it. `stripes`: a Gray-code picture (half lit), which
+    may use the shorter wait measured for a change between two such pictures."""
     display.show(image)
-    sleep(settings.settle_ms / 1000)
+    settle_ms = settings.settle_ms
+    if stripes and settings.pattern_settle_ms is not None:
+        settle_ms = settings.pattern_settle_ms
+    sleep(settle_ms / 1000)
     for _ in range(settings.discard_frames):
         camera.read()
     acc: np.ndarray | None = None
@@ -160,7 +167,9 @@ def run_capture(
     for i, f in enumerate(frames):
         if cancel is not None and cancel():
             raise FkError("CANCELLED", "Calibration cancelled")
-        gray, bgr = _shoot(display, camera, render_pattern(spec, f), settings, sleep)
+        gray, bgr = _shoot(
+            display, camera, render_pattern(spec, f), settings, sleep, stripes=f.kind == "pattern"
+        )
         images[i] = gray
         if f.kind == "white":
             white_bgr = bgr

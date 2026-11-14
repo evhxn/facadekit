@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import re
 import shutil
@@ -28,7 +29,8 @@ from facadekit.calib.quality import (
     verdict,
 )
 from facadekit.calib.roi import crop_too_tight, maps_to_full
-from facadekit.calib.tuning import measure_latency
+from facadekit.calib.timing import ScanTimer
+from facadekit.calib.tuning import measure_latency, measure_pattern_latency
 from facadekit.devices.base import Camera, ProjectorDisplay
 from facadekit.devices.cropped import CroppedCamera
 from facadekit.errors import FkError
@@ -36,6 +38,8 @@ from facadekit.ids import new_id
 from facadekit.models.calibration import CalibQuality, Calibration, CalibSettings
 from facadekit.models.jobs import utc_now_iso
 from facadekit.models.project import ProjectorSpec
+
+log = logging.getLogger(__name__)
 
 _CAL_ID = re.compile(r"^cal_[0-9a-f]{8}$")
 
@@ -103,19 +107,37 @@ def run_calibration(
     spec = PatternSpec(*display.size, skip_lsb=settings.skip_lsb)
     if settings.roi is not None:  # tuning, exposure, precheck and capture all see the crop
         camera = CroppedCamera(camera, settings.roi)
+    timer = ScanTimer(clock, sleep)
+    display, camera, sleep = timer.display(display), timer.camera(camera), timer.sleep
+    timer.phase("opening camera")
     camera.open()
     try:
         tuned: CalibSettings | None = None
         if settings.settle_ms == 0:  # automatic: measure the projector-to-camera delay
             report(0.0, "Tuning camera…")
+            timer.phase("tuning")
             lat = measure_latency(display, camera, clock=clock, sleep=sleep)
+            _check_cancel(cancel)
+            pattern_ms = measure_pattern_latency(
+                display,
+                camera,
+                step_settle_ms=lat.settle_ms,
+                frame_interval_ms=lat.frame_interval_ms,
+                clock=clock,
+                sleep=sleep,
+            )
             settings = settings.model_copy(
-                update={"settle_ms": lat.settle_ms, "discard_frames": lat.discard_frames}
+                update={
+                    "settle_ms": lat.settle_ms,
+                    "discard_frames": lat.discard_frames,
+                    "pattern_settle_ms": pattern_ms,
+                }
             )
             tuned = settings
         else:
             report(0.0, "Checking setup")
         _check_cancel(cancel)
+        timer.phase("checking")
         pre = precheck(
             display,
             camera,
@@ -132,11 +154,13 @@ def run_calibration(
             strategy = advisor.choose(camera_id, pre)
             settings = strategy.apply(settings)
             spec = PatternSpec(*display.size, skip_lsb=settings.skip_lsb)
+        timer.phase("patterns")
         capture = run_capture(
             display, camera, spec, settings, progress=capture_progress, cancel=cancel, sleep=sleep
         )
     finally:
         camera.close()
+    timer.phase("decoding")
 
     try:
         cal = run_calibration_from_capture(
@@ -153,6 +177,15 @@ def run_calibration(
         if advisor is not None and strategy is not None and exc.code == "SCAN_FAILED":
             advisor.failed(camera_id, pre, strategy, exc.code)
         raise
+    finally:
+        log.info(
+            "scan timing (strategy %s, wait %d ms, stripe wait %s ms, %d frames averaged): %s",
+            strategy.id if strategy is not None else "fixed",
+            settings.settle_ms,
+            settings.pattern_settle_ms if settings.pattern_settle_ms is not None else "same",
+            settings.average_frames,
+            timer.summary(),
+        )
     if advisor is not None and strategy is not None:
         advisor.succeeded(camera_id, pre, strategy, cal)
     return cal
