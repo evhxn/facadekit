@@ -36,6 +36,9 @@ class CalibSettings(BaseModel):
 
     skip_lsb: int = 2
     settle_ms: int = 300
+    # Wait before a stripe picture when it was measured apart from settle_ms (see
+    # tuning.measure_pattern_latency); None = use settle_ms for every picture.
+    pattern_settle_ms: int | None = None
     discard_frames: int = 5
     average_frames: int = 3
     min_conf: float = Field(default=0.10, gt=0.0, lt=1.0)  # decode confidence threshold

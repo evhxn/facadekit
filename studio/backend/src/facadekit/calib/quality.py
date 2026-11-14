@@ -148,6 +148,7 @@ def probe_modulation(
             render_pattern(spec, PatternFrame("pattern", "x", bit, False)),
             settings,
             sleep,
+            stripes=True,
         )
         neg, _ = _shoot(
             display,
@@ -155,6 +156,7 @@ def probe_modulation(
             render_pattern(spec, PatternFrame("pattern", "x", bit, True)),
             settings,
             sleep,
+            stripes=True,
         )
         out[bit] = stripe_modulation(pos, neg, contrast, lit)
     return out

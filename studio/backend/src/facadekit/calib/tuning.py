@@ -46,10 +46,11 @@ def _watch_edge(
     clock: Callable[[], float],
     t_show: float,
     b0: float,
+    level: Callable[[np.ndarray], float] = _mean,
 ) -> list[tuple[float, float]]:
     readings: list[tuple[float, float]] = []
     while clock() - t_show < _WINDOW_S:
-        m = _mean(camera.read())
+        m = level(camera.read())
         readings.append((clock() - t_show, m))
         if len(readings) >= 8:
             last = [v for _, v in readings[-5:]]
@@ -57,7 +58,7 @@ def _watch_edge(
             if step >= _MIN_STEP and max(last) - min(last) <= max(1.0, 0.02 * step):
                 break  # new level reached and stable; no need to watch longer
     if not readings:
-        readings.append((clock() - t_show, _mean(camera.read())))
+        readings.append((clock() - t_show, level(camera.read())))
     return readings
 
 
@@ -84,9 +85,15 @@ def measure_latency(
     interval_ms = float(np.median(stamps))
 
     worst = 0.0
+    previous: float | None = None
     for trial in range(max(1, trials)):
         if trial >= 1 and clock() - start > _BUDGET_S:
             break
+        # Stop once a trial did not raise the worst time by more than one camera frame:
+        # further trials would only cost time (each takes 1 to 4 s).
+        if trial >= 2 and previous is not None and (worst - previous) * 1000 <= interval_ms:
+            break
+        previous = worst if trial >= 1 else None
         display.show(black)
         sleep(0.7)
         b0 = _mean(camera.read())
@@ -109,6 +116,72 @@ def measure_latency(
 
     settle_ms = min(1500, math.ceil(worst * 1000.0 * 1.3 + interval_ms))
     return LatencyResult(settle_ms=settle_ms, discard_frames=1, frame_interval_ms=interval_ms)
+
+
+_PATTERN_STEP = 4.0  # mean gray-level change between a stripe picture and its inverse
+
+
+def _small_gray(frame: np.ndarray) -> np.ndarray:
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) if frame.ndim == 3 else frame
+    return gray[::4, ::4].astype(np.float32)
+
+
+def measure_pattern_latency(
+    display: ProjectorDisplay,
+    camera: Camera,
+    *,
+    step_settle_ms: int,
+    frame_interval_ms: float,
+    clock: Callable[[], float] = time.monotonic,
+    sleep: Callable[[float], None] = time.sleep,
+) -> int | None:
+    """Wait needed between two stripe pictures, in ms; None when it cannot be measured.
+
+    `measure_latency` times a jump from black to white. A camera whose automatic exposure
+    cannot be switched off (most laptop cameras) keeps adjusting for about a second after such
+    a jump, so that wait comes out long. A scan, though, shows stripe pictures one after the
+    other, and each is half lit: the exposure does not move and only the projector and camera
+    delay is left. This measures that delay, by swapping a wide-stripe picture with its
+    inverse and timing how long the camera picture takes to follow.
+
+    Never longer than `step_settle_ms` (that wait is always safe).
+    """
+    from facadekit.calib.patterns import (  # tuning is imported by capture
+        PatternFrame,
+        PatternSpec,
+        bits_for,
+        render_pattern,
+    )
+
+    w, h = display.size
+    spec = PatternSpec(w, h)
+    bit = max(bits_for(w) - 3, 0)  # stripes an eighth of the width: any camera resolves them
+    pictures = [
+        render_pattern(spec, PatternFrame("pattern", "x", bit, inverted))
+        for inverted in (False, True)
+    ]
+    display.show(pictures[0])
+    sleep(step_settle_ms / 1000)  # the first stripes follow black: give the exposure its time
+    camera.read()
+    reference = _small_gray(camera.read())
+
+    worst = 0.0
+    for swap in range(1, 5):
+
+        def change(frame: np.ndarray, ref: np.ndarray = reference) -> float:
+            return float(np.abs(_small_gray(frame) - ref).mean())
+
+        baseline = change(camera.read())
+        display.show(pictures[swap % 2])
+        t_show = clock()
+        readings = _watch_edge(camera, clock, t_show, baseline, change)
+        settled, final = _settled_time(readings, baseline)
+        if final - baseline < _PATTERN_STEP:
+            return None  # the stripes hardly show in the picture: keep the safe wait
+        worst = max(worst, settled)
+        reference = _small_gray(camera.read())
+    pattern_ms = math.ceil(worst * 1000.0 * 1.3 + frame_interval_ms)
+    return int(min(pattern_ms, step_settle_ms))
 
 
 def auto_exposure(
