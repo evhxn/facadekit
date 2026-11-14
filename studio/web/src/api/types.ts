@@ -131,6 +131,8 @@ export interface CalibQuality {
   px_per_proj_px?: number | null;
   snr?: number | null;
   verdict?: CameraVerdict | null;
+  /** Share of the projection not measured, by reason; absent on older scans. */
+  unmeasured?: Partial<Record<"dark" | "bright" | "outside" | "unclear", number>> | null;
 }
 export interface Calibration {
   id: string;

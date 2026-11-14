@@ -308,6 +308,8 @@ export const projViewUrl = (pid: string, cid: string) =>
   `${BASE}/projects/${enc(pid)}/calibrations/${enc(cid)}/proj_view.png`;
 export const measuredMaskUrl = (pid: string, cid: string) =>
   `${BASE}/projects/${enc(pid)}/calibrations/${enc(cid)}/measured_mask.png`;
+export const reasonsUrl = (pid: string, cid: string) =>
+  `${BASE}/projects/${enc(pid)}/calibrations/${enc(cid)}/reasons.png`;
 export const frameUrl = (pid: string, tMs: number, scale: number) =>
   `${BASE}/projects/${enc(pid)}/frame?t_ms=${tMs}&scale=${scale}`;
 

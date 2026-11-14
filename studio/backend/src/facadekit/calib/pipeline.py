@@ -28,6 +28,7 @@ from facadekit.calib.quality import (
     px_per_proj_px_from_h,
     verdict,
 )
+from facadekit.calib.reasons import PNG_STEP, reason_fractions, unmeasured_reasons
 from facadekit.calib.roi import crop_too_tight, maps_to_full
 from facadekit.calib.timing import ScanTimer
 from facadekit.calib.tuning import measure_latency, measure_pattern_latency
@@ -203,6 +204,13 @@ def _contrast_stats(capture: CaptureSet, crop_check: bool = False) -> dict[str, 
     return stats
 
 
+def _white_gray(capture: CaptureSet) -> np.ndarray:
+    for i, frame in enumerate(capture.frames):
+        if frame.kind == "white":
+            return np.asarray(capture.images[i])
+    raise FkError("SCAN_FAILED", "Capture set is incomplete")
+
+
 def run_calibration_from_capture(
     project_dir: Path,
     capture: CaptureSet,
@@ -271,6 +279,9 @@ def _decode_capture(
         raise FkError("SCAN_FAILED", f"Only {pct}% of the projection was measured.")
     _check_cancel(cancel)
     proj_view = make_proj_view(capture.white_bgr, maps)  # crop photo with crop-coordinate maps
+    reasons = unmeasured_reasons(  # also in crop coordinates, like the camera pictures
+        maps.p2c, maps.measured, decoded.contrast, _white_gray(capture)
+    )
     if roi is not None:
         maps = maps_to_full(maps, roi)
 
@@ -314,6 +325,7 @@ def _decode_capture(
             px_per_proj_px=scale,
             snr=snr,
             verdict=quality_verdict,
+            unmeasured=reason_fractions(reasons),
         ),
         h_c2p=maps.h_c2p.tolist() if maps.h_c2p is not None else None,
         warnings=warnings,
@@ -327,6 +339,7 @@ def _decode_capture(
             "proj_view.png": proj_view,
             "p2c.npy": maps.p2c.astype(np.float32),
             "measured_mask.png": maps.measured.astype(np.uint8) * 255,
+            "reasons.png": reasons * np.uint8(PNG_STEP),
         },
     )
     report(1.0, "Saving")
