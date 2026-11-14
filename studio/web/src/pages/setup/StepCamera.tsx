@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ApiError,
+  cameraAccess,
   cameraSnapshotUrl,
   listCameras,
   projectorShow,
@@ -15,8 +16,8 @@ import styles from "../SetupPage.module.css";
 import CameraCheckCard from "./CameraCheckCard";
 import { COPY, isPictureSizeMessage } from "./cameraCopy";
 import CropBox from "./CropBox";
+import LiveView from "./LiveView";
 
-const REFRESH_MS = 350;
 const DEBOUNCE_MS = 200;
 
 interface Props {
@@ -35,56 +36,6 @@ interface Props {
   onUsePhone: () => void;
 }
 
-interface LiveProps {
-  cameraId: string;
-  /** The camera is busy (camera check): stop asking for pictures. */
-  paused: boolean;
-  onFrame: (width: number, height: number) => void;
-}
-
-function LiveView({ cameraId, paused, onFrame }: LiveProps) {
-  const [src, setSrc] = useState(() => `${cameraSnapshotUrl(cameraId)}?t=${Date.now()}`);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pausedRef = useRef(paused);
-  pausedRef.current = paused;
-
-  useEffect(() => {
-    setSrc(`${cameraSnapshotUrl(cameraId)}?t=${Date.now()}`);
-    return () => {
-      if (timer.current !== null) clearTimeout(timer.current);
-    };
-  }, [cameraId]);
-
-  // Start again when the camera is free.
-  useEffect(() => {
-    if (!paused) setSrc(`${cameraSnapshotUrl(cameraId)}?t=${Date.now()}`);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paused]);
-
-  // Next request starts only after the previous image finished (or failed) loading.
-  const scheduleNext = () => {
-    if (timer.current !== null) clearTimeout(timer.current);
-    if (pausedRef.current) return;
-    timer.current = setTimeout(() => {
-      if (!pausedRef.current) setSrc(`${cameraSnapshotUrl(cameraId)}?t=${Date.now()}`);
-    }, REFRESH_MS);
-  };
-
-  return (
-    <img
-      className={styles.live}
-      src={src}
-      alt="Live camera view"
-      onLoad={(e) => {
-        const img = e.currentTarget;
-        if (img.naturalWidth > 0) onFrame(img.naturalWidth, img.naturalHeight);
-        scheduleNext();
-      }}
-      onError={scheduleNext}
-    />
-  );
-}
-
 /** Zoomed view of the cropped area. Loaded once; the live view keeps the camera busy otherwise. */
 function CropPreview({ cameraId, roi }: { cameraId: string; roi: CameraRoi }) {
   const [stamp] = useState(() => Date.now());
@@ -96,6 +47,14 @@ function CropPreview({ cameraId, roi }: { cameraId: string; roi: CameraRoi }) {
       alt={COPY.cropPreviewAlt}
     />
   );
+}
+
+const KIND_NOTE: Record<string, string> = { built_in: "built in", phone: "phone" };
+
+/** The device name, with a note for the kinds that are easy to pick by mistake. */
+export function cameraLabel(camera: CameraInfo): string {
+  const note = camera.kind ? KIND_NOTE[camera.kind] : undefined;
+  return note && !camera.name.toLowerCase().includes(note) ? `${camera.name} (${note})` : camera.name;
 }
 
 export default function StepCamera({
@@ -178,14 +137,29 @@ export default function StepCamera({
     }
   };
 
-  const refresh = () => {
-    listCameras()
+  const [listError, setListError] = useState<string | null>(null);
+  const [accessMessage, setAccessMessage] = useState<string | null>(null);
+
+  /** `look` also asks a system that finds cameras by opening them to search again. */
+  const refresh = (look = false) => {
+    setListError(null);
+    listCameras(look)
       .then((list) => {
         setCameras(list);
         if (list.length === 1 && list[0] && !cameraId) onCameraChange(list[0].id);
         if (cameraId && !list.some((c) => c.id === cameraId)) onCameraChange(null);
       })
-      .catch(() => setCameras([]));
+      .catch((e) => {
+        setCameras(null);
+        setListError(
+          e instanceof ApiError
+            ? userMessage(e.code, e.message)
+            : "Could not ask FacadeKit for the cameras.",
+        );
+      });
+    cameraAccess()
+      .then((access) => setAccessMessage(access.message))
+      .catch(() => setAccessMessage(null));
   };
 
   useEffect(() => {
@@ -219,6 +193,9 @@ export default function StepCamera({
         Place the camera next to the projector, pointing at the house. The whole grid must be inside
         the picture. Fix the camera so it cannot move.
       </p>
+      {accessMessage ? <ErrorBanner message={accessMessage} /> : null}
+      {listError ? <ErrorBanner message={listError} /> : null}
+      {cameras === null && !listError ? <p role="status">Looking for cameras…</p> : null}
       {cameras !== null && cameras.length === 0 ? (
         <p>No camera found. Plug in a USB webcam and click Refresh.</p>
       ) : null}
@@ -230,13 +207,16 @@ export default function StepCamera({
               <option value="">Choose a camera…</option>
               {cameras.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.name}
+                  {cameraLabel(c)}
                 </option>
               ))}
             </select>
           </label>
         ) : null}
-        <button type="button" onClick={refresh}>
+        {cameras && cameras.length === 1 && cameras[0] ? (
+          <span>Camera: {cameraLabel(cameras[0])}</span>
+        ) : null}
+        <button type="button" onClick={() => refresh(true)}>
           Refresh
         </button>
         <button type="button" onClick={toggle}>
@@ -261,6 +241,10 @@ export default function StepCamera({
           <LiveView
             cameraId={cameraId}
             paused={checking}
+            onGone={() => {
+              onCameraChange(null);
+              refresh();
+            }}
             onFrame={(width, height) =>
               setFrame((old) => (old?.width === width && old.height === height ? old : { width, height }))
             }

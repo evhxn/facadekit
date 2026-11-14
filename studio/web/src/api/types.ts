@@ -169,6 +169,8 @@ export interface CameraInfo {
   name: string;
   width: number;
   height: number;
+  /** Absent on servers older than the named-camera listing. */
+  kind?: "built_in" | "external" | "phone" | "unknown";
 }
 export interface ProjectorStatus {
   connected: boolean;
