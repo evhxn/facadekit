@@ -1,9 +1,27 @@
 import { useEffect, useRef, useState } from "react";
 import { fppProbe, health, projectorShow, projectorStatus } from "../../api/client";
 import { connectEvents } from "../../api/events";
-import { userMessage } from "../../api/errors";
 import type { Project, ProjectorStatus } from "../../api/types";
+import { useProjectStore } from "../../state/projectStore";
 import styles from "../SetupPage.module.css";
+
+/** Sizes a projector really has; a window of any other size is just not full screen. */
+const PROJECTOR_SIZES = new Set([
+  "800x600", "1024x768", "1280x720", "1280x800", "1366x768", "1600x900",
+  "1920x1080", "1920x1200", "2560x1440", "3840x2160",
+]); // prettier-ignore
+
+/** What to change when the projector window has the wrong number of pixels. */
+export function mismatchAdvice(status: ProjectorStatus, pw: number, ph: number): string {
+  const { width, height, dpr } = status;
+  if (dpr !== null && Math.abs(dpr - 1) > 0.01) {
+    return `The computer scales this display by ${dpr}. In the display settings, set the projector to ${pw}×${ph} with scaling off (100 %), and set the browser zoom of the projector window to 100 %.`;
+  }
+  if (width !== null && height !== null && width < pw && height < ph && !PROJECTOR_SIZES.has(`${width}x${height}`)) {
+    return "The projector window is probably not full screen, or is still on the laptop screen. Drag it onto the projector, then click it to go full screen.";
+  }
+  return `Set the projector display to ${pw}×${ph} in the computer's display settings.`;
+}
 
 interface Props {
   project: Project;
@@ -37,8 +55,29 @@ export default function StepProjector({ project, onReadyChange, piHost, onPiHost
 
   const connected = status?.connected === true;
   const matches = connected && status.width === pw && status.height === ph;
-  const mismatch = connected && !matches;
+  // The simulated projector takes the project's resolution, so it cannot mismatch.
+  const mismatch = connected && !matches && !sim;
   const ready = onPi ? piHost !== null : sim || matches;
+  // A project nothing has been built on yet may simply take the projector's resolution.
+  const untouched =
+    project.calibration_id === null &&
+    (project.surfaces?.length ?? 0) === 0 &&
+    !(project.timeline?.tracks ?? []).some((t) => t.clips.length > 0);
+  const adoptable =
+    mismatch &&
+    untouched &&
+    status.width !== null &&
+    status.height !== null &&
+    (status.dpr === null || Math.abs(status.dpr - 1) <= 0.01) &&
+    PROJECTOR_SIZES.has(`${status.width}x${status.height}`);
+  const adopt = () => {
+    if (!adoptable || status.width === null || status.height === null) return;
+    const [width, height] = [status.width, status.height];
+    useProjectStore.getState().update((draft) => {
+      draft.projector.width = width;
+      draft.projector.height = height;
+    });
+  };
 
   useEffect(() => {
     onReadyChange(ready);
@@ -142,20 +181,32 @@ export default function StepProjector({ project, onReadyChange, piHost, onPiHost
       >
         Open projector window
       </button>
-      {sim ? <p className={styles.note}>Simulator mode: no projector needed</p> : null}
-      <p>
-        {connected
-          ? `Projector connected (${status.width ?? "?"}×${status.height ?? "?"}).`
-          : "Projector not connected."}
-      </p>
-      {mismatch ? (
-        <p role="alert">
-          {userMessage("RESOLUTION_MISMATCH", "The projector resolution does not match.")} The
-          projector shows {status.width ?? "?"}×{status.height ?? "?"}, but this project needs {pw}×
-          {ph}.
+      {sim ? (
+        <p className={styles.note}>
+          Simulator mode: no projector needed. The simulated projector is {pw}×{ph}, like this
+          project.
         </p>
+      ) : (
+        <p>
+          {connected
+            ? `Projector connected (${status.width ?? "?"}×${status.height ?? "?"}).`
+            : "Projector not connected."}
+        </p>
+      )}
+      {mismatch ? (
+        <div role="alert">
+          <p>
+            The projector window is {status.width ?? "?"}×{status.height ?? "?"}, but this project
+            needs {pw}×{ph}. {mismatchAdvice(status, pw, ph)}
+          </p>
+          {adoptable ? (
+            <button type="button" onClick={adopt}>
+              Use {status.width}×{status.height} for this project instead
+            </button>
+          ) : null}
+        </div>
       ) : null}
-      {matches ? (
+      {matches && !sim ? (
         <p>
           You should see a white grid on the house. The projector may take 2 minutes to reach full
           brightness.

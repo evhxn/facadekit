@@ -12,6 +12,8 @@ import styles from "../SetupPage.module.css";
 interface Props {
   project: Project;
   cameraId: string | null;
+  /** Go to the camera step (shown when a scan is asked for without a camera). */
+  onChooseCamera?: () => void;
 }
 
 type Phase = "idle" | "scanning" | "preview" | "failed" | "applied" | "kept";
@@ -19,7 +21,7 @@ type Phase = "idle" | "scanning" | "preview" | "failed" | "applied" | "kept";
 const polygon = (pts: readonly (readonly [number, number])[]) =>
   pts.map(([x, y]) => `${x},${y}`).join(" ");
 
-export default function StepRealign({ project, cameraId }: Props) {
+export default function StepRealign({ project, cameraId, onChooseCamera }: Props) {
   const pid = project.id;
   const [phase, setPhase] = useState<Phase>("idle");
   const [job, setJob] = useState<Job | null>(null);
@@ -28,6 +30,7 @@ export default function StepRealign({ project, cameraId }: Props) {
   const [preview, setPreview] = useState<RealignResponse | null>(null);
   const [oldSurfaces, setOldSurfaces] = useState(project.surfaces);
   const [busy, setBusy] = useState(false);
+  const [needsCamera, setNeedsCamera] = useState(false);
   const mounted = useRef(true);
 
   useEffect(() => {
@@ -40,6 +43,14 @@ export default function StepRealign({ project, cameraId }: Props) {
   const start = async () => {
     const oldId = project.calibration_id;
     if (!oldId) return;
+    if (!cameraId) {
+      // The request used to go out without a camera and come back as an unexplained 422.
+      setError("No camera is chosen yet. Choose the camera that will watch the projection, then scan again.");
+      setNeedsCamera(true);
+      setPhase("failed");
+      return;
+    }
+    setNeedsCamera(false);
     setError(null);
     setPreview(null);
     setOldSurfaces(project.surfaces);
@@ -55,9 +66,7 @@ export default function StepRealign({ project, cameraId }: Props) {
       }
       const sameCamera = !cameraId || !earlier?.camera_id || earlier.camera_id === cameraId;
       const roi = sameCamera ? earlier?.settings?.roi : null;
-      const body: Parameters<typeof startCalibration>[1] = cameraId
-        ? { mode: "scan", camera_id: cameraId }
-        : { mode: "scan" };
+      const body: Parameters<typeof startCalibration>[1] = { mode: "scan", camera_id: cameraId };
       if (roi) body.settings = { roi };
       const { job_id } = await startCalibration(pid, body);
       const final = await waitForJob(job_id, (j) => mounted.current && setJob(j));
@@ -160,7 +169,18 @@ export default function StepRealign({ project, cameraId }: Props) {
   const canKeep = ids !== null;
   return (
     <section>
-      {phase === "failed" && error ? <ErrorBanner message={error} /> : null}
+      {phase === "failed" && error ? (
+        <ErrorBanner
+          message={error}
+          actions={
+            needsCamera && onChooseCamera ? (
+              <button type="button" className="primary" onClick={onChooseCamera}>
+                Choose a camera
+              </button>
+            ) : undefined
+          }
+        />
+      ) : null}
       {phase === "preview" && preview && ids ? (
         <>
           <div className={styles.viewWrap}>

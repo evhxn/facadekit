@@ -31,6 +31,8 @@ interface Props {
   onRoiReset?: () => void;
   /** The user chose "Use my phone instead". */
   phone?: boolean;
+  /** Go to the camera step (shown when a scan is asked for without a camera). */
+  onChooseCamera?: () => void;
 }
 
 /** Projector-view photo; where the measured mask is black, a red tint is laid over it. */
@@ -80,6 +82,11 @@ const STRATEGY_NOTES: Record<string, string> = {
 
 type Phase = "idle" | "running" | "failed" | "done";
 
+class NoCameraError extends Error {}
+
+export const NO_CAMERA_MESSAGE =
+  "No camera is chosen yet. Choose the camera that will watch the projection, then scan.";
+
 export default function StepScan({
   project,
   cameraId,
@@ -87,6 +94,7 @@ export default function StepScan({
   roi = null,
   onRoiReset,
   phone = false,
+  onChooseCamera,
 }: Props) {
   const navigate = useNavigate();
   const pid = project.id;
@@ -97,7 +105,24 @@ export default function StepScan({
   const [fixedWait, setFixedWait] = useState(false);
   const [waitMs, setWaitMs] = useState(300);
   const [usePhone, setUsePhone] = useState(phone);
+  const [noCamera, setNoCamera] = useState(false);
   const mounted = useRef(true);
+
+  useEffect(() => {
+    if (cameraId) setNoCamera(false);
+  }, [cameraId]);
+  const noCameraBanner = noCamera ? (
+    <ErrorBanner
+      message={NO_CAMERA_MESSAGE}
+      actions={
+        onChooseCamera ? (
+          <button type="button" className="primary" onClick={onChooseCamera}>
+            Choose a camera
+          </button>
+        ) : undefined
+      }
+    />
+  ) : null;
 
   useEffect(() => setUsePhone(phone), [phone]);
 
@@ -123,6 +148,7 @@ export default function StepScan({
 
   const run = async (mode: "scan" | "manual") => {
     setError(null);
+    setNoCamera(false);
     setPhase("running");
     setJob(null);
     try {
@@ -132,7 +158,9 @@ export default function StepScan({
       const settings: Partial<CalibSettings> = { settle_ms };
       if (roi) settings.roi = roi; // only used by the camera branch below; Pi scans ignore it
       let body: Parameters<typeof startCalibration>[1] = { mode: "manual" };
-      if (mode === "scan" && cameraId) {
+      if (mode === "scan") {
+        // Without a camera this used to fall through to manual mode without saying so.
+        if (!cameraId) throw new NoCameraError();
         body = piHost
           ? { mode: "scan_pi", camera_id: cameraId, host: piHost }
           : { mode, camera_id: cameraId, settings };
@@ -161,6 +189,11 @@ export default function StepScan({
       setPhase("done");
     } catch (e) {
       if (!mounted.current) return;
+      if (e instanceof NoCameraError) {
+        setNoCamera(true);
+        setPhase(project.calibration_id && calibration ? "done" : "idle");
+        return;
+      }
       fail(
         e instanceof ApiError
           ? userMessage(e.code, e.message)
@@ -253,6 +286,7 @@ export default function StepScan({
             Picture looks wrong, try another way
           </button>
         </div>
+        {noCameraBanner}
         <p className={styles.note}>
           FacadeKit remembers which scans worked on this computer and adapts the next one.
         </p>
@@ -350,6 +384,7 @@ export default function StepScan({
               </button>
             </div>
           )}
+          {noCameraBanner}
           {piHost ? null : (
             <p>
               <button type="button" className={styles.linkButton} onClick={() => setUsePhone(true)}>

@@ -18,4 +18,14 @@ describe("phone error messages (docs/08 section 4)", () => {
       "This light show has expired. Start it again.",
     );
   });
+  it("keeps the numbers of a resolution mismatch", () => {
+    const detail =
+      "Projector window is 1512x982 but the project expects 1920x1080. The computer scales this display by 2.";
+    expect(userMessage("RESOLUTION_MISMATCH", detail)).toBe(
+      `The projector window does not have the project's resolution. ${detail}`,
+    );
+    expect(userMessage("RESOLUTION_MISMATCH", "")).toBe(
+      "The projector window does not have the project's resolution.",
+    );
+  });
 });

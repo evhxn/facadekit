@@ -57,11 +57,13 @@ def test_every_response_carries_a_request_id(tmp_path: Path, log_file: Path) -> 
 
 def test_refused_request_is_explained_in_the_log(tmp_path: Path, log_file: Path) -> None:
     """The first hardware run had `camera-check -> 500` with nothing saying why."""
-    with _client(tmp_path, log_file) as c:
-        pid = c.post(
-            "/api/v1/projects", json={"name": "p", "projector": {"width": 1280, "height": 720}}
-        ).json()["id"]
-        res = c.post(f"/api/v1/projects/{pid}/camera-check", json={"camera_id": "sim"})
+    app = create_app(data_dir=tmp_path, log_file=log_file)
+    with TestClient(app) as c, c.websocket_connect("/ws/projector") as ws:
+        ws.send_json({"type": "hello", "width": 1280, "height": 720, "dpr": 1})
+        while not c.get("/api/v1/projector/status").json()["connected"]:
+            pass
+        pid = c.post("/api/v1/projects", json={"name": "p"}).json()["id"]
+        res = c.post(f"/api/v1/projects/{pid}/camera-check", json={"camera_id": "0"})
     assert res.status_code == 500
     assert res.json()["error"]["code"] == "RESOLUTION_MISMATCH"
     _flush()

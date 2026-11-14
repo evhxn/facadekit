@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import { getCalibration } from "../api/client";
+import { getCalibration, listCameras } from "../api/client";
 import type { CameraCheck, CameraRoi } from "../api/types";
 import { useProjectStore } from "../state/projectStore";
 import styles from "./SetupPage.module.css";
@@ -66,6 +66,33 @@ export default function SetupPage() {
     };
   }, [projectId, cameraId, lastCalibrationId]);
 
+  // A calibrated project opens on the scan step, past the camera step. Choose the camera
+  // there too: the one of the last scan if it is still plugged in, else the only one.
+  // ("Scan again" without a camera used to be refused by the server with a bare 422.)
+  useEffect(() => {
+    if (!lastCalibrationId) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const list = await listCameras();
+        if (cancelled || !Array.isArray(list)) return;
+        let pick = list.length === 1 ? list[0]?.id : undefined;
+        try {
+          const last = (await getCalibration(projectId, lastCalibrationId)).camera_id;
+          if (last && list.some((c) => c.id === last)) pick = last;
+        } catch {
+          // No old scan to read: the only camera, if there is exactly one, still stands.
+        }
+        if (!cancelled && pick) setCameraId((current) => current ?? pick);
+      } catch {
+        // The camera step shows listing problems; here the user is simply asked to choose.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, lastCalibrationId]);
+
   const goScan = (viaPhone: boolean) => {
     setSearchParams(viaPhone ? { phone: "1" } : {}, { replace: true });
     setStep(3);
@@ -115,10 +142,11 @@ export default function SetupPage() {
           roi={roi}
           onRoiReset={() => changeRoi(null)}
           phone={phone}
+          onChooseCamera={() => setStep(2)}
         />
       ) : null}
       {step === 3 && project.calibration_id && project.surfaces.length > 0 ? (
-        <StepRealign project={project} cameraId={cameraId} />
+        <StepRealign project={project} cameraId={cameraId} onChooseCamera={() => setStep(2)} />
       ) : null}
       <div className={styles.nav}>
         <button type="button" disabled={step === 1} onClick={() => setStep(step - 1)}>

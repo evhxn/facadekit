@@ -304,6 +304,11 @@ class CameraManager:
             self._busy.add(camera_id)
             return camera
 
+    def busy(self) -> bool:
+        """True while a scan or camera check holds a camera."""
+        with self._lock:
+            return bool(self._busy)
+
     def release(self, camera_id: str) -> None:
         with self._lock:
             self._busy.discard(camera_id)

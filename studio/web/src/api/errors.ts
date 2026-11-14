@@ -1,6 +1,5 @@
 const MESSAGES: Record<string, string> = {
-  RESOLUTION_MISMATCH:
-    "Your computer is not sending the projector its native resolution. Set the projector display to the project's resolution and 100 % scaling.",
+  RESOLUTION_MISMATCH: "The projector window does not have the project's resolution.",
   CAMERA_NO_PROJECTION:
     "The camera cannot see the projection. Move the camera so the whole white rectangle is inside the picture.",
   TOO_BRIGHT: "It is too bright to scan. Try again after sunset or turn off nearby lights.",
@@ -30,8 +29,13 @@ const MESSAGES: Record<string, string> = {
   NETWORK: "Cannot reach the FacadeKit server. Check that it is running and try again.",
 };
 
+/** Codes whose server text names the numbers the user has to change: show it as well. */
+const WITH_DETAIL = new Set(["RESOLUTION_MISMATCH"]);
+
 export function userMessage(code: string, fallback: string): string {
-  return Object.prototype.hasOwnProperty.call(MESSAGES, code)
-    ? (MESSAGES[code] ?? fallback)
-    : fallback;
+  if (!Object.prototype.hasOwnProperty.call(MESSAGES, code)) return fallback;
+  const message = MESSAGES[code] ?? fallback;
+  return WITH_DETAIL.has(code) && fallback && fallback !== message
+    ? `${message} ${fallback}`
+    : message;
 }

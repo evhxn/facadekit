@@ -7,6 +7,7 @@ import type { Calibration, CameraCheck, CameraRoi, Job, Project } from "../api/t
 import { useProjectStore } from "../state/projectStore";
 import SetupPage from "./SetupPage";
 import StepCamera from "./setup/StepCamera";
+import StepProjector from "./setup/StepProjector";
 import StepScan from "./setup/StepScan";
 
 vi.mock("../api/client", async (orig) => ({
@@ -75,6 +76,7 @@ beforeEach(() => {
   useProjectStore.setState({ project, dirty: false });
   m.getProject.mockResolvedValue(project);
   m.health.mockResolvedValue({ status: "ok", version: "0", sim: false });
+  m.listCameras.mockResolvedValue([{ id: "cam0", name: "Cam", width: 1280, height: 720 }]);
   m.cameraAccess.mockResolvedValue({ status: "authorized", message: null });
   m.fetchSnapshot.mockImplementation(async () => new Blob(["jpeg"]));
   let frames = 0;
@@ -877,12 +879,103 @@ describe("Crop across the wizard", () => {
     m.startCalibration.mockResolvedValue({ job_id: "j1" });
     ev.waitForJob.mockResolvedValue(job({ state: "failed", error: null, result: null }));
     renderSetup();
+    // The page chooses the only camera by itself; the scan must not start before that.
+    await waitFor(() => expect(m.listCameras).toHaveBeenCalled());
+    await act(async () => {});
     await act(async () => {
       fireEvent.click(await screen.findByRole("button", { name: /Projector moved/ }));
     });
     expect(m.startCalibration).toHaveBeenCalledWith("p1", {
       mode: "scan",
+      camera_id: "cam0",
       settings: { roi: sampleRoi },
     });
+  });
+
+  it("re-align without any camera asks for one instead of sending a scan the server refuses", async () => {
+    const calibrated = { ...withLast, surfaces: [{ id: "s1", name: "Door", quad: [[0, 0], [1, 0], [1, 1], [0, 1]] }] } as unknown as Project; // prettier-ignore
+    useProjectStore.setState({ project: calibrated, dirty: false });
+    m.getProject.mockResolvedValue(calibrated);
+    m.getCalibration.mockResolvedValue(calibration());
+    m.listCameras.mockResolvedValue([]);
+    renderSetup();
+    await act(async () => {
+      fireEvent.click(await screen.findByRole("button", { name: /Projector moved/ }));
+    });
+    expect(m.startCalibration).not.toHaveBeenCalled();
+    expect((await screen.findByRole("alert")).textContent).toMatch(/No camera is chosen yet/);
+    fireEvent.click(screen.getByRole("button", { name: "Choose a camera" }));
+    expect(await screen.findByText("Step 2 of 3: Camera")).toBeTruthy();
+  });
+});
+
+describe("Scan without a camera", () => {
+  it("Start scan asks for a camera; it does not quietly make a manual calibration", async () => {
+    const onChooseCamera = vi.fn();
+    render(
+      <MemoryRouter>
+        <StepScan project={project} cameraId={null} onChooseCamera={onChooseCamera} />
+      </MemoryRouter>,
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Start scan" }));
+    });
+    expect(m.startCalibration).not.toHaveBeenCalled();
+    expect(screen.getByText(/No camera is chosen yet/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Choose a camera" }));
+    expect(onChooseCamera).toHaveBeenCalledOnce();
+  });
+});
+
+describe("Step 1 - resolution mismatch", () => {
+  const status = (width: number, height: number, dpr: number) => ({
+    connected: true,
+    width,
+    height,
+    dpr,
+    mode: "blank",
+  });
+  const props = { piHost: null, onPiHostChange: vi.fn(), onReadyChange: vi.fn() };
+
+  it("says which setting to change, with both sizes", async () => {
+    m.projectorStatus.mockResolvedValue(status(1512, 982, 2));
+    render(<StepProjector project={project} {...props} />);
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("1512×982");
+    expect(alert.textContent).toContain("1920×1080");
+    expect(alert.textContent).toContain("scales this display by 2");
+    expect(screen.queryByRole("button", { name: /for this project instead/ })).toBeNull();
+  });
+
+  it("offers the projector's own resolution for a project nothing was built on", async () => {
+    m.projectorStatus.mockResolvedValue(status(1280, 720, 1));
+    useProjectStore.setState({
+      project: { ...project, surfaces: [], timeline: { tracks: [] } } as unknown as Project,
+    });
+    const fresh = useProjectStore.getState().project as Project;
+    render(<StepProjector project={fresh} {...props} />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Use 1280×720 for this project instead" }),
+    );
+    expect(useProjectStore.getState().project?.projector).toMatchObject({
+      width: 1280,
+      height: 720,
+    });
+  });
+
+  it("does not offer it once the project has a scan", async () => {
+    m.projectorStatus.mockResolvedValue(status(1280, 720, 1));
+    render(<StepProjector project={{ ...project, calibration_id: "c1" }} {...props} />);
+    await screen.findByRole("alert");
+    expect(screen.queryByRole("button", { name: /for this project instead/ })).toBeNull();
+  });
+
+  it("shows no mismatch in simulator mode", async () => {
+    m.health.mockResolvedValue({ status: "ok", version: "0", sim: true });
+    m.projectorStatus.mockResolvedValue(status(1920, 1080, 1));
+    const small = { ...project, projector: { width: 1280, height: 720, fps: 30 } } as Project;
+    render(<StepProjector project={small} {...props} />);
+    expect(await screen.findByText(/simulated projector is 1280×720/)).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 });
