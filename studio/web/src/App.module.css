@@ -76,6 +76,10 @@
   color: var(--on-accent);
 }
 
+.tools {
+  margin-left: auto;
+}
+
 .main {
   padding: var(--space-4);
 }

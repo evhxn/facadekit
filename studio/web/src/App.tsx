@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { NavLink, useLocation, useMatch, useRoutes } from "react-router-dom";
 import { listRenders } from "./api/client";
 import styles from "./App.module.css";
+import DiagnosticsButton from "./components/DiagnosticsButton";
 import { PROJECTOR_PATH, routes } from "./routes";
 import { useProjectStore } from "./state/projectStore";
 
@@ -49,6 +50,9 @@ function Header() {
           ))}
         </nav>
       )}
+      <span className={styles.tools}>
+        <DiagnosticsButton />
+      </span>
     </header>
   );
 }

@@ -47,6 +47,11 @@ class JobRunner:
         with self._lock:
             return self._lookup(job_id).model_copy(deep=True)
 
+    def recent(self) -> list[Job]:
+        """Every job still remembered, oldest first."""
+        with self._lock:
+            return [job.model_copy(deep=True) for job in self._jobs.values()]
+
     def cancel(self, job_id: str) -> Job:
         snapshot: Job | None = None
         with self._lock:
@@ -116,6 +121,8 @@ class JobRunner:
             event = self._cancel[job_id]
             snapshot = job.model_copy(deep=True)
         self._emit(snapshot)
+        log.info("job %s (%s) started", job_id, snapshot.kind)
+        started = time.monotonic()
 
         def progress(fraction: float, message: str) -> None:
             fraction = min(1.0, max(0.0, fraction))
@@ -144,11 +151,22 @@ class JobRunner:
             else:
                 state = "failed"
                 error = JobError(code=exc.code, message=exc.message)
+                log.warning(
+                    "job %s (%s) failed: %s: %s",
+                    job_id,
+                    snapshot.kind,
+                    exc.code,
+                    exc.message,
+                    exc_info=exc if exc.code == INTERNAL else None,
+                )
         except Exception as exc:
-            log.exception("job %s failed", job_id)
+            log.exception("job %s (%s) crashed", job_id, snapshot.kind)
             state = "failed"
             error = JobError(code=INTERNAL, message=str(exc))
 
+        log.info(
+            "job %s (%s) %s after %.1f s", job_id, snapshot.kind, state, time.monotonic() - started
+        )
         with self._lock:
             j = self._jobs.get(job_id)
             if j is None:

@@ -23,15 +23,44 @@ const BASE = "/api/v1";
 export class ApiError extends Error {
   code: string;
   status: number;
-  constructor(code: string, message: string, status: number) {
+  /** The server's id for the failed request; the same id is on its lines in the log. */
+  requestId: string | null;
+  constructor(code: string, message: string, status: number, requestId: string | null = null) {
     super(message);
     this.name = "ApiError";
     this.code = code;
     this.status = status;
+    this.requestId = requestId;
   }
 }
 
-function errorFromBody(status: number, text: string): ApiError {
+export interface RecentError {
+  at: string;
+  request: string;
+  status: number;
+  code: string;
+  message: string;
+  request_id: string | null;
+}
+const MAX_RECENT_ERRORS = 20;
+const recent: RecentError[] = [];
+/** The last failed requests of this page, newest last (part of the diagnostic info). */
+export const recentErrors = (): RecentError[] => recent.slice();
+
+function remember(request: string, error: ApiError): ApiError {
+  recent.push({
+    at: new Date().toISOString(),
+    request,
+    status: error.status,
+    code: error.code,
+    message: error.message,
+    request_id: error.requestId,
+  });
+  if (recent.length > MAX_RECENT_ERRORS) recent.shift();
+  return error;
+}
+
+function errorFromBody(status: number, text: string, requestId: string | null = null): ApiError {
   let code = "HTTP_ERROR";
   let message = `Request failed (${status})`;
   try {
@@ -42,7 +71,7 @@ function errorFromBody(status: number, text: string): ApiError {
   } catch {
     // keep defaults
   }
-  return new ApiError(code, message, status);
+  return new ApiError(code, message, status, requestId);
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -56,10 +85,18 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   try {
     res = await fetch(BASE + path, init);
   } catch (e) {
-    throw new ApiError("NETWORK", e instanceof Error ? e.message : "Network error", 0);
+    throw remember(
+      `${method} ${path}`,
+      new ApiError("NETWORK", e instanceof Error ? e.message : "Network error", 0),
+    );
   }
   const text = await res.text();
-  if (!res.ok) throw errorFromBody(res.status, text);
+  if (!res.ok) {
+    throw remember(
+      `${method} ${path}`,
+      errorFromBody(res.status, text, res.headers?.get("X-Request-ID") ?? null),
+    );
+  }
   if (res.status === 204 || text === "") return undefined as T;
   return JSON.parse(text) as T;
 }
@@ -67,6 +104,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 const enc = encodeURIComponent;
 
 export const health = () => request<Health>("GET", "/health");
+/** Versions, device state, recent jobs and the end of the server log (home directory hidden). */
+export const getDiagnostics = () => request<Record<string, unknown>>("GET", "/diagnostics");
 
 export const listProjects = () => request<ProjectSummary[]>("GET", "/projects");
 export const createProject = (name: string, projector?: ProjectorSpec) =>
@@ -111,7 +150,12 @@ function xhrUpload<T>(
           );
         }
       } else {
-        reject(errorFromBody(xhr.status, xhr.responseText));
+        reject(
+          remember(
+            `POST ${path}`,
+            errorFromBody(xhr.status, xhr.responseText, xhr.getResponseHeader("X-Request-ID")),
+          ),
+        );
       }
     };
     xhr.onerror = () => reject(new ApiError("NETWORK", "Network error", 0));

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from fastapi import Request
@@ -29,6 +30,7 @@ class AppState:
     sim_display: SimDisplay | None = None
     scan_memory: ScanMemory | None = None  # scan strategy learning; None = not available
     align_memory: AlignMemory | None = None  # re-align history; None = not available
+    log_file: Path | None = None  # set by `serve`; read by /diagnostics
     segmenters: dict[tuple[str, str, str], Any] = field(default_factory=dict)
 
 
