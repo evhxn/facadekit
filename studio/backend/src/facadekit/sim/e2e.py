@@ -169,39 +169,22 @@ def _green_dominant(px: np.ndarray) -> bool:
     return g > r + 40 and g > b + 40
 
 
-def run_e2e(
-    workdir: Path,
-    *,
-    publish_host: str | None = None,
-    log: Callable[[str], None] = print,
-) -> E2EResult:
-    # 1. project
-    project_dir = workdir / "e2e.fkproj"
+def new_project_dir(project_dir: Path) -> Path:
+    """An empty project "E2E" in `project_dir` (created)."""
     project_dir.mkdir(parents=True, exist_ok=True)
     for sub in SUBFOLDERS:
         (project_dir / sub).mkdir(exist_ok=True)
-    project = Project(id="e2e", name="E2E")
-    save_project_dir(project_dir, project)
-    log("project created")
+    save_project_dir(project_dir, Project(id="e2e", name="E2E"))
+    return project_dir
 
-    # 2. scan
-    scene = default_scene()
-    display = SimDisplay(scene)
-    camera = SimCamera(scene, display)
-    cal = run_calibration(
-        project_dir,
-        display,
-        camera,
-        "sim",
-        CalibSettings(discard_frames=0, average_frames=1),
-        sleep=lambda s: None,
-    )
-    coverage = cal.quality.coverage if cal.quality is not None else 0.0
-    project = load_project_dir(project_dir).model_copy(update={"calibration_id": cal.id})
-    log(f"scan done, coverage {coverage * 100:.0f} %")
 
-    # 3-4. door and surface
-    proj_view = cv2.imread(str(project_dir / "calibration" / cal.id / "proj_view.png"))
+def add_demo_show(project_dir: Path, calibration_id: str) -> tuple[Project, list[Point]]:
+    """Attach the scan, find the garage door on it and put a 2 s test picture on it.
+
+    Returns the saved project and the detected door quad.
+    """
+    project = load_project_dir(project_dir).model_copy(update={"calibration_id": calibration_id})
+    proj_view = cv2.imread(str(project_dir / "calibration" / calibration_id / "proj_view.png"))
     if proj_view is None:
         raise FkError(INTERNAL, "proj_view.png is missing")
     quad = detect_door_quad(proj_view)
@@ -211,9 +194,6 @@ def run_e2e(
         quad=(quad[0], quad[1], quad[2], quad[3]),
         aspect=estimate_aspect(quad),
     )
-    log("door detected")
-
-    # 5. test image and clip
     asset_id = new_id("ast")
     image = np.zeros((360, 640, 3), np.uint8)
     image[:] = (255, 0, 255)
@@ -236,7 +216,37 @@ def run_e2e(
         update={"surfaces": [surface], "assets": [asset], "timeline": timeline}
     )
     save_project_dir(project_dir, project)
-    project = load_project_dir(project_dir)
+    return load_project_dir(project_dir), quad
+
+
+def run_e2e(
+    workdir: Path,
+    *,
+    publish_host: str | None = None,
+    log: Callable[[str], None] = print,
+) -> E2EResult:
+    # 1. project
+    project_dir = new_project_dir(workdir / "e2e.fkproj")
+    log("project created")
+
+    # 2. scan
+    scene = default_scene()
+    display = SimDisplay(scene)
+    camera = SimCamera(scene, display)
+    cal = run_calibration(
+        project_dir,
+        display,
+        camera,
+        "sim",
+        CalibSettings(discard_frames=0, average_frames=1),
+        sleep=lambda s: None,
+    )
+    coverage = cal.quality.coverage if cal.quality is not None else 0.0
+    log(f"scan done, coverage {coverage * 100:.0f} %")
+
+    # 3-5. door, surface, test image and clip
+    project, quad = add_demo_show(project_dir, cal.id)
+    log("door detected")
 
     # 6. render
     render_path = project_dir / "renders" / f"{new_id('rnd')}.mp4"

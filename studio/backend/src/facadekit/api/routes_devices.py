@@ -35,6 +35,7 @@ SIM_CAMERA_ID = "sim"
 IDLE_CLOSE_S = 10.0
 BUSY_MESSAGE = "Camera is busy scanning"
 GRAB_INTERVAL_S = 1 / 15  # the preview does not need more, and it keeps a slow laptop cool
+LOW_POWER_GRAB_INTERVAL_S = 1 / 5  # low-power mode: the UI asks for 5 pictures a second anyway
 FIRST_FRAME_TIMEOUT_S = 5.0
 STALE_FRAME_S = 3.0  # no new picture for this long: the camera has stopped delivering
 MAX_READ_FAILURES = 5
@@ -154,7 +155,9 @@ class CameraManager:
         lister: Callable[[], list[CameraInfo] | None] | None = None,
         prober: Callable[[dict[int, CameraInfo]], list[CameraInfo]] | None = None,
         clock: Callable[[], float] = time.monotonic,
+        low_power: bool = False,
     ) -> None:
+        self.low_power = low_power
         self._sim_factory = sim_camera_factory
         self._camera_factory = camera_factory
         self._lister = lister or (lambda: named_cameras(camera_size()))
@@ -262,7 +265,10 @@ class CameraManager:
             raise failed[1]  # asked again too soon: answer from memory, leave the device alone
         self._close_locked()
         session = _LiveSession(
-            camera_id, camera, interval=GRAB_INTERVAL_S, threaded=self._sim_factory is None
+            camera_id,
+            camera,
+            interval=LOW_POWER_GRAB_INTERVAL_S if self.low_power else GRAB_INTERVAL_S,
+            threaded=self._sim_factory is None,
         )
         self.opens += 1
         try:

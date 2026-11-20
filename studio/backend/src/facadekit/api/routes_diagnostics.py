@@ -6,7 +6,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends
 
-from facadekit import __version__, logs
+from facadekit import __version__, logs, perf
 from facadekit.api.deps import AppState, get_state
 
 router = APIRouter()
@@ -43,6 +43,8 @@ def diagnostics(state: State) -> dict[str, Any]:
     return {
         "system": system_info(),
         "sim": state.sim,
+        "low_power": state.cameras.low_power,
+        "machine": perf.machine(),
         "projector": state.projector.status().model_dump(),
         "jobs": [
             {

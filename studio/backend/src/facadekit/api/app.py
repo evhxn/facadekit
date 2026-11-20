@@ -11,7 +11,7 @@ from fastapi import APIRouter, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
 
-from facadekit import __version__, logs
+from facadekit import __version__, logs, perf
 from facadekit.api import (
     origin_guard,
     remote_auth,
@@ -68,6 +68,8 @@ def create_app(
     jobs = JobRunner(
         on_update=lambda job: events.publish({"type": "job", "job": job.model_dump(mode="json")})
     )
+    low_power, low_power_why = perf.low_power()
+    log.info("low-power mode %s (%s)", "on" if low_power else "off", low_power_why)
     sim_scene = (sim_scene or default_scene()) if sim else None  # test hook: choose the scene
     sim_display = SimDisplay(sim_scene) if sim_scene is not None else None
     sim_camera_factory = (
@@ -80,7 +82,7 @@ def create_app(
         jobs=jobs,
         events=events,
         projector=projector,
-        cameras=CameraManager(sim_camera_factory=sim_camera_factory),
+        cameras=CameraManager(sim_camera_factory=sim_camera_factory, low_power=low_power),
         sim=sim,
         sim_scene=sim_scene,
         sim_display=sim_display,
