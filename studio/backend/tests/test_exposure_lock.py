@@ -175,3 +175,51 @@ def test_mac_camera_without_modes_says_so(monkeypatch: pytest.MonkeyPatch) -> No
     }
     camera.close()
     assert calls == []
+
+
+# -- lock before the timing is measured (2026-11-20 beta scan: wait hit its 1500 ms cap) -----
+
+
+def _timed_scan(tmp_path: Path, **camera: Any) -> tuple[float, int, float]:
+    scene = default_scene()
+    clock = VirtualClock()
+    display = LaggyDisplay(scene, clock)
+    cam = LaggyCamera(scene, display, clock, **camera)
+    cal = run_calibration(
+        tmp_path, display, cam, "0", CalibSettings(settle_ms=0), sleep=clock.sleep, clock=clock
+    )
+    assert cal.settings is not None and cal.quality is not None
+    return clock.now, cal.settings.settle_ms, cal.quality.coverage
+
+
+def test_lockable_camera_is_timed_without_its_exposure_drifting(tmp_path: Path) -> None:
+    """main on this rig: wait 1500 ms (the cap), 47.5 s (lock only) and 45.0 s (settable)."""
+    for name, kwargs in (("a", {"lockable": True, "settable": False}), ("b", {"lockable": True})):
+        seconds, wait_ms, coverage = _timed_scan(tmp_path / name, **kwargs)
+        assert wait_ms < 260, (name, wait_ms)
+        assert seconds < 32.0, (name, seconds)  # measured 26.2 s and 27.6 s
+        assert coverage > 0.99
+
+
+def test_camera_without_a_lock_is_timed_as_before(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seconds, wait_ms, coverage = _timed_scan(tmp_path / "new", lockable=False)
+    assert wait_ms == 1500  # its exposure keeps drifting; nothing can be done about that
+    from facadekit.calib import pipeline
+
+    monkeypatch.setattr(pipeline, "lock_on_white", lambda *_a, **_k: False)  # main's order
+    before, before_wait, _ = _timed_scan(tmp_path / "old", lockable=False)
+    assert (seconds, wait_ms) == (before, before_wait) and coverage > 0.99
+
+
+def test_lock_on_white_costs_nothing_when_the_camera_cannot_lock() -> None:
+    from facadekit.calib.tuning import lock_on_white
+
+    display = SimDisplay(default_scene())
+    waited: list[float] = []
+    assert lock_on_white(display, LockOnly(display, lockable=False), sleep=waited.append) is False
+    assert waited == []
+    camera = LockOnly(display)
+    assert lock_on_white(display, camera, sleep=waited.append) is True
+    assert waited == [2.0] and camera.auto is False

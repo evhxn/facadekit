@@ -187,12 +187,36 @@ def measure_pattern_latency(
     return int(min(pattern_ms, step_settle_ms))
 
 
+def lock_on_white(
+    display: ProjectorDisplay,
+    camera: Camera,
+    *,
+    sleep: Callable[[float], None] = time.sleep,
+) -> bool:
+    """Before any timing is measured: let the camera's automatic exposure settle on the white
+    projection and lock it there. True when the camera took the lock.
+
+    A camera left on automatic exposure keeps adjusting for a second or more after every
+    black-to-white jump, and `measure_latency` then times that drift instead of the projector
+    delay: on the 2026-11-20 beta scan (Logitech C920) the wait hit its 1500 ms cap. A camera
+    that cannot lock costs nothing here: it says so at once and nothing else happens.
+    """
+    if not camera.set_controls(auto_exposure=False).get("auto_exposure", False):
+        return False
+    w, h = display.size
+    camera.set_controls(auto_exposure=True)
+    display.show(np.full((h, w), 255, np.uint8))
+    sleep(SETTLE_ON_WHITE_S)
+    return bool(camera.set_controls(auto_exposure=False).get("auto_exposure", False))
+
+
 def auto_exposure(
     display: ProjectorDisplay,
     camera: Camera,
     *,
     settings: CalibSettings | None = None,
     sleep: Callable[[float], None] = time.sleep,
+    locked_on_white: bool = False,
 ) -> dict[str, float | bool | None]:
     """Lock exposure so a white projection does not clip. `settings` gives the wait per probe."""
     s = settings or CalibSettings()
@@ -219,9 +243,12 @@ def auto_exposure(
         # happened to be showing. Let its own automatic exposure settle on the white
         # projection, the brightest picture of the scan, and lock it there: the white then
         # stays below clipping and the stripes keep their contrast.
-        camera.set_controls(auto_exposure=True)
-        sleep(SETTLE_ON_WHITE_S)
-        locked = bool(camera.set_controls(auto_exposure=False).get("auto_exposure", False))
+        if locked_on_white:  # `lock_on_white` already did this before the timing was measured
+            locked = True
+        else:
+            camera.set_controls(auto_exposure=True)
+            sleep(SETTLE_ON_WHITE_S)
+            locked = bool(camera.set_controls(auto_exposure=False).get("auto_exposure", False))
         p99 = white_p99()
         level = 1.0
         if locked and p99 >= CLIPPED_P99:

@@ -173,9 +173,12 @@ def run_capture(
     progress: Callable[[float, str], None] | None = None,
     cancel: Callable[[], bool] | None = None,
     sleep: Callable[[float], None] = time.sleep,
+    locked_on_white: bool = False,
 ) -> CaptureSet:
     controls = camera.set_controls(auto_exposure=False, auto_wb=False, autofocus=False)
-    exposure = auto_exposure(display, camera, settings=settings, sleep=sleep)
+    exposure = auto_exposure(
+        display, camera, settings=settings, sleep=sleep, locked_on_white=locked_on_white
+    )
     level = float(exposure.get("level") or 1.0)
     if level < 1.0:
         display = DimmedDisplay(display, level)
