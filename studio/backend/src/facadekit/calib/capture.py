@@ -25,6 +25,23 @@ from facadekit.errors import FkError
 from facadekit.models.calibration import CalibSettings
 
 
+class DimmedDisplay:
+    """Shows every picture at `level` (0..1) of its brightness. Used for the scan pictures of
+    a camera whose exposure could be locked but not turned down (see tuning.auto_exposure)."""
+
+    def __init__(self, inner: ProjectorDisplay, level: float) -> None:
+        self._inner = inner
+        self.level = level
+
+    @property
+    def size(self) -> tuple[int, int]:
+        return self._inner.size
+
+    def show(self, image: np.ndarray) -> None:
+        dimmed = np.rint(image.astype(np.float32) * self.level).astype(np.uint8)
+        self._inner.show(dimmed)
+
+
 @dataclass
 class CaptureSet:
     spec: PatternSpec
@@ -158,7 +175,10 @@ def run_capture(
     sleep: Callable[[float], None] = time.sleep,
 ) -> CaptureSet:
     controls = camera.set_controls(auto_exposure=False, auto_wb=False, autofocus=False)
-    auto_exposure(display, camera, settings=settings, sleep=sleep)
+    exposure = auto_exposure(display, camera, settings=settings, sleep=sleep)
+    level = float(exposure.get("level") or 1.0)
+    if level < 1.0:
+        display = DimmedDisplay(display, level)
 
     frames = pattern_sequence(spec)
     cam_w, cam_h = camera.resolution

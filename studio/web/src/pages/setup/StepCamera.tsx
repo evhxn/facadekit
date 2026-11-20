@@ -332,7 +332,7 @@ export default function StepCamera({
             </div>
             {exposureUnavailable ? (
               <p className={styles.note}>
-                This camera does not allow exposure control. That is usually fine.
+                This camera cannot be set to an exposure value, so this slider does nothing. The scan still locks the exposure where the camera allows it.
               </p>
             ) : null}
             {focusUnavailable ? (

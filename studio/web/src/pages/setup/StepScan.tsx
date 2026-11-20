@@ -237,7 +237,7 @@ export default function StepScan({
         ) : null}
         {warnings.includes("CAMERA_CONTROLS_UNAVAILABLE") ? (
           <p className={styles.note}>
-            This camera does not allow exposure control. That is usually fine.
+            This camera does not let FacadeKit lock its exposure (the built-in MacBook camera never does), so bright parts can come out washed out. A USB webcam such as a Logitech C920 can be locked, and FacadeKit then dims the projection until nothing is washed out.
           </p>
         ) : null}
         <div className={styles.row}>

@@ -63,7 +63,10 @@ class LaggyDisplay:
 
 
 class LaggyCamera:
-    """`read()` takes one frame time. Unless `lockable`, automatic exposure follows the picture."""
+    """`read()` takes one frame time. Unless `lockable`, automatic exposure follows the picture.
+
+    `lockable` and not `settable`: exposure can be frozen where it is, but not set to a value.
+    """
 
     def __init__(
         self,
@@ -73,6 +76,7 @@ class LaggyCamera:
         *,
         frame_s: float = 1 / 30,
         lockable: bool = False,
+        settable: bool = True,
         ae_tau_s: float = 0.35,
         ae_target: float = 70.0,
     ) -> None:
@@ -81,6 +85,7 @@ class LaggyCamera:
         self._clock = clock
         self._frame_s = frame_s
         self._lockable = lockable
+        self._settable = settable  # False: exposure can be locked but not set (macOS)
         self._tau = ae_tau_s
         self._target = ae_target
         self._auto = True
@@ -124,8 +129,8 @@ class LaggyCamera:
             if self._lockable:
                 self._auto = auto_exposure
         if exposure is not None:
-            out["exposure"] = self._lockable
-            if self._lockable:
+            out["exposure"] = self._lockable and self._settable
+            if self._lockable and self._settable:
                 self._gain = 0.4 + 1.6 * float(np.clip(exposure, 0.0, 1.0))
         if auto_wb is not None:
             out["auto_wb"] = True
