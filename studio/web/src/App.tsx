@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { NavLink, useLocation, useMatch, useRoutes } from "react-router-dom";
+import { Link, NavLink, useLocation, useMatch, useRoutes } from "react-router-dom";
 import { listRenders } from "./api/client";
 import styles from "./App.module.css";
 import DiagnosticsButton from "./components/DiagnosticsButton";
@@ -35,7 +35,10 @@ function Header() {
   };
   return (
     <header className={styles.header}>
-      <strong className={styles.brand}>FacadeKit</strong>
+      <Link to="/" className={styles.brand} title="All projects">
+        FacadeKit
+      </Link>
+      {projectId && loaded ? <span className={styles.project}>{project.name}</span> : null}
       {projectId && (
         <nav className={styles.nav} aria-label="Steps">
           {NAV.map((name) => (

@@ -27,5 +27,5 @@ export default defineConfig({
       "/ws": { target: "ws://127.0.0.1:8137", ws: true },
     },
   },
-  test: { environment: "jsdom", exclude: ["e2e/**", "node_modules/**"] },
+  test: { environment: "jsdom", exclude: ["e2e/**", "e2e-walkthrough/**", "node_modules/**"] },
 });

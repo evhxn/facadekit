@@ -1,31 +1,66 @@
 .page {
-  max-width: 48rem;
+  max-width: 72rem;
   margin: 0 auto;
-  padding: 1rem;
+  padding: var(--space-4);
+}
+.lead {
+  color: var(--muted);
+  max-width: 60ch;
+  margin-top: 0;
+}
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 22rem;
+  gap: var(--space-5);
+  align-items: start;
+}
+@media (max-width: 800px) {
+  .columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.empty {
+  padding: var(--space-5);
+  margin: 0;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--muted);
+  text-align: center;
 }
 .list {
   list-style: none;
   padding: 0;
+  margin: 0;
   display: grid;
   gap: var(--space-2);
 }
 .item {
-  flex-wrap: wrap;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0.75rem;
+  gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
 }
+.text {
+  flex: 1 1 12rem;
+  min-width: 0;
+  display: grid;
+}
 .name {
-  flex: 1;
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 .date {
   color: var(--muted);
   font-size: 0.9rem;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
 .form {
   display: grid;
@@ -34,12 +69,13 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: var(--space-4);
-  margin-top: 1.5rem;
-  max-width: 30rem;
+}
+.form h2 {
+  margin: 0;
 }
 .field {
   display: grid;
-  gap: 0.25rem;
+  gap: var(--space-1);
 }
 .help {
   color: var(--muted);
@@ -48,5 +84,8 @@
 }
 .custom {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--space-2);
+}
+.custom input {
+  width: 100%;
 }

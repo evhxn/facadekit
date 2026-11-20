@@ -27,7 +27,12 @@ export default function ProjectsPage() {
     try {
       setProjects(await listProjects());
     } catch (e) {
-      setError(fail(e, "Could not load the projects. Check that FacadeKit is running, then reload this page."));
+      setError(
+        fail(
+          e,
+          "Could not load the projects. Check that FacadeKit is running, then reload this page.",
+        ),
+      );
     }
   }, []);
 
@@ -72,7 +77,9 @@ export default function ProjectsPage() {
       const project = await createProject(trimmed, { width, height, fps: FPS });
       navigate(`/p/${project.id}/setup`);
     } catch (e) {
-      setError(fail(e, "Could not create the project. Check that FacadeKit is running, then try again."));
+      setError(
+        fail(e, "Could not create the project. Check that FacadeKit is running, then try again."),
+      );
       setBusy(false);
     }
   };
@@ -80,76 +87,98 @@ export default function ProjectsPage() {
   return (
     <main className={styles.page}>
       <h1>Projects</h1>
+      <p className={styles.lead}>
+        A project is one house and one projector: scan it, mark the surfaces, put videos on them,
+        and send the show to your Falcon Player.
+      </p>
       {error ? <ErrorBanner message={error} /> : null}
-      {projects && projects.length === 0 ? (
-        <p>No projects yet. Create your first one below.</p>
-      ) : null}
-      <ul className={styles.list}>
-        {(projects ?? []).map((p) => (
-          <li key={p.id} className={styles.item}>
-            <span className={styles.name}>{p.name}</span>
-            <span className={styles.date}>{new Date(p.modified_at).toLocaleString()}</span>
-            <button
-              type="button"
-              onClick={() => navigate(`/p/${p.id}/surfaces`)}
-              className="primary"
-            >
-              Open
-            </button>
-            <button type="button" onClick={() => void onDelete(p)} className="danger">
-              Delete
-            </button>
-          </li>
-        ))}
-      </ul>
-
-      <form className={styles.form} onSubmit={(e) => void onCreate(e)}>
-        <h2>New project</h2>
-        <label className={styles.field}>
-          Project name
-          <input value={name} onChange={(e) => setName(e.target.value)} required />
-        </label>
-        <label className={styles.field}>
-          Projector resolution
-          <select value={choice} onChange={(e) => setChoice(e.target.value)}>
-            {PRESETS.map((p) => (
-              <option key={p} value={p}>
-                {p.replace("x", "×")}
-              </option>
+      <div className={styles.columns}>
+        <section aria-label="Your projects">
+          {projects === null && !error ? (
+            <p role="status" className={styles.empty}>
+              Loading projects…
+            </p>
+          ) : null}
+          {projects && projects.length === 0 ? (
+            <p className={styles.empty}>No projects yet. Make your first one with the form.</p>
+          ) : null}
+          <ul className={styles.list}>
+            {(projects ?? []).map((p) => (
+              <li key={p.id} className={styles.item}>
+                <span className={styles.text}>
+                  <span className={styles.name}>{p.name}</span>
+                  <span className={styles.date}>
+                    Changed {new Date(p.modified_at).toLocaleString()}
+                  </span>
+                </span>
+                <span className={styles.actions}>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/p/${p.id}/surfaces`)}
+                    className="primary"
+                  >
+                    Open
+                  </button>
+                  <button type="button" onClick={() => navigate(`/p/${p.id}/setup`)}>
+                    Set up
+                  </button>
+                  <button type="button" onClick={() => void onDelete(p)} className="danger">
+                    Delete
+                  </button>
+                </span>
+              </li>
             ))}
-            <option value="custom">Custom</option>
-          </select>
-        </label>
-        {choice === "custom" ? (
-          <div className={styles.custom}>
-            <label>
-              Width
-              <input
-                type="number"
-                min={1}
-                value={customW}
-                onChange={(e) => setCustomW(e.target.value)}
-              />
-            </label>
-            <label>
-              Height
-              <input
-                type="number"
-                min={1}
-                value={customH}
-                onChange={(e) => setCustomH(e.target.value)}
-              />
-            </label>
-          </div>
-        ) : null}
-        <p className={styles.help}>
-          Use your projector&apos;s <em>native</em> resolution (see its manual or label), not the
-          highest it accepts.
-        </p>
-        <button type="submit" disabled={busy} className="primary">
-          New project
-        </button>
-      </form>
+          </ul>
+        </section>
+
+        <form className={styles.form} onSubmit={(e) => void onCreate(e)}>
+          <h2>New project</h2>
+          <label className={styles.field}>
+            Project name
+            <input value={name} onChange={(e) => setName(e.target.value)} required />
+          </label>
+          <label className={styles.field}>
+            Projector resolution
+            <select value={choice} onChange={(e) => setChoice(e.target.value)}>
+              {PRESETS.map((p) => (
+                <option key={p} value={p}>
+                  {p.replace("x", "×")}
+                </option>
+              ))}
+              <option value="custom">Custom</option>
+            </select>
+          </label>
+          {choice === "custom" ? (
+            <div className={styles.custom}>
+              <label>
+                Width
+                <input
+                  type="number"
+                  min={1}
+                  value={customW}
+                  onChange={(e) => setCustomW(e.target.value)}
+                />
+              </label>
+              <label>
+                Height
+                <input
+                  type="number"
+                  min={1}
+                  value={customH}
+                  onChange={(e) => setCustomH(e.target.value)}
+                />
+              </label>
+            </div>
+          ) : null}
+          <p className={styles.help}>
+            Use your projector&apos;s <em>native</em> resolution (see its manual or label), not the
+            highest it accepts.
+          </p>
+          <button type="submit" disabled={busy} className="primary">
+            {busy ? "Creating…" : "New project"}
+          </button>
+        </form>
+      </div>
     </main>
   );
 }

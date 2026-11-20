@@ -194,6 +194,9 @@ def access_problem() -> str | None:
     return None
 
 
+NO_PROMPT_ENV = "FACADEKIT_NO_CAMERA_PROMPT"
+
+
 def prepare_camera_access(capture_factory: Callable[[int], Any] | None = None) -> str | None:
     """Call once from the main thread before the server starts (macOS only does anything).
 
@@ -203,6 +206,8 @@ def prepare_camera_access(capture_factory: Callable[[int], Any] | None = None) -
     Returns the message to print, if any.
     """
     if sys.platform != "darwin" or not avfoundation.available():
+        return None
+    if os.environ.get(NO_PROMPT_ENV):  # automated runs must not pop up a system window
         return None
     if avfoundation.authorization() == "not_determined":
         factory = capture_factory or (lambda i: cv2.VideoCapture(i, cv2.CAP_AVFOUNDATION))
