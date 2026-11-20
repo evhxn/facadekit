@@ -31,7 +31,7 @@ from facadekit.calib.quality import (
 from facadekit.calib.reasons import PNG_STEP, reason_fractions, unmeasured_reasons
 from facadekit.calib.roi import crop_too_tight, maps_to_full
 from facadekit.calib.timing import ScanTimer
-from facadekit.calib.tuning import measure_latency, measure_pattern_latency
+from facadekit.calib.tuning import lock_on_white, measure_latency, measure_pattern_latency
 from facadekit.devices.base import Camera, ProjectorDisplay
 from facadekit.devices.cropped import CroppedCamera
 from facadekit.errors import FkError
@@ -114,9 +114,11 @@ def run_calibration(
     camera.open()
     try:
         tuned: CalibSettings | None = None
+        locked = False
         if settings.settle_ms == 0:  # automatic: measure the projector-to-camera delay
             report(0.0, "Tuning camera…")
             timer.phase("tuning")
+            locked = lock_on_white(display, camera, sleep=sleep)
             lat = measure_latency(display, camera, clock=clock, sleep=sleep)
             _check_cancel(cancel)
             pattern_ms = measure_pattern_latency(
@@ -157,8 +159,9 @@ def run_calibration(
             spec = PatternSpec(*display.size, skip_lsb=settings.skip_lsb)
         timer.phase("patterns")
         capture = run_capture(
-            display, camera, spec, settings, progress=capture_progress, cancel=cancel, sleep=sleep
-        )
+            display, camera, spec, settings, progress=capture_progress, cancel=cancel,
+            sleep=sleep, locked_on_white=locked,
+        )  # fmt: skip
     finally:
         camera.close()
     timer.phase("decoding")
@@ -180,8 +183,10 @@ def run_calibration(
         raise
     finally:
         log.info(
-            "scan timing (strategy %s, wait %d ms, stripe wait %s ms, %d frames averaged): %s",
+            "scan timing (strategy %s, exposure %s, wait %d ms, stripe wait %s ms, "
+            "%d frames averaged): %s",
             strategy.id if strategy is not None else "fixed",
+            "locked before tuning" if locked else "not locked before tuning",
             settings.settle_ms,
             settings.pattern_settle_ms if settings.pattern_settle_ms is not None else "same",
             settings.average_frames,
