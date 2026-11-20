@@ -59,6 +59,7 @@ def build_parser() -> argparse.ArgumentParser:
         elif name == "doctor":
             sp.add_argument("--no-cameras", action="store_true")
             sp.add_argument("--bundle", default=None, metavar="ZIP")
+            sp.add_argument("--perf", action="store_true", help="time FacadeKit's own work")
         elif name == "sim":
             sim_sub = sp.add_subparsers(dest="sim_command", required=True)
             e2e = sim_sub.add_parser("e2e")
@@ -306,6 +307,16 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
         problem = access_problem()
         if problem is not None:
             say(f"camera access: {problem}")
+    from facadekit import perf
+
+    info = perf.machine()
+    on, why = perf.low_power()
+    say(f"computer: {info['cores']} cores, {info['ram_gb']} GB memory")
+    say(f"low-power mode: {'on' if on else 'off'} ({why})")
+    if args.perf:
+        say("timing FacadeKit's own work (about a minute)...")
+        for line in perf.report(perf.run(log=lambda m: print(f"  {m}...", file=sys.stderr))):
+            say(line)
     log_file = logs.log_path(data_dir())
     say(f"log file: {log_file}" + ("" if log_file.is_file() else " (not written yet)"))
     if args.bundle:
