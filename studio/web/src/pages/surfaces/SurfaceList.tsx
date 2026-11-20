@@ -20,7 +20,16 @@ export default function SurfaceList({ surfaces, selectedId, onSelect, onRename, 
     setEditing(null);
   };
 
-  if (surfaces.length === 0) return <p className={styles.empty}>No surfaces yet.</p>;
+  if (surfaces.length === 0)
+    return (
+      <div className={styles.empty}>
+        <p>No surfaces yet.</p>
+        <p>
+          Press <strong>Magic select</strong> and click on a door or window, or{" "}
+          <strong>Add rectangle</strong> and drag its corners onto the house.
+        </p>
+      </div>
+    );
   return (
     <ul className={styles.list}>
       {surfaces.map((s) => (

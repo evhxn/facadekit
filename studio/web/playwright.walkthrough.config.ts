@@ -7,6 +7,13 @@ import { defineConfig, devices } from "@playwright/test";
 // screenshot of every screen (docs/10-ui.md). Separate from the parity run: other port,
 // other folder, and `--sim`.
 const PORT = 8198;
+// Software WebGL, as in the parity run: headless Chrome has no GPU, and the Arrange preview
+// draws with WebGL.
+const gl = {
+  launchOptions: {
+    args: ["--use-gl=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"],
+  },
+};
 const dataDir = mkdtempSync(join(tmpdir(), "facadekit-walk-"));
 
 export default defineConfig({
@@ -14,11 +21,12 @@ export default defineConfig({
   outputDir: "./test-results/walkthrough",
   workers: 1,
   reporter: "list",
-  timeout: 120000,
+  timeout: 240000,
   use: { baseURL: `http://127.0.0.1:${PORT}`, viewport: { width: 1280, height: 800 } },
   projects: [
-    { name: "dark", use: { ...devices["Desktop Chrome"], colorScheme: "dark" } },
-    { name: "phone", use: { ...devices["Pixel 7"], colorScheme: "dark" } },
+    { name: "dark", use: { ...devices["Desktop Chrome"], ...gl, colorScheme: "dark" } },
+    { name: "light", use: { ...devices["Desktop Chrome"], ...gl, colorScheme: "light" } },
+    { name: "phone", use: { ...devices["Pixel 7"], ...gl, colorScheme: "dark" } },
   ],
   webServer: {
     command: `uv run facadekit serve --sim --no-browser --port ${PORT} --data-dir "${dataDir}"`,

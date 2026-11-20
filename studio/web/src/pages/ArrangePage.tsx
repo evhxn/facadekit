@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { analyzeAsset, ApiError } from "../api/client";
 import { waitForJob } from "../api/events";
 import { defaultGenerator } from "../gl/generators";
 import type { Asset, Clip } from "../api/types";
 import { newId } from "../api/types";
+import EditorHeader from "../components/EditorHeader";
+import PageState from "../components/PageState";
 import { useProjectStore } from "../state/projectStore";
 import ClipForm, { CANVAS_ID } from "./arrange/ClipForm";
 import ClipList from "./arrange/ClipList";
@@ -51,7 +53,9 @@ export default function ArrangePage() {
 
   useEffect(() => {
     if (projectId && useProjectStore.getState().project?.id !== projectId) {
-      load(projectId).catch(() => setLoadError("Could not load the project. Go back to Projects and open it again."));
+      load(projectId).catch(() =>
+        setLoadError("Could not load the project. Go back to Projects and open it again."),
+      );
     }
   }, [projectId, load]);
 
@@ -72,7 +76,22 @@ export default function ArrangePage() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  if (!project) return <p>{loadError ?? "Loading…"}</p>;
+  if (loadError) {
+    return (
+      <PageState
+        kind="error"
+        title="Could not open this project"
+        action={
+          <Link to="/" className="button primary">
+            All projects
+          </Link>
+        }
+      >
+        <p>{loadError}</p>
+      </PageState>
+    );
+  }
+  if (!project) return <PageState kind="loading" title="Loading the project" />;
 
   const firstVisual = project.assets.find((a) => a.kind !== "audio");
   const found = selectedId ? findClip(project, selectedId) : null;
@@ -131,7 +150,10 @@ export default function ArrangePage() {
       update((proj) => {
         ok = moveClipToTrack(proj, id, layer);
       });
-      if (!ok) setMessage("That layer already has a clip at this time. Drop it on another layer or pick a different time.");
+      if (!ok)
+        setMessage(
+          "That layer already has a clip at this time. Drop it on another layer or pick a different time.",
+        );
     }
   }
 
@@ -173,77 +195,100 @@ export default function ArrangePage() {
       ? project.timeline.tracks.indexOf(found.track)
       : 0;
 
+  const clipCount = project.timeline.tracks.reduce((n, t) => n + t.clips.length, 0);
   return (
-    <div className={styles.page}>
-      <div className={styles.library}>
-        <MediaLibrary
-          projectId={project.id}
-          assets={project.assets}
-          audioAssetId={project.timeline.audio_asset_id}
-          onUseAsAudio={useAudio}
-        />
-      </div>
-      <div className={styles.centre}>
-        <ClipList
-          project={project}
-          selectedId={selectedId}
-          onSelect={(id) => {
-            setDraft(null);
-            setMessage(null);
-            setSelectedId(id);
-          }}
-          onAdd={startDraft}
-          onDuration={(ms) =>
-            update((p) => {
-              p.timeline.duration_ms = ms;
-            })
-          }
-          onShowAudio={useAudio}
-          onFindBeats={() => void findBeats()}
-          beats={beats}
-        />
-        {formClip ? (
-          <ClipForm
-            clip={formClip}
+    <>
+      <EditorHeader
+        title="Arrange"
+        help={
+          project.surfaces.length === 0 ? (
+            <>
+              Put videos, pictures and effects on the house. There are no surfaces yet, so clips can
+              only cover the whole picture:{" "}
+              <Link to={`/p/${project.id}/surfaces`}>add surfaces</Link>.
+            </>
+          ) : (
+            "Put videos, pictures and effects on your surfaces, and set when each one plays."
+          )
+        }
+        next={{
+          to: `/p/${project.id}/publish`,
+          label: "Publish",
+          ready: clipCount > 0,
+          hint: "Add a clip first.",
+        }}
+      />
+      <div className={styles.page}>
+        <div className={styles.library}>
+          <MediaLibrary
+            projectId={project.id}
             assets={project.assets}
-            surfaces={project.surfaces}
-            tracks={project.timeline.tracks}
-            layer={layer}
-            isNew={draft !== null}
-            message={message}
-            onPatch={patch}
-            onLayer={setLayer}
-            onSubmit={submitDraft}
-            onCancel={() => {
+            audioAssetId={project.timeline.audio_asset_id}
+            onUseAsAudio={useAudio}
+          />
+        </div>
+        <div className={styles.centre}>
+          <ClipList
+            project={project}
+            selectedId={selectedId}
+            onSelect={(id) => {
               setDraft(null);
-              setSelectedId(null);
+              setMessage(null);
+              setSelectedId(id);
             }}
-            onRemove={() => {
-              const id = formClip.id;
-              update((p) => removeClip(p, id));
-              setSelectedId(null);
+            onAdd={startDraft}
+            onDuration={(ms) =>
+              update((p) => {
+                p.timeline.duration_ms = ms;
+              })
+            }
+            onShowAudio={useAudio}
+            onFindBeats={() => void findBeats()}
+            beats={beats}
+          />
+          {formClip ? (
+            <ClipForm
+              clip={formClip}
+              assets={project.assets}
+              surfaces={project.surfaces}
+              tracks={project.timeline.tracks}
+              layer={layer}
+              isNew={draft !== null}
+              message={message}
+              onPatch={patch}
+              onLayer={setLayer}
+              onSubmit={submitDraft}
+              onCancel={() => {
+                setDraft(null);
+                setSelectedId(null);
+              }}
+              onRemove={() => {
+                const id = formClip.id;
+                update((p) => removeClip(p, id));
+                setSelectedId(null);
+              }}
+            />
+          ) : null}
+        </div>
+        <div className={styles.preview}>
+          <PreviewPane project={project} transport={transport} />
+        </div>
+        <div className={styles.strip}>
+          <Timeline
+            project={project}
+            transport={transport}
+            selectedIds={selection}
+            onSelect={(ids) => {
+              setDraft(null);
+              setSelection(ids);
+            }}
+            onOpen={(id) => {
+              setDraft(null);
+              setSelectedId(id);
             }}
           />
-        ) : null}
+        </div>
       </div>
-      <div className={styles.preview}>
-        <PreviewPane project={project} transport={transport} />
-      </div>
-      <div className={styles.strip}>
-        <Timeline
-          project={project}
-          transport={transport}
-          selectedIds={selection}
-          onSelect={(ids) => {
-            setDraft(null);
-            setSelection(ids);
-          }}
-          onOpen={(id) => {
-            setDraft(null);
-            setSelectedId(id);
-          }}
-        />
-      </div>
-    </div>
+    </>
   );
 }
