@@ -27,6 +27,8 @@ export default defineConfig({
   webServer: {
     command: `uv run facadekit serve --no-browser --port ${E2E_PORT} --data-dir "${dataDir}"`,
     cwd: "../backend",
+    // Starting the server must not make macOS ask for camera access during a test run.
+    env: { FACADEKIT_NO_CAMERA_PROMPT: "1" },
     url: `http://127.0.0.1:${E2E_PORT}/api/v1/health`,
     reuseExistingServer: false,
     timeout: 60000,

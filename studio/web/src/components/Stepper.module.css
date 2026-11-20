@@ -1,0 +1,77 @@
+.wrap {
+  margin: 0 0 var(--space-4);
+}
+.list {
+  list-style: none;
+  display: flex;
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0 0 var(--space-2);
+}
+.item {
+  flex: 1 1 0;
+  min-width: 0;
+  border-top: 4px solid var(--border);
+}
+.item[data-state="current"] {
+  border-top-color: var(--accent);
+}
+.item[data-state="done"] {
+  border-top-color: var(--ok);
+}
+.jump,
+.static {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--target);
+  padding: var(--space-2) 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  text-align: left;
+}
+.jump {
+  cursor: pointer;
+}
+.jump:hover .title {
+  text-decoration: underline;
+}
+.item[data-state="current"] .static {
+  color: var(--text);
+  font-weight: 600;
+}
+.dot {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.item[data-state="current"] .dot {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+.item[data-state="done"] .dot {
+  border-color: var(--ok);
+  color: var(--ok);
+}
+.title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.where {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}

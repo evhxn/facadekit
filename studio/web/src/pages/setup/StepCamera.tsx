@@ -54,7 +54,9 @@ const KIND_NOTE: Record<string, string> = { built_in: "built in", phone: "phone"
 /** The device name, with a note for the kinds that are easy to pick by mistake. */
 export function cameraLabel(camera: CameraInfo): string {
   const note = camera.kind ? KIND_NOTE[camera.kind] : undefined;
-  return note && !camera.name.toLowerCase().includes(note) ? `${camera.name} (${note})` : camera.name;
+  return note && !camera.name.toLowerCase().includes(note)
+    ? `${camera.name} (${note})`
+    : camera.name;
 }
 
 export default function StepCamera({
@@ -73,6 +75,8 @@ export default function StepCamera({
   const [mode, setMode] = useState<"grid" | "white">("grid");
   const [exposure, setExposure] = useState(0.5);
   const [exposureUnavailable, setExposureUnavailable] = useState(false);
+  const [autofocus, setAutofocus] = useState(true);
+  const [focusUnavailable, setFocusUnavailable] = useState(false);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [checking, setChecking] = useState(false);
   const [checkError, setCheckError] = useState<string | null>(null);
@@ -95,12 +99,24 @@ export default function StepCamera({
   }, [cameraId]);
 
   const shownFrame = useMemo(
-    () => frame ?? (check ? { width: check.camera_width, height: check.camera_height } : { width: 1280, height: 720 }),
+    () =>
+      frame ??
+      (check
+        ? { width: check.camera_width, height: check.camera_height }
+        : { width: 1280, height: 720 }),
     [frame, check],
   );
   const editRoi = roi ?? check?.suggested_roi ?? null;
   const wholePicture = useMemo<CameraRoi>(
-    () => ({ x: 0, y: 0, w: shownFrame.width, h: shownFrame.height, frame_width: shownFrame.width, frame_height: shownFrame.height, bin: 1 }),
+    () => ({
+      x: 0,
+      y: 0,
+      w: shownFrame.width,
+      h: shownFrame.height,
+      frame_width: shownFrame.width,
+      frame_height: shownFrame.height,
+      bin: 1,
+    }),
     [shownFrame],
   );
 
@@ -187,139 +203,192 @@ export default function StepCamera({
     }, DEBOUNCE_MS);
   };
 
+  const onAutofocus = (on: boolean) => {
+    setAutofocus(on);
+    if (!cameraId) return;
+    setCameraControls(cameraId, { autofocus: on })
+      .then((r) => setFocusUnavailable(r.applied.autofocus === false))
+      .catch(() => {});
+  };
+
   return (
     <section>
-      <p>
-        Place the camera next to the projector, pointing at the house. The whole grid must be inside
-        the picture. Fix the camera so it cannot move.
-      </p>
       {accessMessage ? <ErrorBanner message={accessMessage} /> : null}
       {listError ? <ErrorBanner message={listError} /> : null}
-      {cameras === null && !listError ? <p role="status">Looking for cameras…</p> : null}
-      {cameras !== null && cameras.length === 0 ? (
-        <p>No camera found. Plug in a USB webcam and click Refresh.</p>
-      ) : null}
-      <div className={styles.row}>
-        {cameras && cameras.length > 1 ? (
-          <label>
-            Camera{" "}
-            <select value={cameraId ?? ""} onChange={(e) => onCameraChange(e.target.value || null)}>
-              <option value="">Choose a camera…</option>
-              {cameras.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {cameraLabel(c)}
-                </option>
-              ))}
-            </select>
-          </label>
+
+      <div className={styles.group}>
+        <h3>1. Choose the camera</h3>
+        {cameras === null && !listError ? <p role="status">Looking for cameras…</p> : null}
+        {cameras !== null && cameras.length === 0 ? (
+          <p>No camera found. Plug in a USB webcam and click Refresh.</p>
         ) : null}
-        {cameras && cameras.length === 1 && cameras[0] ? (
-          <span>Camera: {cameraLabel(cameras[0])}</span>
-        ) : null}
-        <button type="button" onClick={() => refresh(true)}>
-          Refresh
-        </button>
-        <button type="button" onClick={toggle}>
-          {mode === "grid" ? "Show white" : "Show grid"}
-        </button>
-      </div>
-      {cameraId ? (
-        <CropBox
-          frame={shownFrame}
-          initial={editRoi ?? wholePicture}
-          suggested={check?.suggested_roi ?? null}
-          active={editing && editRoi !== null}
-          onUse={(next) => {
-            onRoiChange(next);
-            setEditing(false);
-          }}
-          onWhole={() => {
-            onRoiChange(null);
-            setEditing(false);
-          }}
-        >
-          <LiveView
-            cameraId={cameraId}
-            paused={checking}
-            onGone={() => {
-              onCameraChange(null);
-              refresh();
-            }}
-            onFrame={(width, height) =>
-              setFrame((old) => (old?.width === width && old.height === height ? old : { width, height }))
-            }
-          />
-        </CropBox>
-      ) : null}
-      {cameraId && !editing && roi ? (
-        <div>
-          {roiFromLastScan ? <p className={styles.note}>{COPY.cropFromLastScan}</p> : null}
-          <p>{COPY.cropActive}</p>
-          <CropPreview key={`${roi.x},${roi.y},${roi.w},${roi.h}`} cameraId={cameraId} roi={roi} />
-          <div className={styles.row}>
-            <button type="button" onClick={() => setEditing(true)}>
-              {COPY.cropEdit}
-            </button>
-            <button type="button" onClick={() => onRoiChange(null)}>
-              {COPY.cropWhole}
-            </button>
-          </div>
-        </div>
-      ) : null}
-      {cameraId ? (
         <div className={styles.row}>
-          <button
-            type="button"
-            className={check ? undefined : "primary"}
-            disabled={checking}
-            onClick={() => void runCheck()}
-          >
-            {COPY.checkButton}
+          {cameras && cameras.length > 1 ? (
+            <label>
+              Camera{" "}
+              <select
+                value={cameraId ?? ""}
+                onChange={(e) => onCameraChange(e.target.value || null)}
+              >
+                <option value="">Choose a camera…</option>
+                {cameras.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {cameraLabel(c)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          {cameras && cameras.length === 1 && cameras[0] ? (
+            <span>Camera: {cameraLabel(cameras[0])}</span>
+          ) : null}
+          <button type="button" onClick={() => refresh(true)}>
+            Refresh
           </button>
         </div>
-      ) : null}
-      {checking ? <p role="status">{COPY.checking}</p> : null}
-      {checkError ? (
-        <ErrorBanner
-          message={checkError}
-          actions={
-            <button type="button" className="primary" onClick={() => void runCheck()}>
-              {COPY.buttons.recheck}
-            </button>
-          }
-        />
-      ) : null}
-      {check && !checking ? (
-        <CameraCheckCard
-          check={check}
-          onCrop={() => {
-            if (check.suggested_roi) onRoiChange(check.suggested_roi);
-            setEditing(true);
-          }}
-          onUsePhone={onUsePhone}
-          onNext={onNext}
-          onRecheck={() => void runCheck()}
-        />
-      ) : null}
+      </div>
+
       {cameraId ? (
-        <div className={styles.row}>
-          <label>
-            Exposure{" "}
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.01}
-              value={exposure}
-              onChange={(e) => onExposure(Number(e.target.value))}
+        <div className={styles.group}>
+          <h3>2. Aim it at the house</h3>
+          <p>
+            Put the camera next to the projector, looking the same way. The whole grid must be
+            inside the picture, with a little room around it. Fix the camera so it cannot move.
+          </p>
+          <div className={styles.row}>
+            <button type="button" onClick={toggle}>
+              {mode === "grid" ? "Project white" : "Project the grid"}
+            </button>
+          </div>
+          <CropBox
+            frame={shownFrame}
+            initial={editRoi ?? wholePicture}
+            suggested={check?.suggested_roi ?? null}
+            active={editing && editRoi !== null}
+            onUse={(next) => {
+              onRoiChange(next);
+              setEditing(false);
+            }}
+            onWhole={() => {
+              onRoiChange(null);
+              setEditing(false);
+            }}
+          >
+            <LiveView
+              cameraId={cameraId}
+              paused={checking}
+              onGone={() => {
+                onCameraChange(null);
+                refresh();
+              }}
+              onFrame={(width, height) =>
+                setFrame((old) =>
+                  old?.width === width && old.height === height ? old : { width, height },
+                )
+              }
             />
-          </label>
+          </CropBox>
+          {!editing && roi ? (
+            <div>
+              {roiFromLastScan ? <p className={styles.note}>{COPY.cropFromLastScan}</p> : null}
+              <p>{COPY.cropActive}</p>
+              <CropPreview
+                key={`${roi.x},${roi.y},${roi.w},${roi.h}`}
+                cameraId={cameraId}
+                roi={roi}
+              />
+              <div className={styles.row}>
+                <button type="button" onClick={() => setEditing(true)}>
+                  {COPY.cropEdit}
+                </button>
+                <button type="button" onClick={() => onRoiChange(null)}>
+                  {COPY.cropWhole}
+                </button>
+              </div>
+            </div>
+          ) : null}
+          <details>
+            <summary>Camera settings</summary>
+            <div className={styles.row}>
+              <label>
+                Exposure{" "}
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={exposure}
+                  onChange={(e) => onExposure(Number(e.target.value))}
+                />
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={autofocus}
+                  onChange={(e) => onAutofocus(e.target.checked)}
+                />{" "}
+                Autofocus
+              </label>
+            </div>
+            {exposureUnavailable ? (
+              <p className={styles.note}>
+                This camera does not allow exposure control. That is usually fine.
+              </p>
+            ) : null}
+            {focusUnavailable ? (
+              <p className={styles.note}>
+                This camera does not let FacadeKit switch autofocus. Tap or turn its focus by hand
+                if the picture is soft.
+              </p>
+            ) : null}
+            <p className={styles.note}>
+              The scan sets exposure and focus itself. These only change the live picture.
+            </p>
+          </details>
         </div>
       ) : null}
-      {exposureUnavailable ? (
-        <p className={styles.note}>
-          This camera does not allow exposure control. That is usually fine.
-        </p>
+
+      {cameraId ? (
+        <div className={styles.group}>
+          <h3>3. Check the view</h3>
+          <p className={styles.note}>
+            Optional. The projector flashes and shows stripes for a few seconds, and FacadeKit says
+            whether the camera sees enough for a good scan.
+          </p>
+          <div className={styles.row}>
+            <button
+              type="button"
+              className={check ? undefined : "primary"}
+              disabled={checking}
+              onClick={() => void runCheck()}
+            >
+              {COPY.checkButton}
+            </button>
+          </div>
+          {checking ? <p role="status">{COPY.checking}</p> : null}
+          {checkError ? (
+            <ErrorBanner
+              message={checkError}
+              actions={
+                <button type="button" className="primary" onClick={() => void runCheck()}>
+                  {COPY.buttons.recheck}
+                </button>
+              }
+            />
+          ) : null}
+          {check && !checking ? (
+            <CameraCheckCard
+              check={check}
+              onCrop={() => {
+                if (check.suggested_roi) onRoiChange(check.suggested_roi);
+                setEditing(true);
+              }}
+              onUsePhone={onUsePhone}
+              onNext={onNext}
+              onRecheck={() => void runCheck()}
+            />
+          ) : null}
+        </div>
       ) : null}
     </section>
   );

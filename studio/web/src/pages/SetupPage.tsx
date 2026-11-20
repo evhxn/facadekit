@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { getCalibration, listCameras } from "../api/client";
 import type { CameraCheck, CameraRoi } from "../api/types";
+import Checklist, { type CheckItem } from "../components/Checklist";
+import Stepper from "../components/Stepper";
 import { useProjectStore } from "../state/projectStore";
 import styles from "./SetupPage.module.css";
 import StepCamera from "./setup/StepCamera";
@@ -31,7 +33,9 @@ export default function SetupPage() {
     useProjectStore
       .getState()
       .load(projectId)
-      .catch(() => setLoadError("Could not open this project. Go back to Projects and open it again."));
+      .catch(() =>
+        setLoadError("Could not open this project. Go back to Projects and open it again."),
+      );
   }, [projectId]);
 
   // A crop and a check result belong to one camera.
@@ -106,62 +110,107 @@ export default function SetupPage() {
   if (loadError) return <main className={styles.page}>{loadError}</main>;
   if (!loaded || step === null) return <main className={styles.page}>Loading…</main>;
 
+  const scanned = project.calibration_id !== null;
+  const steps = [
+    { title: TITLES[0] ?? "", done: projectorReady || scanned },
+    { title: TITLES[1] ?? "", done: cameraId !== null && (check !== null || scanned) },
+    { title: TITLES[2] ?? "", done: scanned },
+  ];
+  const checklist: CheckItem[] = [
+    {
+      label: "Projector",
+      state: projectorReady || scanned ? "ok" : "todo",
+      detail:
+        projectorReady || scanned
+          ? `${project.projector.width} × ${project.projector.height}`
+          : "Open the projector window and put it on the projector.",
+    },
+    {
+      label: "Camera",
+      state: cameraId ? "ok" : phone ? "ok" : "todo",
+      detail: cameraId
+        ? "Chosen"
+        : phone
+          ? "Using your phone"
+          : "Choose the camera that watches the house.",
+    },
+    {
+      label: "Camera view",
+      state: !check ? "todo" : check.verdict === "good" ? "ok" : "problem",
+      detail: !check
+        ? "Optional, and worth it: checks the picture before the scan."
+        : check.verdict === "good"
+          ? "Sees the projection clearly."
+          : "Works, with limits. See the advice on the camera step.",
+    },
+    {
+      label: "Scan",
+      state: scanned ? "ok" : "todo",
+      detail: scanned ? "Done. You can scan again at any time." : "About a minute.",
+    },
+  ];
+
   return (
-    <main className={styles.page}>
+    <main className={`${styles.page} ${styles.wide}`}>
       <h1>Set up “{project.name}”</h1>
-      <p className={styles.steps}>
-        Step {step} of 3: {TITLES[step - 1]}
-      </p>
-      {step === 1 ? (
-        <StepProjector
-          project={project}
-          piHost={piHost}
-          onPiHostChange={setPiHost}
-          onReadyChange={setProjectorReady}
-        />
-      ) : null}
-      {step === 2 ? (
-        <StepCamera
-          projectId={projectId}
-          cameraId={cameraId}
-          onCameraChange={changeCamera}
-          roi={roi}
-          onRoiChange={changeRoi}
-          roiFromLastScan={roiFromLastScan}
-          check={check}
-          onCheckChange={setCheck}
-          onNext={() => goScan(false)}
-          onUsePhone={() => goScan(true)}
-        />
-      ) : null}
-      {step === 3 ? (
-        <StepScan
-          project={project}
-          cameraId={cameraId}
-          piHost={piHost}
-          roi={roi}
-          onRoiReset={() => changeRoi(null)}
-          phone={phone}
-          onChooseCamera={() => setStep(2)}
-        />
-      ) : null}
-      {step === 3 && project.calibration_id && project.surfaces.length > 0 ? (
-        <StepRealign project={project} cameraId={cameraId} onChooseCamera={() => setStep(2)} />
-      ) : null}
-      <div className={styles.nav}>
-        <button type="button" disabled={step === 1} onClick={() => setStep(step - 1)}>
-          Back
-        </button>
-        {step < 3 ? (
-          <button
-            type="button"
-            disabled={(step === 1 && !projectorReady) || (step === 2 && !cameraId)}
-            onClick={() => (step === 2 ? goScan(false) : setStep(step + 1))}
-            className="primary"
-          >
-            Next
-          </button>
-        ) : null}
+      <Stepper steps={steps} current={step} onSelect={setStep} />
+      <div className={styles.layout}>
+        <div className={styles.main}>
+          {step === 1 ? (
+            <StepProjector
+              project={project}
+              piHost={piHost}
+              onPiHostChange={setPiHost}
+              onReadyChange={setProjectorReady}
+            />
+          ) : null}
+          {step === 2 ? (
+            <StepCamera
+              projectId={projectId}
+              cameraId={cameraId}
+              onCameraChange={changeCamera}
+              roi={roi}
+              onRoiChange={changeRoi}
+              roiFromLastScan={roiFromLastScan}
+              check={check}
+              onCheckChange={setCheck}
+              onNext={() => goScan(false)}
+              onUsePhone={() => goScan(true)}
+            />
+          ) : null}
+          {step === 3 ? (
+            <StepScan
+              project={project}
+              cameraId={cameraId}
+              piHost={piHost}
+              roi={roi}
+              onRoiReset={() => changeRoi(null)}
+              phone={phone}
+              onChooseCamera={() => setStep(2)}
+            />
+          ) : null}
+          {step === 3 && project.calibration_id && project.surfaces.length > 0 ? (
+            <StepRealign project={project} cameraId={cameraId} onChooseCamera={() => setStep(2)} />
+          ) : null}
+          <div className={styles.nav}>
+            <button type="button" disabled={step === 1} onClick={() => setStep(step - 1)}>
+              Back
+            </button>
+            {step < 3 ? (
+              <button
+                type="button"
+                disabled={(step === 1 && !projectorReady) || (step === 2 && !cameraId)}
+                onClick={() => (step === 2 ? goScan(false) : setStep(step + 1))}
+                className="primary"
+              >
+                Next
+              </button>
+            ) : null}
+          </div>
+        </div>
+        <aside className={styles.aside}>
+          <Checklist title="Ready to scan?" items={checklist} />
+        </aside>
       </div>
     </main>
   );

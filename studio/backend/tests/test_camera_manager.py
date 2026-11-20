@@ -407,3 +407,14 @@ def test_sim_listing_and_stale_real_id(tmp_path: Path) -> None:
         assert c.get(f"{API}/devices/cameras?refresh=true").json()[0]["id"] == "sim"
         assert c.get(f"{API}/devices/cameras/0/snapshot.jpg").status_code == 404
         assert c.get(f"{API}/devices/cameras/sim/snapshot.jpg").status_code == 200
+
+
+def test_automated_runs_can_switch_the_permission_request_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The browser tests start `facadekit serve`; that must not open a macOS dialog."""
+    _fake_mac(monkeypatch, "not_determined")
+    monkeypatch.setenv(camera_opencv.NO_PROMPT_ENV, "1")
+    opened: list[int] = []
+    assert prepare_camera_access(opened.append) is None
+    assert opened == []

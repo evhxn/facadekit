@@ -11,14 +11,53 @@
   padding-top: var(--space-4);
   border-top: 1px solid var(--border);
 }
-.steps {
-  display: inline-block;
-  padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--accent);
-  border-radius: 999px;
-  color: var(--accent);
-  font-weight: 600;
-  margin: 0 0 var(--space-4);
+.wide {
+  max-width: 72rem;
+}
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 18rem;
+  gap: var(--space-5);
+  align-items: start;
+}
+.main {
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-4) var(--space-5);
+}
+.main > section > :first-child {
+  margin-top: 0;
+}
+.aside {
+  position: sticky;
+  top: var(--space-4);
+}
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .aside {
+    position: static;
+  }
+  .main {
+    padding: var(--space-3) var(--space-4);
+  }
+}
+.group {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4);
+  margin: var(--space-4) 0;
+  background: var(--bg);
+}
+.group > h3 {
+  margin: 0 0 var(--space-2);
+  font-size: 1rem;
+}
+.group > :last-child {
+  margin-bottom: 0;
 }
 .note {
   color: var(--muted);
@@ -27,9 +66,10 @@
 .live {
   display: block;
   width: 100%;
-  max-width: 40rem;
+  max-width: 48rem;
   background: #111;
   min-height: 6rem;
+  border-radius: var(--radius);
 }
 .viewWrap {
   position: relative;
