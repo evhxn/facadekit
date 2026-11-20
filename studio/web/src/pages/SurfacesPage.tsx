@@ -9,6 +9,8 @@ import {
 } from "../api/client";
 import { newId } from "../api/types";
 import type { Mask, Mesh, Pt, Surface } from "../api/types";
+import EditorHeader from "../components/EditorHeader";
+import PageState from "../components/PageState";
 import RemoteDialog from "../components/RemoteDialog";
 import { useProjectStore } from "../state/projectStore";
 import SurfaceCanvas from "./surfaces/SurfaceCanvas";
@@ -54,7 +56,9 @@ export default function SurfacesPage() {
 
   useEffect(() => {
     if (projectId && useProjectStore.getState().project?.id !== projectId) {
-      load(projectId).catch(() => setLoadError("Could not load the project. Go back to Projects and open it again."));
+      load(projectId).catch(() =>
+        setLoadError("Could not load the project. Go back to Projects and open it again."),
+      );
     }
   }, [projectId, load]);
 
@@ -150,15 +154,39 @@ export default function SurfacesPage() {
     };
   }, []);
 
-  if (!project) {
-    return <p>{loadError ?? "Loading…"}</p>;
+  if (loadError) {
+    return (
+      <PageState
+        kind="error"
+        title="Could not open this project"
+        action={
+          <Link to="/" className="button primary">
+            All projects
+          </Link>
+        }
+      >
+        <p>{loadError}</p>
+      </PageState>
+    );
   }
+  if (!project) return <PageState kind="loading" title="Loading the project" />;
   const setupLink = `/p/${project.id}/setup`;
   if (!project.calibration_id) {
     return (
-      <p>
-        No calibration yet. Go to <Link to={setupLink} className={styles.linkTarget}>Setup</Link> to scan the house first.
-      </p>
+      <PageState
+        kind="empty"
+        title="Scan the house first"
+        action={
+          <Link to={setupLink} className="button primary">
+            Go to Setup
+          </Link>
+        }
+      >
+        <p>
+          Surfaces are drawn on a photo of the house taken through the projector. That photo comes
+          from the scan on the Setup page (or from manual mode there, without a photo).
+        </p>
+      </PageState>
     );
   }
 
@@ -226,109 +254,129 @@ export default function SurfacesPage() {
     }
   };
 
+  const hasSurfaces = project.surfaces.length > 0;
   return (
-    <div className={styles.page}>
-      <div className={styles.canvasArea}>
-        <SurfaceCanvas
-          imageUrl={projViewUrl(project.id, project.calibration_id)}
-          imgW={width}
-          imgH={height}
-          surfaces={project.surfaces}
-          selectedId={selectedId}
-          corner={corner}
-          onSelect={(id, c) => {
-            setSelectedId(id);
-            setCorner(c);
-          }}
-          onChangeQuad={(id, quad) => patch(id, (s) => (s.quad = quad))}
-          onChangeMask={(id, mask) => patch(id, (s) => (s.mask = mask))}
-          onChangeMesh={(id, mesh) => patch(id, (s) => (s.mesh = mesh))}
-          onChangeShape={(id, quad, mask) =>
-            patch(id, (s) => {
-              s.quad = quad;
-              s.mask = mask;
-            })
-          }
-          onCreate={create}
-          magic={{
-            projectId: project.id,
-            onAccept: createMagic,
-            ...(manualCalib
-              ? {
-                  disabledReason:
-                    "Magic select needs a scanned photo (not available in manual mode).",
-                }
-              : {}),
-          }}
-          onDelete={remove}
-        />
-      </div>
-      <aside className={styles.panel}>
-        <label className={styles.toggle}>
-          <input
-            type="checkbox"
-            checked={outlines}
-            onChange={(e) => {
-              setOutlines(e.target.checked);
-              if (e.target.checked) setNotConnected(false);
+    <div className={styles.screen}>
+      <EditorHeader
+        title="Surfaces"
+        help="Mark each part of the house you want to project onto: a door, a window, a wall."
+        tools={
+          <>
+            <label className={styles.toggle}>
+              <input
+                type="checkbox"
+                checked={outlines}
+                onChange={(e) => {
+                  setOutlines(e.target.checked);
+                  if (e.target.checked) setNotConnected(false);
+                }}
+              />{" "}
+              Show outlines on projector
+            </label>
+            <button type="button" onClick={() => setRemoteOpen(true)}>
+              Use phone as remote
+            </button>
+          </>
+        }
+        next={{
+          to: `/p/${project.id}/arrange`,
+          label: "Arrange",
+          ready: hasSurfaces,
+          hint: "Add a surface first.",
+        }}
+      />
+      {remoteOpen && <RemoteDialog projectId={project.id} onClose={() => setRemoteOpen(false)} />}
+      {notConnected && (
+        <p className={styles.note}>
+          Projector window is not open, so the outlines are not shown on the house.{" "}
+          <Link to={setupLink} className={styles.linkTarget}>
+            Open Setup
+          </Link>
+        </p>
+      )}
+      <div className={styles.page}>
+        <div className={styles.canvasArea}>
+          <SurfaceCanvas
+            imageUrl={projViewUrl(project.id, project.calibration_id)}
+            imgW={width}
+            imgH={height}
+            surfaces={project.surfaces}
+            selectedId={selectedId}
+            corner={corner}
+            onSelect={(id, c) => {
+              setSelectedId(id);
+              setCorner(c);
             }}
-          />{" "}
-          Show outlines on projector
-        </label>
-        <button type="button" onClick={() => setRemoteOpen(true)}>
-          Use phone as remote
-        </button>
-        {remoteOpen && <RemoteDialog projectId={project.id} onClose={() => setRemoteOpen(false)} />}
-        {notConnected && (
-          <p className={styles.note}>
-            Projector window is not open. <Link to={setupLink} className={styles.linkTarget}>Open Setup</Link>
-          </p>
-        )}
-        <h2 className={styles.panelHeading}>Surfaces</h2>
-        <SurfaceList
-          surfaces={project.surfaces}
-          selectedId={selectedId}
-          onSelect={(id) => {
-            setSelectedId(id);
-            setCorner(null);
-          }}
-          onRename={(id, name) => patch(id, (s) => (s.name = name))}
-          onDelete={remove}
-        />
-        {selected && (
-          <Properties
-            key={selected.id}
-            surface={selected}
-            onName={(name) => patch(selected.id, (s) => (s.name = name))}
-            onAspect={(a) => patch(selected.id, (s) => (s.aspect = a))}
-            onEstimate={() =>
-              patch(
-                selected.id,
-                (s) => (s.aspect = Math.round(estimateAspect(s.quad) * 100) / 100 || 1),
-              )
+            onChangeQuad={(id, quad) => patch(id, (s) => (s.quad = quad))}
+            onChangeMask={(id, mask) => patch(id, (s) => (s.mask = mask))}
+            onChangeMesh={(id, mesh) => patch(id, (s) => (s.mesh = mesh))}
+            onChangeShape={(id, quad, mask) =>
+              patch(id, (s) => {
+                s.quad = quad;
+                s.mask = mask;
+              })
             }
-            onFeather={(f) => patch(selected.id, (s) => (s.feather_px = f))}
-            onFlip={() => patch(selected.id, (s) => (s.quad = flipHorizontal(s.quad)))}
-            onRotate={() => patch(selected.id, (s) => (s.quad = rotateCorners(s.quad)))}
+            onCreate={create}
+            magic={{
+              projectId: project.id,
+              onAccept: createMagic,
+              ...(manualCalib
+                ? {
+                    disabledReason:
+                      "Magic select needs a scanned photo (not available in manual mode).",
+                  }
+                : {}),
+            }}
+            onDelete={remove}
           />
-        )}
-        {selected && (
-          <MaskEditor
-            key={`shape-${selected.id}`}
-            surface={selected}
-            onChange={(mask) => patch(selected.id, (s) => (s.mask = mask))}
+        </div>
+        <aside className={styles.panel}>
+          <h2 className={styles.panelHeading}>Surfaces ({project.surfaces.length})</h2>
+          <SurfaceList
+            surfaces={project.surfaces}
+            selectedId={selectedId}
+            onSelect={(id) => {
+              setSelectedId(id);
+              setCorner(null);
+            }}
+            onRename={(id, name) => patch(id, (s) => (s.name = name))}
+            onDelete={remove}
           />
-        )}
-        {selected && (
-          <MeshEditor
-            key={`mesh-${selected.id}`}
-            surface={selected}
-            onChange={(mesh: Mesh | null) => patch(selected.id, (s) => (s.mesh = mesh))}
-            testPattern={testPattern}
-            onTestPattern={setTestPattern}
-          />
-        )}
-      </aside>
+          {selected && (
+            <Properties
+              key={selected.id}
+              surface={selected}
+              onName={(name) => patch(selected.id, (s) => (s.name = name))}
+              onAspect={(a) => patch(selected.id, (s) => (s.aspect = a))}
+              onEstimate={() =>
+                patch(
+                  selected.id,
+                  (s) => (s.aspect = Math.round(estimateAspect(s.quad) * 100) / 100 || 1),
+                )
+              }
+              onFeather={(f) => patch(selected.id, (s) => (s.feather_px = f))}
+              onFlip={() => patch(selected.id, (s) => (s.quad = flipHorizontal(s.quad)))}
+              onRotate={() => patch(selected.id, (s) => (s.quad = rotateCorners(s.quad)))}
+            />
+          )}
+          {selected && (
+            <MaskEditor
+              key={`shape-${selected.id}`}
+              surface={selected}
+              onChange={(mask) => patch(selected.id, (s) => (s.mask = mask))}
+            />
+          )}
+          {selected && (
+            <MeshEditor
+              key={`mesh-${selected.id}`}
+              surface={selected}
+              onChange={(mesh: Mesh | null) => patch(selected.id, (s) => (s.mesh = mesh))}
+              testPattern={testPattern}
+              onTestPattern={setTestPattern}
+            />
+          )}
+        </aside>
+      </div>
     </div>
   );
 }

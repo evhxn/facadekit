@@ -117,6 +117,27 @@ button.danger:hover:not(:disabled) {
   border-color: var(--danger-solid);
   color: var(--on-danger);
 }
+/* A link that does what a button does (go to another page) and looks like one. */
+a.button {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--target);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  text-decoration: none;
+}
+a.button:hover {
+  border-color: var(--accent);
+}
+a.button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
 button:disabled {
   opacity: 0.5;
   cursor: not-allowed;

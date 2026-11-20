@@ -1,8 +1,14 @@
+.screen {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 90px);
+}
 .page {
+  flex: 1;
+  min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 300px;
-  gap: 16px;
-  height: calc(100vh - 80px);
+  gap: var(--space-4);
 }
 .canvasArea {
   min-width: 0;
@@ -16,8 +22,7 @@
   padding: var(--space-3);
 }
 .toggle {
-  display: block;
-  margin-bottom: 8px;
+  display: inline-flex;
 }
 .note {
   color: var(--warn);
@@ -39,6 +44,9 @@
 }
 
 @media (max-width: 800px) {
+  .screen {
+    height: auto;
+  }
   .page {
     grid-template-columns: minmax(0, 1fr);
     height: auto;
@@ -49,7 +57,8 @@
 }
 
 .panelHeading {
-  margin-top: var(--space-4);
+  margin: 0 0 var(--space-2);
+  font-size: 1.05rem;
 }
 .linkTarget {
   display: inline-block;

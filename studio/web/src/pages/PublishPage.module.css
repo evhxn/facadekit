@@ -1,5 +1,5 @@
 .page {
-  max-width: 48rem;
+  max-width: 56rem;
   margin: 0 auto;
   padding: 1rem;
 }
@@ -12,4 +12,34 @@
   align-items: center;
   min-height: var(--target);
   min-width: var(--target);
+}
+
+.steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--space-4);
+  counter-reset: step;
+}
+.steps li {
+  counter-increment: step;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+.steps li::before {
+  content: counter(step) ". ";
+  font-weight: 700;
+}
+.steps li[data-done] {
+  border-color: var(--ok);
+  color: var(--text);
+}
+.steps li[data-done]::before {
+  content: "\2713  ";
+  color: var(--ok);
 }

@@ -1,0 +1,34 @@
+.wrap {
+  max-width: 40rem;
+  margin: var(--space-6) auto;
+  padding: 0 var(--space-4);
+}
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-5);
+}
+.card[data-kind="error"] {
+  border-color: var(--danger);
+  border-left-width: 6px;
+}
+.card[data-kind="loading"] .title::after {
+  content: "…";
+}
+.title {
+  font-size: 1.25rem;
+  margin: 0 0 var(--space-2);
+}
+.body {
+  color: var(--muted);
+}
+.body > p {
+  margin: 0 0 var(--space-2);
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}

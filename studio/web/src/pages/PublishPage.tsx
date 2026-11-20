@@ -5,6 +5,8 @@ import type { RenderInfo } from "../api/types";
 import { useProjectStore } from "../state/projectStore";
 import FppPanel from "./publish/FppPanel";
 import RenderPanel from "./publish/RenderPanel";
+import EditorHeader from "../components/EditorHeader";
+import PageState from "../components/PageState";
 import styles from "./PublishPage.module.css";
 
 export default function PublishPage() {
@@ -25,7 +27,9 @@ export default function PublishPage() {
 
   useEffect(() => {
     if (projectId && useProjectStore.getState().project?.id !== projectId) {
-      load(projectId).catch(() => setLoadError("Could not load the project. Go back to Projects and open it again."));
+      load(projectId).catch(() =>
+        setLoadError("Could not load the project. Go back to Projects and open it again."),
+      );
     }
   }, [projectId, load]);
 
@@ -50,12 +54,42 @@ export default function PublishPage() {
     refresh().catch(() => {});
   }, [refresh]);
 
-  if (loadError) return <p role="alert">{loadError}</p>;
-  if (!project || project.id !== projectId) return <p>Loading…</p>;
+  if (loadError) {
+    return (
+      <PageState
+        kind="error"
+        title="Could not open this project"
+        action={
+          <Link to="/" className="button primary">
+            All projects
+          </Link>
+        }
+      >
+        <p>{loadError}</p>
+      </PageState>
+    );
+  }
+  if (!project || project.id !== projectId) {
+    return <PageState kind="loading" title="Loading the project" />;
+  }
+  const clipCount = project.timeline.tracks.reduce((n, t) => n + t.clips.length, 0);
 
   return (
     <div className={styles.page}>
-      <h1>Publish</h1>
+      <EditorHeader
+        title="Publish"
+        help="Render the show as a video for the projector, then send it to Falcon Player (FPP) on your Raspberry Pi."
+      />
+      <ol className={styles.steps}>
+        <li data-done={clipCount > 0 || undefined}>
+          Arrange:{" "}
+          {clipCount > 0 ? `${clipCount} clip${clipCount === 1 ? "" : "s"}` : "no clips yet"}
+        </li>
+        <li data-done={renders.length > 0 || undefined}>
+          Render: {renders.length > 0 ? `${renders.length} made` : "not yet"}
+        </li>
+        <li>Send to the Pi</li>
+      </ol>
       <RenderPanel
         project={project}
         renders={renders}
@@ -69,7 +103,9 @@ export default function PublishPage() {
         onRendered={(rid) => refresh(rid)}
       />
       <nav className={styles.nav}>
-        <Link to={`/p/${project.id}/arrange`} className={styles.back}>Back</Link>
+        <Link to={`/p/${project.id}/arrange`} className={styles.back}>
+          Back
+        </Link>
       </nav>
     </div>
   );
