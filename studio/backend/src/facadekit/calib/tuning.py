@@ -118,6 +118,9 @@ def measure_latency(
     return LatencyResult(settle_ms=settle_ms, discard_frames=1, frame_interval_ms=interval_ms)
 
 
+SETTLE_ON_WHITE_S = 2.0  # same wait the camera without any lock gets
+CLIPPED_P99 = 240.0  # the brightest 1 % of a white picture at or above this: washed out
+MIN_LEVEL = 0.35  # never project dimmer than this: the stripes must stay well above noise
 _PATTERN_STEP = 4.0  # mean gray-level change between a stripe picture and its inverse
 
 
@@ -210,6 +213,33 @@ def auto_exposure(
         return {"locked": False, "exposure": None, "white_p99": white_p99()}
 
     display.show(white)
+    if not camera.set_controls(exposure=0.5).get("exposure", False):
+        # The camera can lock its exposure but not be told a value (AVFoundation on macOS,
+        # and some Windows and Linux drivers). It was locked a moment ago, at whatever it
+        # happened to be showing. Let its own automatic exposure settle on the white
+        # projection, the brightest picture of the scan, and lock it there: the white then
+        # stays below clipping and the stripes keep their contrast.
+        camera.set_controls(auto_exposure=True)
+        sleep(SETTLE_ON_WHITE_S)
+        locked = bool(camera.set_controls(auto_exposure=False).get("auto_exposure", False))
+        p99 = white_p99()
+        level = 1.0
+        if locked and p99 >= CLIPPED_P99:
+            # Still washed out, and the camera cannot be turned down: project dimmer instead.
+            # With the exposure locked, a dimmer projection is a darker camera picture.
+            lo, hi = MIN_LEVEL, 1.0
+            for _ in range(5):
+                mid = (lo + hi) / 2
+                display.show(np.full((h, w), round(255 * mid), np.uint8))
+                p99 = white_p99()
+                if p99 < CLIPPED_P99:
+                    lo = mid
+                else:
+                    hi = mid
+            level = lo
+            display.show(np.full((h, w), round(255 * level), np.uint8))
+            p99 = white_p99()
+        return {"locked": locked, "exposure": None, "white_p99": p99, "level": level}
     lo, hi = 0.0, 1.0
     for _ in range(6):
         mid = (lo + hi) / 2

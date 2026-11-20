@@ -236,6 +236,8 @@ class OpenCvCamera:
         self._resolution = (width, height)
         self._platform = _platform_key()
         self._table = _CONTROL_TABLE[self._platform]
+        self._mac_id: str | None = None  # AVFoundation device of this index (macOS only)
+        self._mac_locked: set[avfoundation.Control] = set()
 
     @property
     def resolution(self) -> tuple[int, int]:
@@ -268,11 +270,33 @@ class OpenCvCamera:
         h, w = frame.shape[:2]
         self._resolution = (int(w), int(h))
         self._cap = cap
+        if self._real and self._platform == "avfoundation":
+            devices = avfoundation.devices()  # the same order OpenCV numbers them in
+            self._mac_id = devices[self._index].unique_id if self._index < len(devices) else None
 
     def close(self) -> None:
         cap, self._cap = self._cap, None
+        # The lock belongs to the device, not to this program: hand it back, or the camera
+        # stays locked for every other app until it is unplugged.
+        if self._mac_id is not None:
+            for control in sorted(self._mac_locked):
+                avfoundation.set_locked(self._mac_id, control, False)
+        self._mac_locked.clear()
         if cap is not None:
             cap.release()
+
+    def _mac_set(self, control: avfoundation.Control, locked: bool) -> bool:
+        """macOS: lock or release `control` through AVFoundation. False when not possible."""
+        if self._mac_id is None or self._cap is None:
+            return False
+        if not avfoundation.lockable(self._mac_id, control):
+            return False
+        ok = avfoundation.set_locked(self._mac_id, control, locked)
+        if ok and locked:
+            self._mac_locked.add(control)
+        elif ok:
+            self._mac_locked.discard(control)
+        return ok
 
     def read(self) -> np.ndarray:
         if self._cap is None:
@@ -306,7 +330,9 @@ class OpenCvCamera:
             key = "ae_auto" if auto_exposure else "ae_manual"
             first = t[key]
             alt = _CONTROL_TABLE["dshow" if self._platform == "v4l2" else "v4l2"][key]
-            ok = self._set(cv2.CAP_PROP_AUTO_EXPOSURE, first)
+            ok = self._mac_set("exposure", locked=not auto_exposure)
+            if not ok:
+                ok = self._set(cv2.CAP_PROP_AUTO_EXPOSURE, first)
             if not ok:
                 ok = self._set(cv2.CAP_PROP_AUTO_EXPOSURE, alt)
             result["auto_exposure"] = ok
@@ -320,5 +346,6 @@ class OpenCvCamera:
         if auto_wb is not None:
             result["auto_wb"] = self._set(cv2.CAP_PROP_AUTO_WB, 1 if auto_wb else 0)
         if autofocus is not None:
-            result["autofocus"] = self._set(cv2.CAP_PROP_AUTOFOCUS, 1 if autofocus else 0)
+            ok = self._mac_set("focus", locked=not autofocus)
+            result["autofocus"] = ok or self._set(cv2.CAP_PROP_AUTOFOCUS, 1 if autofocus else 0)
         return result

@@ -191,3 +191,97 @@ def host_app() -> str:
     }
     program = os.environ.get("TERM_PROGRAM", "")
     return names.get(program, program or "the app you started FacadeKit from")
+
+
+# -- exposure and focus ----------------------------------------------------------------------
+#
+# OpenCV cannot change exposure on macOS. AVFoundation can, on cameras that offer it: an
+# external UVC webcam usually allows "locked" and "continuous" exposure and focus, while the
+# built-in MacBook camera and Continuity Camera offer no mode at all (measured 2026-11-19 on a
+# MacBook Pro with a Logitech C920). The setting belongs to the device, so it applies to the
+# capture session OpenCV runs, and it is undone when FacadeKit closes the camera.
+
+Control = Literal["exposure", "focus"]
+LOCKED = 0
+CONTINUOUS = 2
+_SUPPORTED: dict[Control, bytes] = {
+    "exposure": b"isExposureModeSupported:",
+    "focus": b"isFocusModeSupported:",
+}
+_SETTER: dict[Control, bytes] = {"exposure": b"setExposureMode:", "focus": b"setFocusMode:"}
+_ADJUSTING: dict[Control, bytes] = {
+    "exposure": b"isAdjustingExposure",
+    "focus": b"isAdjustingFocus",
+}
+
+
+def _device(rt: _Runtime, unique_id: str) -> Any:
+    nsstring = rt.objc.objc_getClass(b"NSString")
+    fn = rt.objc.objc_msgSend
+    fn.restype = ctypes.c_void_p
+    fn.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_char_p]
+    text = fn(nsstring, rt.objc.sel_registerName(b"stringWithUTF8String:"), unique_id.encode())
+    return rt.send(ctypes.c_void_p, rt.device_class, b"deviceWithUniqueID:", text)
+
+
+def _mode_supported(rt: _Runtime, device: Any, control: Control, mode: int) -> bool:
+    selector = _SUPPORTED[control]
+    if not rt.responds(device, selector):
+        return False
+    fn = rt.objc.objc_msgSend
+    fn.restype = ctypes.c_bool
+    fn.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_long]
+    return bool(fn(device, rt.objc.sel_registerName(selector), mode))
+
+
+def lockable(unique_id: str, control: Control) -> bool:
+    """True when the device can both lock and run `control` automatically."""
+    rt = _runtime()
+    if rt is None:
+        return False
+    with _lock:
+        device = _device(rt, unique_id)
+        return bool(device) and all(
+            _mode_supported(rt, device, control, mode) for mode in (LOCKED, CONTINUOUS)
+        )
+
+
+def set_locked(unique_id: str, control: Control, locked: bool) -> bool:
+    """Lock `control` at its current value, or hand it back to the camera. True if applied.
+
+    Needs camera permission (macOS refuses `lockForConfiguration` otherwise).
+    """
+    rt = _runtime()
+    if rt is None:
+        return False
+    mode = LOCKED if locked else CONTINUOUS
+    with _lock:
+        device = _device(rt, unique_id)
+        if not device or not _mode_supported(rt, device, control, mode):
+            return False
+        error = ctypes.c_void_p()
+        fn = rt.objc.objc_msgSend
+        fn.restype = ctypes.c_bool
+        fn.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
+        if not fn(device, rt.objc.sel_registerName(b"lockForConfiguration:"), ctypes.byref(error)):
+            return False
+        try:
+            fn.restype = None
+            fn.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_long]
+            fn(device, rt.objc.sel_registerName(_SETTER[control]), mode)
+        finally:
+            rt.send(None, device, b"unlockForConfiguration")
+        return True
+
+
+def adjusting(unique_id: str, control: Control) -> bool | None:
+    """Whether the camera is still adjusting `control`; None when it cannot say."""
+    rt = _runtime()
+    if rt is None:
+        return None
+    with _lock:
+        device = _device(rt, unique_id)
+        selector = _ADJUSTING[control]
+        if not device or not rt.responds(device, selector):
+            return None
+        return bool(rt.send(ctypes.c_bool, device, selector))
