@@ -320,7 +320,7 @@ Minimum laptop: 4 cores, 8 GB RAM, any OS with Python 3.11 and Chrome, Edge or F
 
 BYO-key design rule: one provider interface, keys stored only in the user's local config file, nothing sent anywhere unless the user enables a provider. Default text model id for the Anthropic provider when it is built: `claude-sonnet-5-5`.
 
-Models are downloaded on first use from the project's GitHub Releases with a SHA-256 check, never bundled in the installer.
+Models are never bundled in the installer. They are downloaded only when the user confirms the size and source, from the upstream host at a pinned revision, with a SHA-256 check (spike S-6, `docs/16`; this replaces "on first use from the project's GitHub Releases").
 
 ## 9. Decision log (ADR style)
 
@@ -352,7 +352,7 @@ Each entry: options considered → choice → rationale → risk if wrong.
 
 **ADR-013 Simulator-first.** Options: test on hardware only; build a simulator. **Choice: simulator** implementing the same `Camera` and `ProjectorDisplay` interfaces. Rationale: builder models and CI have no projector. Risk: simulator is too kind. Mitigation: noise, blur, ambient light, gamma, occluders, plus the hardware test plan in `docs/06-project.md`.
 
-**ADR-014 Segmentation model: MobileSAM via ONNX on CPU.** Options: SAM 2.1 tiny; EfficientSAM; MobileSAM; classical GrabCut. **Choice: MobileSAM**, with GrabCut as zero-download fallback. Rationale: Apache-2.0, about 40 MB, a few seconds per image on CPU [A]. Risk: ONNX export friction. Mitigation: ticketed export script and hosted weights; interface allows swapping models.
+**ADR-014 Segmentation model: MobileSAM via ONNX on CPU.** Options: SAM 2.1 tiny; EfficientSAM; MobileSAM; classical GrabCut. **Choice: MobileSAM**, with GrabCut as zero-download fallback. Rationale: Apache-2.0, about 40 MB, a few seconds per image on CPU [A]. Risk: ONNX export friction. Mitigation: ticketed export script and hosted weights; interface allows swapping models. *Update (spike S-6, `docs/16`):* recommended model is now SAM 2.1 tiny (Apache-2.0), with EfficientSAM-Ti as runner-up and MobileSAM kept; models plug in through registry entries and small adapters; no FacadeKit-hosted weights.
 
 **ADR-015 Beat detection with librosa.** Options: aubio (GPL), essentia (AGPL), madmom (non-commercial models), librosa (ISC). **Choice: librosa.** Rationale: licence and adequate accuracy for holiday music. Risk: heavy install (numba). Acceptable on a laptop.
 
