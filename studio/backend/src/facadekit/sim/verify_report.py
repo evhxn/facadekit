@@ -413,6 +413,20 @@ def ml_comparison(train: list[Row], held: list[Row]) -> tuple[str, dict[str, Any
             f"(95 % CI {lo * 100:+.1f} to {hi * 100:+.1f}), {len(te)} runs in "
             f"{len(set(r['index'] for r in te))} scenes."
         )
+        miss_rule = int((~rule_pred & y).sum())
+        miss_ml = int((~ml & y).sum())
+        lines.append(
+            f"  - missed (truly positive, called negative): rule {miss_rule}, logistic {miss_ml} "
+            f"of {int(y.sum())}; false alarms: rule {int((rule_pred & ~y).sum())}, logistic "
+            f"{int((ml & ~y).sum())} of {int((~y).sum())}"
+        )
+        flat = np.array([not r["params"]["raised"] for r in te])
+        if flat.any() and (~flat).any():
+            lines.append(
+                f"  - flat doors only: rule {acc_rule[flat].mean() * 100:.1f} %, logistic "
+                f"{acc_ml[flat].mean() * 100:.1f} %; doors standing out: rule "
+                f"{acc_rule[~flat].mean() * 100:.1f} %, logistic {acc_ml[~flat].mean() * 100:.1f} %"
+            )
         data[name] = {
             "rule": float(acc_rule.mean()),
             "ml": float(acc_ml.mean()),
@@ -430,7 +444,16 @@ def ml_comparison(train: list[Row], held: list[Row]) -> tuple[str, dict[str, Any
         surf_label,
         _surf_features,
         lambda r: r["surface"]["verdict"] != "pass",
-        "surface needs fixing",
+        "surface needs fixing (rule: verdict is not pass)",
+    )
+    fit_eval(
+        surf_label,
+        _surf_features,
+        lambda r: (
+            (r["surface"]["max_edge_px"] if r["surface"]["max_edge_px"] is not None else 99.0)
+            > sc.PASS_EDGE_PX
+        ),
+        "surface needs fixing (rule: worst edge > PASS_EDGE_PX)",
     )
     return "\n".join(lines), data
 
