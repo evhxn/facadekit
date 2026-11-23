@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import threading
 from collections.abc import Callable, Iterable, Iterator
 from importlib import resources
@@ -21,6 +22,10 @@ REGISTRY_ENV = "FACADEKIT_MODEL_REGISTRY"
 PLACEHOLDER_PREFIX = "TO_BE_FILLED"
 CHUNK_SIZE = 64 * 1024
 HTTP_TIMEOUT_S = 30.0
+# Plain http is accepted only from these hosts, and only when FACADEKIT_MODEL_REGISTRY names a
+# replacement registry (tests and local mirrors). Real downloads are always https.
+_LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
+_SAFE_DIR = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 
 # One lock per model name so two callers never download the same file at once.
 _locks_guard = threading.Lock()
@@ -67,28 +72,76 @@ def is_published(name: str) -> bool:
     return not str(entry.get("sha256", "")).upper().startswith(PLACEHOLDER_PREFIX.upper())
 
 
+def model_path(name: str) -> Path:
+    """Where model ``name`` lives (or would live) on disk. Does not check that it exists.
+
+    An optional registry field ``dir`` (one plain folder name) keeps files that must sit
+    together, such as an ONNX graph and its external ``.onnx_data`` weights, in one folder.
+    """
+    entry = _entry(name)
+    filename = str(entry.get("filename", ""))
+    if Path(filename).name != filename or filename in ("", ".", ".."):
+        raise FkError(INTERNAL, f"Model registry filename for {name} is invalid.")
+    folder = entry.get("dir")
+    if folder is None:
+        return models_dir() / filename
+    if not isinstance(folder, str) or not _SAFE_DIR.match(folder) or folder in (".", ".."):
+        raise FkError(INTERNAL, f"Model registry folder for {name} is invalid.")
+    return models_dir() / folder / filename
+
+
+# (path, size, mtime_ns) -> sha256, so status checks do not re-hash large files every time.
+_hash_cache: dict[tuple[str, int, int], str] = {}
+
+
+def _cached_sha256(path: Path) -> str:
+    stat = path.stat()
+    key = (str(path), stat.st_size, stat.st_mtime_ns)
+    digest = _hash_cache.get(key)
+    if digest is None:
+        digest = _sha256_file(path)
+        _hash_cache[key] = digest
+    return digest
+
+
+def local_model(name: str) -> Path | None:
+    """The verified local file of model ``name``, or None. Never downloads anything.
+
+    None when the entry is unknown or unpublished, the file is missing, or its SHA-256 does
+    not match the registry.
+    """
+    if not is_published(name):
+        return None
+    path = model_path(name)
+    if not path.is_file():
+        return None
+    expected = str(_entry(name).get("sha256", "")).lower()
+    return path if _cached_sha256(path) == expected else None
+
+
 def ensure_model(name: str, progress: Callable[[float, str], None] | None = None) -> Path:
     """Return the local path of model ``name``, downloading and verifying it if needed.
 
     A file already in ``models_dir()`` whose SHA-256 matches is returned without any
     request. Otherwise the file is fetched to ``<filename>.part``, verified, and moved
     into place. Failures raise ``FkError`` and leave no partial file behind.
+
+    Only the explicit, user-confirmed download flow calls this (``POST /ai/models/...``);
+    segmentation itself uses ``local_model`` and never downloads.
     """
     entry = _entry(name)
-    filename = str(entry.get("filename", ""))
     url = str(entry.get("url", ""))
     expected = str(entry.get("sha256", "")).lower()
     size_hint = _int_or_zero(entry.get("size_bytes", 0))
 
-    if Path(filename).name != filename or filename in ("", ".", ".."):
-        raise FkError(INTERNAL, f"Model registry filename for {name} is invalid.")
+    dest = model_path(name)
     if expected.upper().startswith(PLACEHOLDER_PREFIX.upper()):
         raise FkError(MODEL_DOWNLOAD_FAILED, f"Model {name} is not published yet.")
 
-    dest = models_dir() / filename
-    part = dest.with_name(f"{filename}.part")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    part = dest.with_name(f"{dest.name}.part")
     with _lock_for(name):
-        if dest.is_file() and _sha256_file(dest) == expected:
+        if dest.is_file() and _cached_sha256(dest) == expected:
             return dest
         try:
             actual = _fetch(name, url, part, size_hint, progress)
@@ -123,8 +176,14 @@ def _fetch(
     progress: Callable[[float, str], None] | None,
 ) -> str:
     """Write the file at ``url`` to ``part`` and return its SHA-256 hex digest."""
-    scheme = urlparse(url).scheme
-    if scheme == "https":
+    parsed = urlparse(url)
+    scheme = parsed.scheme
+    loopback_http = (
+        scheme == "http"
+        and parsed.hostname in _LOOPBACK_HOSTS
+        and bool(os.environ.get(REGISTRY_ENV))
+    )
+    if scheme == "https" or loopback_http:
         try:
             return _download_https(name, url, part, size_hint, progress)
         except (httpx.HTTPError, OSError) as exc:
@@ -184,6 +243,8 @@ def _write_chunks(
             done += len(chunk)
             if progress is not None and total > 0:
                 progress(min(done / total, 1.0), f"Downloading {name}")
+        out.flush()
+        os.fsync(out.fileno())
     return hasher.hexdigest()
 
 

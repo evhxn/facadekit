@@ -232,7 +232,10 @@ def test_bundled_registry_lists_mobilesam_models(monkeypatch: pytest.MonkeyPatch
     assert {"mobilesam_encoder", "mobilesam_decoder"} <= set(entries)
     for name in ("mobilesam_encoder", "mobilesam_decoder"):
         assert entries[name]["sha256"].startswith("TO_BE_FILLED")
-        assert str(entries[name]["url"]).startswith("https://github.com/evhxn/facadekit/")
+        # Spike S-6: the upstream file at a pinned revision, never a FacadeKit release.
+        assert str(entries[name]["url"]).startswith(
+            "https://huggingface.co/Acly/MobileSAM/resolve/0d3b403339b4674a82493d5e97964dd78089ddc8/"
+        )
 
 
 def test_bundled_models_are_not_published(monkeypatch: pytest.MonkeyPatch) -> None:
