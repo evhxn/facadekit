@@ -41,6 +41,7 @@ MIN_GROUP_SHARE = 0.05  # of the plane's decoded blocks
 MAX_GROUPS_PER_PLANE = 4
 RESIDUAL_SIGMA_PX = 8.0  # camera px
 RESIDUAL_MAX_PX = 5.0
+SCAN_PLANAR_SHARE = 0.97  # share of blocks the global homography must explain to call it a plane
 MAX_RANSAC_PAIRS = 20000
 MAPPINGS = ("plane", "model", "hybrid")
 
@@ -270,6 +271,18 @@ def build_mapping(
         x3, x2, proj_size, ransac_px=opts.ransac_px, inlier_px=opts.inlier_px,
         distortion=opts.distortion, seed=opts.seed,
     )  # fmt: skip
+    if sol.usable and h_plane is not None:
+        resid = np.linalg.norm(apply_homography(h_plane, corr.cam) - corr.proj, axis=1)
+        share = float(np.mean(resid < PLANE_H_PX))
+        if share >= SCAN_PLANAR_SHARE:
+            # the scan is far more precise than the depth: if one homography explains it, the
+            # surface is one plane for this projector, whatever the depth's noise suggests
+            sol = sol.rejected(
+                "planar",
+                f"the Gray-code scan fits one homography ({share * 100:.0f} % of blocks within "
+                f"{PLANE_H_PX:g} px): one plane for the projector, which is then under-"
+                "constrained. The plane mapping is used instead.",
+            )
     sensor_surface = surface
     if sol.usable:
         surface, _ = scan_corrected(surface, sol, corr.cam, corr.proj)
