@@ -8,10 +8,14 @@ GrabCut, which separates colours, took the whole cluster. The synthetic set buil
 shows the same thing: GrabCut with one click gets mean IoU 0.12 on small light objects
 (§5).
 
-**Status.** Phase 1 is done: research, code and tests. No model file has been downloaded.
-The registry points at the upstream files at pinned revisions. The checksums stay
-`TO_BE_FILLED_BY_SPIKE_S6` until the owner approves the downloads (§7) and phase 2 checks the
-files. Until then, Magic select runs GrabCut and says so in the toolbar.
+**Status (2026-11-23).** Phase 2 is done. The owner approved all three model sets in §7. They
+were downloaded from the pinned URLs into a folder outside the repo, and every size and
+SHA-256 matched §7. The registry now carries those checksums. The real tensor signatures
+match §1 (§9), and the models were measured against GrabCut (§9).
+
+**Default: SAM 2.1 tiny.** Magic select uses it once the user has pressed "Download model
+(156 MB)" and confirmed. Until then it runs GrabCut and says so. Nothing is downloaded
+without that confirmation.
 
 Evidence tags: **[V]** = checked in a primary source on 2026-11-22 (a licence file, a model
 card, the Hugging Face file API, or the export or consumer source code; the source is named).
@@ -42,11 +46,13 @@ SAM 2.1 tiny (`*_quantized.onnx*`, 52.6 MB + 8.7 MB [V]) are possible later step
 model's accuracy is unknown [A]. EfficientSAM-S (encoder 89,558,337 B [V], the same decoder
 contract) can be added by registry entries alone if Ti is too weak.
 
-Not verified, because it needs the files: the exact input names, shapes and dtypes stored
-inside each ONNX graph (they come from the export and consumer code above); whether
-`vision_encoder.onnx` refers to its weights as `vision_encoder.onnx_data` (the Transformers.js
-naming convention [A]); which MobileSAM encoder variant was uploaded. Phase 2 loads each file
-and reads `get_inputs()`/`get_outputs()` before it fills in a checksum.
+Phase 1 could not verify three things without the files. Phase 2 checked all three by loading
+each file with onnxruntime 1.31.1 (§9):
+- The input names, shapes and dtypes stored inside each graph: all **match** the rows above.
+- Whether `vision_encoder.onnx` finds its weights under the name `vision_encoder.onnx_data`:
+  **yes**, it loads with the file next to it.
+- Which MobileSAM encoder variant was uploaded: **`(h, w, 3)`, with preprocessing inside the
+  graph**.
 
 ## 2. Decision
 
@@ -69,9 +75,16 @@ and reads `get_inputs()`/`get_outputs()` before it fills in a checksum.
 
 **Kept:** MobileSAM (adapter `sam1`), now pointing at the Acly export.
 
-Phase 2 picks the default from measured numbers (§6), not from this table. The registry order
-sets which installed engine `auto` uses first: SAM 2.1 tiny, then EfficientSAM-Ti, then
-MobileSAM.
+Phase 2 measured the three models (§9) and **confirms SAM 2.1 tiny as the default**. On the
+case the owner hit, a small light object in a full projector-size picture, it was clearly
+best:
+- one click: IoU 0.80, against 0.62 (EfficientSAM-Ti) and 0.58 (MobileSAM);
+- clicks needed to reach IoU 0.85: 1.25, against 2.5 and 1.9;
+- pictures that reached IoU 0.85 within 5 clicks: 100 %, against 83 % and 92 %.
+
+The registry order sets which installed engine `auto` uses first: SAM 2.1 tiny, then
+EfficientSAM-Ti, then MobileSAM. The UI offers the first one that is published and not
+installed.
 
 ## 3. What was built (works without any weights)
 
@@ -158,10 +171,12 @@ installed.
 5. Choose the default from the numbers. Update §2 and `docs/12`. Optionally try the owner's
    Ring photo locally; it stays on this Mac.
 
-## 7. Files awaiting the owner's download approval
+## 7. Model files (approved by the owner, verified)
 
-Nothing below has been downloaded. The sizes and SHA-256 values come from the Hugging Face
-file API (Git LFS object ids) at the pinned commits [V].
+The owner approved all three sets ("download all three"). The files were fetched from these
+URLs into `~/facadekit-models-s6`, outside the repo. Every size and SHA-256 below matched the
+downloaded bytes, checked twice. These are the values in `model_registry.json`. No weight file
+is in the repo.
 
 **Recommended: SAM 2.1 tiny, 155,610,424 bytes (155.6 MB) in all**
 
@@ -199,3 +214,107 @@ Total if all three are approved: 241,629,565 bytes (241.6 MB).
 | MobileSAM licence statements differ (Apache-2.0 upstream, MIT on the export repo) | Treated as Apache-2.0 (the weights' licence). It is the third option only |
 | Users without `onnxruntime` | Magic select stays GrabCut and says so. No download is offered without `onnxruntime` (`facadekit[ai]`) |
 | An upstream file is changed or removed | Pinned commits plus SHA-256; a mismatch is refused and leaves nothing behind. GrabCut keeps working |
+
+## 9. Phase 2 results (2026-11-23)
+
+Measured on an Apple M5 Pro (18 cores, 24 GB) with onnxruntime 1.31.1, on the CPU provider
+only. Python 3.13; the project's own `ai` extra was installed from the lockfile.
+
+### Real tensor signatures (read with `get_inputs()`/`get_outputs()`)
+
+| File | Inputs | Outputs |
+|---|---|---|
+| `vision_encoder.onnx` | `pixel_values` f32 `[b,3,1024,1024]` | `image_embeddings.0` `[b,32,256,256]`, `.1` `[b,64,128,128]`, `.2` (dynamic) |
+| `prompt_encoder_mask_decoder.onnx` | `input_points` f32 `[b,1,n,2]`, `input_labels` int64 `[b,1,n]`, `input_boxes` f32 `[b,nb,4]`, `image_embeddings.0/.1/.2` | `iou_scores` `[b,n,3]`, `pred_masks` `[b,n,3,h,w]`, `object_score_logits` |
+| `efficientsam_ti_encoder.onnx` | `batched_images` f32 `[b,3,h,w]` | `image_embeddings` `[…,256,…]` |
+| `efficientsam_ti_decoder.onnx` | `image_embeddings` f32 `[b,256,64,64]`, `batched_point_coords` f32 `[1,1,n,2]`, `batched_point_labels` f32 `[1,1,n]`, `orig_im_size` int64 `[2]` | `output_masks`, `iou_predictions` `[1,1,3]`, `onnx::Shape_1830` (low-res masks) |
+| `mobile_sam_image_encoder.onnx` | `input_image` f32 `[h,w,3]` | `image_embeddings` `[1,256,64,64]` |
+| `sam_mask_decoder_multi.onnx` | `image_embeddings`, `point_coords` `[1,n,2]`, `point_labels` `[1,n]`, `mask_input` `[1,1,256,256]`, `has_mask_input` `[1]`, `orig_im_size` f32 `[2]` | `masks`, `iou_predictions` `[n,4]`, `low_res_masks` |
+
+All of these match §1 and the adapters: **no adapter change was needed**.
+`tests/test_ai_models_real.py` now checks that the stub models used by the default test run
+have the same input names, dtypes and ranks as the real graphs.
+
+### Download flow
+
+The app was run against a local mirror of the verified files, with a registry override and
+loopback http. Its own Download flow was used for each engine:
+- `GET /ai/segment/engines` listed all three as published and not installed.
+- A request without confirmation got 422 and fetched nothing.
+- With `confirm: true` and the shown size, a `download` job fetched exactly the 8 files once.
+  It verified them and installed them under `models/<engine>/`.
+- `active` then read `sam2_1_tiny`.
+- A segment request on a simulator project returned `engine: "sam2_1_tiny"` with score 0.99.
+
+### segment_eval
+
+Protocol: a click at the centre of the object, then a click on the middle of the largest error,
+up to 5 clicks; target IoU 0.85. IoU is measured on the returned outline. "Box" is the object's
+bounding box padded by 4 px. Encode is the time per picture; decode is the time per prompt,
+including post-processing.
+
+**A. Synthetic shelves, 960 × 540 (24 pictures, seed 0), plus the 3 simulator features.** All
+27 pictures:
+
+| engine | IoU 1 | IoU 3 | IoU 5 | clicks to 0.85 | reached | box | box + click | encode | decode |
+|---|---|---|---|---|---|---|---|---|---|
+| grabcut | 0.116 | 0.090 | 0.134 | 5.44 | 11.1 % | 0.704 | 0.735 | 1 ms | 581 ms |
+| **sam2_1_tiny** | 0.703 | 0.933 | 0.905 | **1.48** | 96.3 % | 0.932 | 0.940 | 370 ms | 11 ms |
+| efficientsam_ti | 0.643 | **0.948** | 0.945 | 1.56 | 96.3 % | **0.970** | **0.972** | 304 ms | 11 ms |
+| mobilesam | **0.760** | 0.879 | **0.948** | 1.52 | 96.3 % | 0.947 | 0.944 | **148 ms** | 13 ms |
+
+Simulator features only (garage door and two windows):
+
+| engine | IoU 1 | box |
+|---|---|---|
+| grabcut | 0.90 | 0.99 |
+| sam2_1_tiny | 0.93 | 0.95 |
+| efficientsam_ti | 0.96 | 0.95 |
+| mobilesam | 0.96 | 0.96 |
+
+**B. Ring-camera case: small light objects on cluttered shelves in a projector-size picture**
+(`generate --size 1920x1080 --count 12 --seed 11`; synthetic only, the owner's photos were not
+used):
+
+| engine | IoU 1 | IoU 3 | IoU 5 | clicks to 0.85 | reached | box | box + click | encode | decode |
+|---|---|---|---|---|---|---|---|---|---|
+| grabcut | 0.028 | 0.088 | 0.134 | 6.0 | 0 % | 0.902 | 0.902 | 3 ms | 1069 ms |
+| **sam2_1_tiny** | **0.799** | **0.923** | 0.875 | **1.25** | **100 %** | 0.879 | 0.881 | 393 ms | 13 ms |
+| efficientsam_ti | 0.624 | 0.787 | 0.792 | 2.50 | 83.3 % | 0.912 | 0.918 | 279 ms | 13 ms |
+| mobilesam | 0.575 | 0.915 | **0.901** | 1.92 | 91.7 % | **0.918** | 0.915 | **143 ms** | 16 ms |
+
+### Reading the numbers
+
+- **Every model beats GrabCut by far on clicks.** GrabCut never reached IoU 0.85 on a small
+  object from clicks alone: it takes the light neighbours, which is the owner's report. With
+  a box, GrabCut does reasonably well (0.70–0.90). That is why "Add rectangle" stays useful
+  even without a model.
+- **Why SAM 2.1 tiny is the default.** The owner's problem is clicking a small object in a
+  projector-size picture, and there it was best by a wide margin (set B). It was also best
+  on clicks to 0.85 in set A and the only model to reach the target on every picture in set B.
+- **Where SAM 2.1 tiny is weaker.** Its box IoU is the lowest of the three, though still far
+  above GrabCut's click results. More clicks can lower its IoU slightly (IoU 3 is above
+  IoU 5 in both sets).
+- **What the others are good at.** EfficientSAM-Ti has the best box IoU on the smaller
+  pictures. MobileSAM has the fastest encoder.
+- **Speed is not a problem on this Mac.** Every encoder takes 0.15–0.4 s per picture, once,
+  cached per calibration. Every click then takes about 11–16 ms, against 0.6–1.1 s for
+  GrabCut.
+- **Most first-click failures are the harness clicking the lens.** The simulated first click
+  is the deepest point of the object. On objects with a dark "lens" spot it lands on the
+  lens, and the models return the lens alone (IoU ≈ 0.08). A second click fixes it. A person
+  would more likely click the body. This affects every engine equally and is left in, because
+  a real lens can be clicked too.
+- **These sets are synthetic and small** (27 + 12 pictures). The differences between the
+  three models are within what another seed could change, except the set-B gap in favour of
+  SAM 2.1 tiny. The first hardware run should re-check with real photos.
+
+### Tests
+
+`FK_TEST_MODELS=1 FACADEKIT_DATA=<folder with the models> pytest -m models` gave 11 passed
+(each of the three models):
+- real signatures match the stub models;
+- garage door IoU > 0.8 with one click and with a box;
+- Ring-style box IoU > 0.8;
+- the default engine reaches 0.85 in ≤ 2 clicks on average on four Ring-style pictures;
+- the original MobileSAM garage-door test.

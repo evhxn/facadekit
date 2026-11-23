@@ -8,15 +8,10 @@ Superseded: the plan to upload MobileSAM files to a `models-v1` release of this 
 dropped. No FacadeKit release hosts model weights. The registry points at the upstream files at
 pinned revisions; the full record is `docs/16-magic-select-model.md`.
 
-Phase 1 (research, adapters, box prompts, confirmed download flow, evaluation harness) is
-done. Phase 2 needs the owner's approval of the files listed in `docs/16` §7. For each approved
-file, check the bytes against the size and SHA-256 listed there before pasting the checksum
-into `sha256` in `studio/backend/src/facadekit/ai/model_registry.json`:
+Phase 1 (research, adapters, box prompts, confirmed download flow, evaluation harness) and
+phase 2 (owner-approved download of the files in `docs/16` §7, size and SHA-256 verified,
+real tensor signatures checked, registry checksums filled, models measured against GrabCut)
+are done. The default engine is SAM 2.1 tiny. Results: `docs/16` §9.
 
-```sh
-shasum -a 256 FILE
-stat -f %z FILE   # macOS; use stat -c %s on Linux
-```
-
-Until then every entry keeps its `TO_BE_FILLED_BY_SPIKE_S6` placeholder and Magic select uses
-GrabCut (and says so).
+To verify a file again: `shasum -a 256 FILE` and `stat -f %z FILE` (macOS), compared with
+`docs/16` §7 and `model_registry.json`.
