@@ -19,7 +19,7 @@ DEFAULT_PORT = 8137
 
 COMMANDS = [
     "serve", "new", "calibrate", "render", "publish", "doctor", "sim", "phone-scan", "verify",
-    "spike",
+    "spike", "calib3d",
 ]  # fmt: skip
 
 
@@ -95,6 +95,25 @@ def build_parser() -> argparse.ArgumentParser:
                 "--ask-password", action="store_true", help="prompt for FPP's UI password"
             )
             fpp.add_argument("--timeout", type=float, default=10.0)
+        elif name == "calib3d":
+            c3_sub = sp.add_subparsers(dest="calib3d_command", required=True)
+            solve = c3_sub.add_parser(
+                "solve",
+                help="S-11: projector + surface from a depth capture and a Gray-code scan "
+                "(docs/18)",
+            )
+            solve.add_argument("capture_dir", help="folder with manifest.json (docs/18)")
+            solve.add_argument("--json", action="store_true", help="print the report as JSON")
+            solve.add_argument(
+                "--report",
+                default=None,
+                metavar="DIR",
+                help="write report.json, report.md, overlay.png, proj_view_3d.png",
+            )
+            solve.add_argument("--min-confidence", type=int, default=None, choices=(0, 1, 2),
+                               help="lowest depth confidence used (default 2, high)")  # fmt: skip
+            solve.add_argument("--max-range", type=float, default=None, metavar="M",
+                               help="ignore depth beyond this many metres (default 5)")  # fmt: skip
         elif name == "phone-scan":
             phone_sub = sp.add_subparsers(dest="phone_command", required=True)
             analyse = phone_sub.add_parser("analyse")
@@ -447,6 +466,35 @@ def _cmd_verify(args: argparse.Namespace) -> int:
     )
 
 
+def _cmd_calib3d(args: argparse.Namespace) -> int:
+    import json
+    from dataclasses import replace
+
+    from facadekit.calib3d.capture_format import load_capture
+    from facadekit.calib3d.solve import SolveOptions, solve_capture, summary_table, write_report
+
+    capture = load_capture(Path(args.capture_dir))
+    opts = SolveOptions()
+    fusion = opts.fusion
+    if args.min_confidence is not None:
+        fusion = replace(fusion, min_confidence=args.min_confidence)
+    if args.max_range is not None:
+        fusion = replace(fusion, max_range_m=args.max_range)
+    result = solve_capture(capture, replace(opts, fusion=fusion))
+    if args.report:
+        for path in write_report(result, Path(args.report)):
+            print(f"wrote {path}", file=sys.stderr)
+    for w in capture.warnings:
+        print(f"warning: {w}", file=sys.stderr)
+    if args.json:
+        print(json.dumps(result.to_json(), indent=1))
+    else:
+        print(summary_table(result))
+        if capture.ground_truth is not None:
+            print("SIMULATED capture: these numbers describe the simulator, not a device.")
+    return 0
+
+
 def _cmd_spike(args: argparse.Namespace) -> int:
     import getpass
     import time
@@ -504,5 +552,6 @@ def main(argv: list[str] | None = None) -> int:
         "phone-scan": _cmd_phone_scan,
         "verify": _cmd_verify,
         "spike": _cmd_spike,
+        "calib3d": _cmd_calib3d,
     }
     return _run(lambda: handlers[args.command](args))
