@@ -26,6 +26,7 @@ from facadekit.api import (
     routes_projector,
     routes_projects,
     routes_render,
+    routes_verify,
 )
 from facadekit.api import ws as ws_module
 from facadekit.api.deps import AppState
@@ -158,6 +159,7 @@ def create_app(
     api.include_router(routes_devices.router)
     api.include_router(routes_diagnostics.router)
     api.include_router(routes_calibration.router)
+    api.include_router(routes_verify.router)
     api.include_router(routes_learning.router)
     api.include_router(routes_jobs.router)
     api.include_router(routes_render.router)
