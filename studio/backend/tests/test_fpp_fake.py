@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import httpx
@@ -28,20 +29,32 @@ def _upload(client: httpx.Client, dir_name: str, name: str, data: bytes, chunk: 
         offset += len(piece)
 
 
+FIXTURES = Path(__file__).parent / "fixtures" / "fpp"
+
+
 def test_version(fake_fpp: FakeFpp) -> None:
     with httpx.Client(base_url=f"http://{fake_fpp.host}") as client:
         body = client.get("/api/fppd/version").json()
-    assert body["majorVersion"] == 10
+    # FPP 10.4 sends the version parts as strings (src/fppversion.sh, httpAPI.cpp) [V]
+    assert body["majorVersion"] == "10"
     assert body["version"] == "10.4"
     assert body["fppdAPI"] == "v1"
+
+
+def test_version_matches_real_fpp_10_4_reply(fake_fpp: FakeFpp) -> None:
+    """The reply recorded from a real FPP 10.4 (owner's Pi, GET /api/fppd/version)."""
+    real = json.loads((FIXTURES / "fppd_version_10_4.json").read_text("utf-8"))
+    with httpx.Client(base_url=f"http://{fake_fpp.host}") as client:
+        body = client.get("/api/fppd/version").json()
+    assert body == real
 
 
 def test_version_is_derived_from_argument(tmp_path: Path) -> None:
     app = create_fake_fpp(tmp_path / "fpp", version="9.2")
     with TestClient(app) as client:
         body = client.get("/api/fppd/version").json()
-    assert body["majorVersion"] == 9
-    assert body["minorVersion"] == 2
+    assert body["majorVersion"] == "9"
+    assert body["minorVersion"] == "2"
 
 
 def test_requests_are_recorded(fake_fpp: FakeFpp) -> None:
@@ -56,7 +69,7 @@ def test_two_chunk_upload_is_listed_and_concatenated(fake_fpp: FakeFpp) -> None:
         _upload(client, "videos", "clip.mp4", data, chunk=512)
         listing = client.get("/api/files/videos").json()
     assert listing["status"] == "ok"
-    assert listing["files"] == [{"name": "clip.mp4", "sizeBytes": len(data)}]
+    assert [(f["name"], f["sizeBytes"]) for f in listing["files"]] == [("clip.mp4", len(data))]
     assert (fake_fpp.state_dir / "videos" / "clip.mp4").read_bytes() == data
     assert not list((fake_fpp.state_dir / "videos").glob(".partial_*"))
 
@@ -88,15 +101,20 @@ def test_playlist_save_then_get_round_trip(fake_fpp: FakeFpp) -> None:
     }
     with httpx.Client(base_url=f"http://{fake_fpp.host}") as client:
         assert client.post("/api/playlist/garage", json=playlist).status_code == 200
-        assert client.get("/api/playlist/garage").json() == playlist
+        stored = client.get("/api/playlist/garage").json()
+        assert {k: stored[k] for k in playlist} == playlist
+        assert stored["version"] == 4
+        assert stored["playlistInfo"]["total_items"] == 1
         assert client.get("/api/playlists").json() == ["garage"]
         assert client.get("/api/playlist/missing").status_code == 404
 
 
-def test_playlist_without_main_playlist_is_400(fake_fpp: FakeFpp) -> None:
+def test_playlist_bad_name_is_400(fake_fpp: FakeFpp) -> None:
+    # FPP's PlaylistFilePath refuses "\\" (and "/", NUL); it does not check mainPlaylist [V]
     with httpx.Client(base_url=f"http://{fake_fpp.host}") as client:
-        resp = client.post("/api/playlist/garage", json={"name": "garage"})
+        resp = client.post("/api/playlist/a%5Cb", json={"name": "a\\b", "mainPlaylist": []})
     assert resp.status_code == 400
+    assert resp.json()["Status"] == "Error"
 
 
 def test_start_sets_playing_and_stop_returns_to_idle(fake_fpp: FakeFpp) -> None:
@@ -112,15 +130,17 @@ def test_start_sets_playing_and_stop_returns_to_idle(fake_fpp: FakeFpp) -> None:
         assert status["status_name"] == "idle"
 
 
-def test_start_unknown_playlist_is_404(fake_fpp: FakeFpp) -> None:
+def test_start_unknown_playlist_answers_200_and_plays_nothing(fake_fpp: FakeFpp) -> None:
+    # fppd's Start Playlist command answers "Playlist Starting" either way [V]
     with httpx.Client(base_url=f"http://{fake_fpp.host}") as client:
-        assert client.post("/api/playlist/nope/start").status_code == 404
+        resp = client.post("/api/playlist/nope/start")
+        assert resp.status_code == 200
+        assert resp.text == "Playlist Starting"
+        assert client.get("/api/fppd/status").json()["status_name"] == "idle"
 
 
 def test_dot_dot_in_name_is_400(fake_fpp: FakeFpp) -> None:
     with httpx.Client(base_url=f"http://{fake_fpp.host}") as client:
-        resp = client.post("/api/playlist/a..b", json={"mainPlaylist": []})
-        assert resp.status_code == 400
         resp = client.patch(
             "/api/file/videos",
             content=b"x",
@@ -128,3 +148,36 @@ def test_dot_dot_in_name_is_400(fake_fpp: FakeFpp) -> None:
         )
     assert resp.status_code == 400
     assert not (fake_fpp.state_dir.parent / "escape.mp4").exists()
+
+
+def test_unknown_directory_is_200_invalid_directory(fake_fpp: FakeFpp) -> None:
+    with httpx.Client(base_url=f"http://{fake_fpp.host}") as client:
+        resp = client.get("/api/files/video")
+        assert resp.status_code == 200
+        assert resp.json() == {"status": "Invalid Directory"}
+        assert client.get("/api/files/Videos").json()["status"] == "ok"
+
+
+def test_upload_start_is_plain_text_and_chunk_reply_is_json(fake_fpp: FakeFpp) -> None:
+    with httpx.Client(base_url=f"http://{fake_fpp.host}") as client:
+        start = client.post("/api/file/videos")
+        assert start.headers["content-type"].startswith("text/plain")
+        resp = client.patch(
+            "/api/file/videos",
+            content=b"abc",
+            headers={"Upload-Name": "a.mp4", "Upload-Offset": "0", "Upload-Length": "3"},
+        )
+    assert resp.json() == {"status": "OK", "file": "a.mp4", "dir": "videos", "size": 3}
+
+
+def test_password_and_cross_site_gate(tmp_path: Path) -> None:
+    app = create_fake_fpp(tmp_path / "fpp", password="secret")
+    with TestClient(app) as client:
+        assert client.get("/api/fppd/version").status_code == 401
+        assert client.get("/api/fppd/version", auth=("admin", "secret")).status_code == 200
+        assert client.get("/api/fppd/version", auth=("fpp", "secret")).status_code == 200
+    app = create_fake_fpp(tmp_path / "fpp2")
+    with TestClient(app) as client:
+        resp = client.post("/api/playlists/stop", headers={"Origin": "http://evil.example"})
+        assert resp.status_code == 403
+        assert client.post("/api/playlists/stop").status_code == 200
