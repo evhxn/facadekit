@@ -232,26 +232,46 @@ def assess_rig(
     total = rc.shift_of(m_fit, e, o, s)
     base.total_shift_px = round(total, 3)
     frac = found / max(len(pts), 1)
+    # How well can this picture measure a shift at all? Residual of the dots about their
+    # fit, as the uncertainty of the fitted shift (projector px). A small, noisy picture needs
+    # a larger move before it is called a move.
+    moved_at = rc.PROJ_MOVED_PX
+    if m_fit is not None:
+        resid = np.linalg.norm(apply_h(m_fit, e) - o, axis=1)
+        se = float(np.sqrt(np.mean(resid**2))) / float(np.median(s)) * np.sqrt(8.0 / len(e))
+        moved_at = max(rc.PROJ_MOVED_PX, rc.NOISE_K * se)
+    total_cam = rc.shift_of(m_fit, e, o, np.ones(len(e)))
+    cam_shift: float | None = None
+    if motion is not None:
+        cam_shift = rc.mean_shift(motion.h, lit)
+        if cam_shift > rc.CAM_MOVED_PX and cam_shift > 2.0 * total_cam + 1.0:
+            # The texture says the camera moved, but the dots (which move with the camera)
+            # hardly did: the texture match is wrong. Do not use it.
+            log.info("verify: camera motion %.2f px contradicts the dots (%.2f px); ignored",
+                     cam_shift, total_cam)  # fmt: skip
+            motion, cam_shift = None, None
+            base.texture_method = None
     drift: np.ndarray | None = None
-    if motion is None:
-        moved = total > rc.PROJ_MOVED_PX
+    h_cam: np.ndarray | None = None
+    if motion is None or cam_shift is None:
+        moved = total > moved_at
         base.verdict = "moved" if moved else "stable"
         base.camera = "unknown" if moved else "stable"
         base.projector = "unknown" if moved else "stable"
-        margin = min(1.0, abs(total - rc.PROJ_MOVED_PX) / rc.PROJ_MOVED_PX)
+        margin = min(1.0, abs(total - moved_at) / moved_at)
         base.confidence = round(frac * (0.5 + 0.5 * margin) * (0.6 if moved else 1.0), 2)
     else:
-        cam_shift = rc.mean_shift(motion.h, lit)
-        r = apply_h(np.linalg.inv(motion.h), o)
-        q, okq = pmap.to_proj(r)
-        # what is left of the dots' motion once the camera's own motion is taken out
-        if m_fit is not None:
-            proj_only = np.linalg.inv(motion.h) @ m_fit
-            proj_shift = rc.shift_of(proj_only, e, e, s)
-        else:
-            proj_shift = rc.shift_of(None, e, r, s)
         cam_moved = cam_shift > rc.CAM_MOVED_PX
-        proj_moved = proj_shift > rc.PROJ_MOVED_PX
+        if cam_moved:
+            h_cam = motion.h
+            # what is left of the dots' motion once the camera's own motion is taken out
+            if m_fit is not None:
+                proj_shift = rc.shift_of(np.linalg.inv(motion.h) @ m_fit, e, e, s)
+            else:
+                proj_shift = rc.shift_of(None, e, apply_h(np.linalg.inv(motion.h), o), s)
+        else:
+            proj_shift = total  # the camera stayed: every bit of dot motion is the projector's
+        proj_moved = proj_shift > moved_at
         base.camera_shift_px = round(cam_shift, 3)
         base.projector_shift_px = round(proj_shift, 3)
         base.camera = "moved" if cam_moved else "stable"
@@ -267,16 +287,19 @@ def assess_rig(
         )
         margins = [
             min(1.0, abs(cam_shift - rc.CAM_MOVED_PX) / rc.CAM_MOVED_PX),
-            min(1.0, abs(proj_shift - rc.PROJ_MOVED_PX) / rc.PROJ_MOVED_PX),
+            min(1.0, abs(proj_shift - moved_at) / moved_at),
         ]
         base.confidence = round(frac * (0.5 + 0.5 * min(margins)) * min(1.0, motion.score + 0.3), 2)
-        if proj_moved and int(okq.sum()) >= 8:
-            hh, _ = cv2.findHomography(q[okq], p[okq], cv2.RANSAC, 1.5)
-            if hh is not None:
-                drift = np.asarray(hh, dtype=np.float64)
-                base.drift = [[float(v) for v in row] for row in drift]
+        if proj_moved:
+            r = apply_h(np.linalg.inv(h_cam), o) if h_cam is not None else o
+            q, okq = pmap.to_proj(r)
+            if int(okq.sum()) >= 8:
+                hh, _ = cv2.findHomography(q[okq], p[okq], cv2.RANSAC, 1.5)
+                if hh is not None:
+                    drift = np.asarray(hh, dtype=np.float64)
+                    base.drift = [[float(v) for v in row] for row in drift]
     base.message, base.recommendation = _messages(base)
-    return RigResult(base, motion.h if motion is not None else None, m.h, drift)
+    return RigResult(base, h_cam, m.h, drift)
 
 
 # --- surface ------------------------------------------------------------------------------
@@ -309,7 +332,6 @@ def edge_advice(edge: sc.EdgeStats, usable: bool) -> str:
 
 @dataclass
 class SurfaceShots:
-    fill_num: np.ndarray  # fill minus black, gray levels
     fill_q: np.ndarray
     fill_valid: np.ndarray
     inner_q: np.ndarray | None
@@ -410,7 +432,6 @@ def assess_surface(
             exposure.white.gray - exposure.black.gray
             >= max(sc.STRONG_CONTRAST, 0.2 * exposure.median_contrast)
         ),
-        num=shots.fill_num,
         norm=norm,
         obj=obj_f,
         lab=lab,
@@ -441,8 +462,13 @@ def assess_surface(
     max_edge = max(worsts) if worsts else None
     drifts = [abs(e.lit + (e.drift or 0.0)) for e in edges if e.lit is not None]
     max_drift = max(drifts) if drifts else None
-    flat_warn = (parallax is not None and parallax > sc.PARALLAX_PX) or (
-        inner_res is not None and inner_res > sc.INNER_PX
+    disagree = sc.disagreement(samples)
+    step = sc.depth_step(pmap, shape)
+    flat_warn = (
+        (parallax is not None and parallax > sc.PARALLAX_PX)
+        or (inner_res is not None and inner_res > sc.INNER_PX)
+        or (disagree is not None and disagree > sc.DISAGREE_SHARE)
+        or (step is not None and step > sc.DEPTH_STEP_CAM_PX)
     )
 
     if usable and max_edge is not None:
@@ -536,6 +562,7 @@ def assess_surface(
         object_confidence=round(float(obj.confidence), 3),
         parallax_px=_r(parallax),
         inner_residual_px=_r(inner_res),
+        depth_step_px=_r(step),
         flatness_warning=flat_warn,
         outline_measured=round(intended.coverage, 3),
         edges=reports,
@@ -695,7 +722,7 @@ def run_verify(
             surface,
             shape,
             exposure,
-            SurfaceShots(fill_shot.gray - exposure.black.gray, fq, fv, iq, iv),
+            SurfaceShots(fq, fv, iq, iv),
             rig,
             scale,
             inner_pts,

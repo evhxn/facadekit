@@ -320,23 +320,23 @@ def choose_pass_threshold(train: list[Row]) -> float:
 
 
 def _logit_fit(
-    x: np.ndarray, y: np.ndarray, l2: float = 1e-2
+    x: np.ndarray, y: np.ndarray, l2: float = 1.0
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     mu, sd = x.mean(axis=0), x.std(axis=0) + 1e-9
     z = np.hstack([np.ones((len(x), 1)), (x - mu) / sd])
     w = np.zeros(z.shape[1])
     for _ in range(50):  # Newton steps
-        p = 1 / (1 + np.exp(-z @ w))
+        p = 1 / (1 + np.exp(-np.clip(z @ w, -30, 30)))
         g = z.T @ (p - y) + l2 * np.r_[0, w[1:]]
         hess = z.T @ (z * (p * (1 - p))[:, None]) + l2 * np.diag(np.r_[0, np.ones(len(w) - 1)])
-        w -= np.linalg.solve(hess, g)
+        w -= np.linalg.lstsq(hess, g, rcond=None)[0]
     return w, mu, sd
 
 
 def _logit_predict(model: tuple[np.ndarray, np.ndarray, np.ndarray], x: np.ndarray) -> np.ndarray:
     w, mu, sd = model
     z = np.hstack([np.ones((len(x), 1)), (x - mu) / sd])
-    return np.asarray(1 / (1 + np.exp(-z @ w)))
+    return np.asarray(1 / (1 + np.exp(-np.clip(z @ w, -30, 30))))
 
 
 def _paired_ci(

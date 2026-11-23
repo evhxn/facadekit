@@ -42,8 +42,10 @@ MAX_FIX_FRACTION = 0.25  # a suggested edge move larger than this share of the s
 MAX_FIX_PX = 60.0
 CORNER_SKIP = 0.15  # ignore this share of each side at both ends (rounded corners)
 LIT_TOL_PX = 3.0  # "hybrid": measured light edge this close to the prediction: use the prediction
-SPILL_SOURCE = "hybrid"  # light edge for the spill: "measured", "predicted" or "hybrid"
+SPILL_SOURCE = "predicted"  # light edge for the spill: "measured", "predicted" or "hybrid"
 NEAR_EDGE_CAM_PX = 3.0  # light edge this close to a colour edge: the ratio crossing is pulled
+DEPTH_STEP_CAM_PX = 1.0  # map residual at the outline above this: a depth step
+DISAGREE_SHARE = 0.3  # this share of measured light edges off the prediction: warn
 STRONG_CONTRAST = 20.0  # gray levels of white minus black needed to trust a measured edge
 SNAP_CAM_PX = 3.0
 CORE_FRACTION = 0.35  # the region's core: eroded by this share of its inradius
@@ -284,7 +286,6 @@ class EdgeInputs:
 
     q: np.ndarray  # ratio image of the fill shot
     valid: np.ndarray  # where the ratio is clear enough to locate the light's edge
-    num: np.ndarray | None  # fill minus black, gray levels
     norm: float  # ratio level of fully lit pixels
     obj: np.ndarray | None  # float32 object mask (None: object not usable)
     lab: np.ndarray | None  # reflectance picture in Lab, for snapping to the object's edge
@@ -364,10 +365,6 @@ def edge_samples(
             near_edge = False
             if reliable and t_lit is not None and t_obj is not None:
                 near_edge = abs(t_lit - t_obj) < NEAR_EDGE_CAM_PX
-                if near_edge and data.num is not None:
-                    t_num = _half_level(data.num, mx, my, tt, t_obj)
-                    if t_num is not None:
-                        t_lit = t_num
             rows.append(
                 {
                     "side": side,
@@ -426,24 +423,6 @@ def edge_samples(
             )
         )
     return out
-
-
-def _half_level(
-    num: np.ndarray, mx: np.ndarray, my: np.ndarray, tt: np.ndarray, t_obj: float
-) -> float | None:
-    """Light edge from the plain lit-minus-black picture, where it ends at the object's own
-    colour edge: half of the level just inside the object. Unlike the ratio, this is not pulled
-    across a colour edge by the camera's blur (the light outside is zero, whatever the colour
-    there)."""
-    prof = cv2.remap(num, mx, my, cv2.INTER_LINEAR).reshape(-1)
-    inside = (tt >= t_obj - 8.0) & (tt <= t_obj - 3.0)
-    if int(inside.sum()) < 3:
-        return None
-    level = float(np.median(prof[inside]))
-    if level < 4.0:
-        return None
-    t = _crossing(prof, tt - t_obj, 0.5 * level)
-    return t_obj + t if t is not None else None
 
 
 def _snap(lab: np.ndarray, mx: np.ndarray, my: np.ndarray, tt: np.ndarray, t_obj: float) -> float:
@@ -513,6 +492,42 @@ def summarize_edges(samples: list[EdgeSample]) -> list[EdgeStats]:
             )
         )
     return stats
+
+
+def disagreement(samples: list[EdgeSample]) -> float | None:
+    """Share of the trustworthy measured light edges more than LIT_TOL_PX from where the rig
+    check predicted them: the light is not where the scan and the rig motion say."""
+    lit = [s.lit for s in samples if s.lit is not None and not s.near_edge]
+    if len(lit) < 8:
+        return None
+    return float(np.mean([abs(v) > LIT_TOL_PX for v in lit]))
+
+
+def depth_step(pmap: ProjCamMap, shape: Shape, band_px: float = 12.0) -> float | None:
+    """Does the scan's map jump at the outline (an object standing out from the wall)?
+    One homography is fitted to the map on both sides of the outline; returns the 90th
+    percentile residual in camera px (a flat surface in a flat wall: a few tenths), or None
+    when too little was measured. Unmeasured points in the band (a shadow) count as a jump."""
+    poly = shape.outer
+    normals = outward_normals(poly)
+    pts = []
+    for i in range(len(poly)):
+        a, b = poly[i], poly[(i + 1) % len(poly)]
+        for u in np.linspace(0.1, 0.9, 9):
+            c = a + u * (b - a)
+            for off in (-band_px, 0.0, band_px):
+                pts.append(c + off * normals[i])
+    q = np.array(pts)
+    cam, ok = pmap.to_cam(q)
+    if int(ok.sum()) < 12:
+        return None
+    unmeasured = 1.0 - float(ok.mean())
+    h, _ = cv2.findHomography(q[ok], cam[ok], 0)
+    if h is None:
+        return None
+    resid = np.linalg.norm(apply_h(np.asarray(h, dtype=np.float64), q[ok]) - cam[ok], axis=1)
+    p90 = float(np.percentile(resid, 90))
+    return p90 + (10.0 if unmeasured > 0.15 else 0.0)
 
 
 def parallax_spread(samples: list[EdgeSample]) -> float | None:

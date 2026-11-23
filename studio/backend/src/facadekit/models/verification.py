@@ -62,6 +62,7 @@ class SurfaceCheck(BaseModel):
     object_confidence: float = 0.0
     parallax_px: float | None = None  # spread of the lit edge's displacement, projector px
     inner_residual_px: float | None = None  # inner dots against the wall-wide motion
+    depth_step_px: float | None = None  # how much the scan's map jumps at the outline, camera px
     flatness_warning: bool = False
     outline_measured: float = 1.0  # share of the outline the scan measured
     edges: list[EdgeReport] = Field(default_factory=list)

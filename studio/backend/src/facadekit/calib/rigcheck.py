@@ -35,6 +35,7 @@ LAYOUT_SEED = 20261122
 # the smallest values whose false-alarm rate on stable train scenes stayed at 0.
 PROJ_MOVED_PX = 0.75  # projector px, median dot displacement after removing camera motion
 CAM_MOVED_PX = 0.75  # camera px, median texture displacement over the lit area
+NOISE_K = 3.0  # a move must also exceed this many standard errors of the dots' fit
 MIN_DOTS = 8  # fewer matched dots: the check cannot judge
 MIN_TEXTURE_INLIERS = 20
 MIN_ECC_SCORE = 0.3  # texture correlation needed to trust the camera-motion estimate
