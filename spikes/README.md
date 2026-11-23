@@ -2,34 +2,21 @@
 
 Hardware and model spikes that produce values the app needs before a feature can ship.
 
-## S-6: MobileSAM ONNX models
+## S-6: Magic select model
 
-Output of spike S-6 is two ONNX files and their checksums. Until the values below are pasted into
-`studio/backend/src/facadekit/ai/model_registry.json`, the registry keeps its
-`TO_BE_FILLED_BY_SPIKE_S6` placeholders and Magic select uses the GrabCut selector only.
+Superseded: the plan to upload MobileSAM files to a `models-v1` release of this repository is
+dropped. No FacadeKit release hosts model weights. The registry points at the upstream files at
+pinned revisions; the full record is `docs/16-magic-select-model.md`.
 
-### Files
-
-Upload both files as assets of the GitHub release tagged `models-v1` in the `evhxn/facadekit`
-repository:
-
-- `mobilesam_encoder.onnx`
-- `mobilesam_decoder.onnx`
-
-The registry URLs point at
-`https://github.com/evhxn/facadekit/releases/download/models-v1/<filename>`, so the asset names must
-match exactly.
-
-### Registry values
-
-For each file, compute the SHA-256 and byte size of the exact file that was uploaded:
+Phase 1 (research, adapters, box prompts, confirmed download flow, evaluation harness) is
+done. Phase 2 needs the owner's approval of the files listed in `docs/16` §7. For each approved
+file, check the bytes against the size and SHA-256 listed there before pasting the checksum
+into `sha256` in `studio/backend/src/facadekit/ai/model_registry.json`:
 
 ```sh
-shasum -a 256 mobilesam_encoder.onnx mobilesam_decoder.onnx
-stat -f %z mobilesam_encoder.onnx mobilesam_decoder.onnx   # macOS; use stat -c %s on Linux
+shasum -a 256 FILE
+stat -f %z FILE   # macOS; use stat -c %s on Linux
 ```
 
-Paste the lowercase hex digest into `sha256` and the byte count into `size_bytes` for the matching
-entry (`mobilesam_encoder` or `mobilesam_decoder`). Once both entries have real checksums,
-`GET /api/v1/ai/capabilities` lists `mobilesam` as a segment engine, provided `onnxruntime` is
-installed.
+Until then every entry keeps its `TO_BE_FILLED_BY_SPIKE_S6` placeholder and Magic select uses
+GrabCut (and says so).
