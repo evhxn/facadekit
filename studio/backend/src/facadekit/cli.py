@@ -364,6 +364,7 @@ def _cmd_sim(args: argparse.Namespace) -> int:
     result = run_e2e(workdir, log=lambda m: print(m, file=sys.stderr))
     print(f"max corner error: {result.max_corner_error_px:.2f} px")
     print(f"coverage: {result.coverage * 100:.0f} %")
+    print(f"verify: rig {result.verify_rig}, surface {result.verify_surface}")
     print(result.render_path)
     if result.max_corner_error_px >= MAX_CORNER_ERROR_PX:
         raise FkError(INTERNAL, f"corner error {result.max_corner_error_px:.2f} px is too large")

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import cv2
@@ -30,6 +30,8 @@ class E2EResult:
     render_path: Path
     max_corner_error_px: float
     coverage: float
+    verify_rig: str = ""  # rig verdict of the check on the detected door (docs/13)
+    verify_surface: str = ""  # surface verdict of that check
 
 
 def _order_corners(pts: np.ndarray) -> np.ndarray:
@@ -280,6 +282,27 @@ def run_e2e(
         raise FkError(INTERNAL, f"Wall beside the door is green in the camera view: {cam[wy, wx]}")
     log("camera colour checks passed")
 
+    # 7b. check the door surface on the (simulated) house, as the Surfaces page does
+    from facadekit.calib.verify import run_verify
+
+    check_scene = replace(scene, seed=scene.seed + 1)  # a later moment: new camera noise
+    check_display = SimDisplay(check_scene)
+    outcome = run_verify(
+        project_dir,
+        project,
+        check_display,
+        SimCamera(check_scene, check_display),
+        surface_id=project.surfaces[0].id,
+        sleep=lambda s: None,
+    )
+    rec = outcome.record
+    surface_verdict = rec.surface.verdict if rec.surface is not None else "none"
+    worst = rec.surface.max_edge_px if rec.surface is not None else None
+    log(f"verify: rig {rec.rig.verdict}, surface {surface_verdict} (worst edge {worst} px)")
+    if rec.rig.verdict != "stable" or surface_verdict != "pass":
+        raise FkError(INTERNAL, f"Verify on the detected door: rig {rec.rig.verdict}, "
+                      f"surface {surface_verdict}")  # fmt: skip
+
     # 8. publish
     if publish_host is not None:
         from facadekit.fpp.publish import publish_render
@@ -292,4 +315,7 @@ def run_e2e(
         log("published")
 
     load_calibration(project_dir, cal.id)
-    return E2EResult(project_dir, render_path, err, coverage)
+    return E2EResult(
+        project_dir, render_path, err, coverage, verify_rig=rec.rig.verdict,
+        verify_surface=surface_verdict,
+    )  # fmt: skip
