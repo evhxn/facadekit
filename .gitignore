@@ -11,3 +11,4 @@ studio/backend/src/facadekit/webdist/*
 .DS_Store
 build/
 .rl_cache/
+.calib3d_cache/

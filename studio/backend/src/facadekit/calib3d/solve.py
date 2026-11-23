@@ -177,7 +177,6 @@ class Mapping3d:
         h, w = self.surface.label.shape
         ui = np.clip(np.rint(cam[:, 0]).astype(np.int64), 0, w - 1)
         vi = np.clip(np.rint(cam[:, 1]).astype(np.int64), 0, h - 1)
-        lab = self.surface.label[vi, ui]
         if self.residual is not None:
             model = model + self.residual[vi, ui]
         out = np.where(np.isfinite(model).all(axis=1, keepdims=True), model, plane)
@@ -186,7 +185,6 @@ class Mapping3d:
             m = grp == g
             if m.any():
                 out[m] = apply_homography(hg, cam[m])
-        del lab
         return out
 
 
