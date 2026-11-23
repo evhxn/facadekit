@@ -28,4 +28,13 @@ describe("phone error messages (docs/08 section 4)", () => {
       "The projector window does not have the project's resolution.",
     );
   });
+  it("keeps the FPP connection detail", () => {
+    const detail = "No route to 192.168.1.50. Check the address.";
+    expect(userMessage("FPP_UNREACHABLE", detail)).toBe(
+      `The Falcon Player (FPP) could not be reached. Check the address and that the Pi is powered and on the same network. ${detail}`,
+    );
+    expect(userMessage("FPP_AUTH_REQUIRED", "FPP at 192.168.1.50 asks for a password.")).toBe(
+      "FPP at 192.168.1.50 asks for a password.",
+    );
+  });
 });

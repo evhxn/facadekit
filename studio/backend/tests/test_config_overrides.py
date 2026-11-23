@@ -72,12 +72,20 @@ def test_fpp_overrides_reach_the_playlist_entry(data: Path) -> None:
 def test_publish_uploads_to_the_overridden_directory(
     data: Path, fake_fpp: FakeFpp, tmp_path: Path
 ) -> None:
-    _write(data, {"fpp": {"video_dir": "media"}})
+    # "uploads" is another directory key FPP 10.4 accepts (folder "upload"); see docs/17.
+    _write(data, {"fpp": {"video_dir": "uploads"}})
     mp4 = tmp_path / "render.mp4"
     mp4.write_bytes(b"\x00" * 4096)
     publish_render(fake_fpp.host, mp4, media_name="show.mp4", playlist_name="P", start=False)
-    assert (fake_fpp.state_dir / "media" / "fk_show.mp4").is_file()
+    assert (fake_fpp.state_dir / "upload" / "fk_show.mp4").is_file()
     assert not (fake_fpp.state_dir / "videos").exists()
+    # "media" is not an FPP directory key: FPP answers 200 "Invalid Directory", which used to
+    # look like an empty folder. Now publish stops before uploading and names the folder.
+    _write(data, {"fpp": {"video_dir": "media"}})
+    with pytest.raises(FkError) as exc:
+        publish_render(fake_fpp.host, mp4, media_name="show.mp4", playlist_name="P", start=False)
+    assert exc.value.code == "FPP_BAD_RESPONSE" and "'media'" in exc.value.message
+    assert not (fake_fpp.state_dir / "media").exists()
 
 
 def test_unknown_and_malformed_settings_are_ignored_with_one_warning(

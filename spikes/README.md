@@ -2,6 +2,12 @@
 
 Hardware and model spikes that produce values the app needs before a feature can ship.
 
+## S-1: FPP contract
+
+Source audit done (`docs/17-fpp-integration-audit.md`); the recorder
+`facadekit spike fpp-contract HOST` is built. Not yet run on a real Pi: see
+`spikes/S-1-fpp-contract.md` for the owner's commands.
+
 ## S-6: Magic select model
 
 Superseded: the plan to upload MobileSAM files to a `models-v1` release of this repository is

@@ -29,8 +29,12 @@ const MESSAGES: Record<string, string> = {
   NETWORK: "Cannot reach the FacadeKit server. Check that it is running and try again.",
 };
 
-/** Codes whose server text names the numbers the user has to change: show it as well. */
-const WITH_DETAIL = new Set(["RESOLUTION_MISMATCH"]);
+/**
+ * Codes whose server text names what the user has to change (the numbers of a resolution
+ * mismatch; the exact FPP connection problem, such as a refused connection, a name that
+ * cannot be found or macOS Local Network access): show it as well.
+ */
+const WITH_DETAIL = new Set(["RESOLUTION_MISMATCH", "FPP_UNREACHABLE", "FPP_UPLOAD_FAILED"]);
 
 export function userMessage(code: string, fallback: string): string {
   if (!Object.prototype.hasOwnProperty.call(MESSAGES, code)) return fallback;

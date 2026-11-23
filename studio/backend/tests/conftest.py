@@ -4,6 +4,7 @@ import socket
 import threading
 import time
 from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -27,6 +28,25 @@ def _free_port() -> int:
         sock.bind(("127.0.0.1", 0))
         port: int = sock.getsockname()[1]
         return port
+
+
+@contextmanager
+def serve_app(app: FastAPI) -> Iterator[str]:
+    """Run an ASGI app on 127.0.0.1:<free port> in a thread; yield "127.0.0.1:<port>"."""
+    port = _free_port()
+    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning"))
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    deadline = time.monotonic() + 10
+    while not server.started:
+        if not thread.is_alive() or time.monotonic() > deadline:
+            raise RuntimeError("test server did not start")
+        time.sleep(0.01)
+    try:
+        yield f"127.0.0.1:{port}"
+    finally:
+        server.should_exit = True
+        thread.join(timeout=10)
 
 
 @pytest.fixture

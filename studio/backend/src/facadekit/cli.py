@@ -19,6 +19,7 @@ DEFAULT_PORT = 8137
 
 COMMANDS = [
     "serve", "new", "calibrate", "render", "publish", "doctor", "sim", "phone-scan", "verify",
+    "spike",
 ]  # fmt: skip
 
 
@@ -75,6 +76,25 @@ def build_parser() -> argparse.ArgumentParser:
             sp.add_argument("--bundle", default=None, metavar="ZIP")
             sp.add_argument("--apply", action="store_true", help="apply the suggested outline")
             sp.add_argument("--json", action="store_true")
+        elif name == "spike":
+            spike_sub = sp.add_subparsers(dest="spike_command", required=True)
+            fpp = spike_sub.add_parser(
+                "fpp-contract",
+                help="S-1: check a real FPP against FacadeKit's client (read-only by default)",
+            )
+            fpp.add_argument("host", help="FPP address, e.g. 192.168.1.50 or fpp.local")
+            fpp.add_argument("--out", default=None, metavar="DIR", help="where to save replies")
+            fpp.add_argument("--bundle", default=None, metavar="ZIP")
+            fpp.add_argument(
+                "--write-test",
+                action="store_true",
+                help="also upload a test clip and a throwaway playlist, then delete both "
+                "(asks first)",
+            )
+            fpp.add_argument(
+                "--ask-password", action="store_true", help="prompt for FPP's UI password"
+            )
+            fpp.add_argument("--timeout", type=float, default=10.0)
         elif name == "phone-scan":
             phone_sub = sp.add_subparsers(dest="phone_command", required=True)
             analyse = phone_sub.add_parser("analyse")
@@ -427,6 +447,44 @@ def _cmd_verify(args: argparse.Namespace) -> int:
     )
 
 
+def _cmd_spike(args: argparse.Namespace) -> int:
+    import getpass
+    import time
+
+    from facadekit.config import data_dir
+    from facadekit.fpp.contract import FAIL, format_table, run_contract, write_bundle
+
+    if args.out:
+        out_dir = Path(args.out)
+    else:
+        stamp = time.strftime("%Y%m%d-%H%M%S")
+        out_dir = data_dir() / "spikes" / f"fpp-contract-{stamp}"
+    password = getpass.getpass("FPP UI password: ") if args.ask_password else None
+
+    def confirm(prompt: str) -> str:
+        if not sys.stdin.isatty():
+            print("Write test needs an interactive terminal; skipped.", file=sys.stderr)
+            return ""
+        return input(prompt)
+
+    print(
+        f"Checking FPP at {args.host} (read-only{'' if not args.write_test else ' + write test'})"
+    )
+    steps = run_contract(
+        args.host,
+        out_dir,
+        password=password,
+        write_test=args.write_test,
+        confirm=confirm,
+        timeout=args.timeout,
+    )
+    print(format_table(steps))
+    print(f"\nFixtures and report (addresses, names and serials removed): {out_dir}")
+    if args.bundle:
+        print(f"Bundle: {write_bundle(Path(args.bundle), out_dir)}")
+    return 1 if any(step.verdict == FAIL for step in steps) else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args, _ = parser.parse_known_args(argv)
@@ -445,5 +503,6 @@ def main(argv: list[str] | None = None) -> int:
         "sim": _cmd_sim,
         "phone-scan": _cmd_phone_scan,
         "verify": _cmd_verify,
+        "spike": _cmd_spike,
     }
     return _run(lambda: handlers[args.command](args))

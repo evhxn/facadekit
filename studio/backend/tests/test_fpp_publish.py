@@ -136,3 +136,41 @@ def test_sanitize_name() -> None:
 
 def test_media_entry_plain() -> None:
     assert "sequenceName" not in media_entry("fk_a.mp4")
+
+
+def test_sanitize_name_has_no_dot_dot() -> None:
+    # FPP refuses an upload name containing ".." (PatchFile, files.php) [V]
+    assert sanitize_name("my..show...mp4") == "fk_my.show.mp4"
+    assert ".." not in sanitize_name("a. .b.mp4")
+
+
+def test_probe_reports_reason_and_detail(fake_fpp: FakeFpp) -> None:
+    ok = probe_fpp(fake_fpp.host)
+    assert ok["reason"] is None
+    closed = probe_fpp("127.0.0.1:9")
+    assert closed["reason"] in ("refused", "timeout")
+    assert "127.0.0.1:9" in closed["problems"][0]
+
+
+def test_probe_password_needed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from facadekit.fpp.client import PASSWORD_ENV
+    from tests.conftest import serve_app
+
+    monkeypatch.delenv(PASSWORD_ENV, raising=False)
+    with serve_app(create_fake_fpp(tmp_path / "pw", password="x")) as host:
+        result = probe_fpp(host)
+    assert result["reachable"] is True and result["ok"] is False
+    assert result["reason"] == "auth_required"
+    assert PASSWORD_ENV in result["problems"][0]
+
+
+def test_publish_unknown_video_dir_fails_before_upload(
+    fake_fpp: FakeFpp, mp4: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from facadekit.fpp import publish
+
+    monkeypatch.setattr(publish, "video_dir", lambda: "video")
+    with pytest.raises(FkError) as exc:
+        publish_render(fake_fpp.host, mp4, media_name="a.mp4", playlist_name="p", start=False)
+    assert exc.value.code == "FPP_BAD_RESPONSE" and "'video'" in exc.value.message
+    assert not any(r.startswith("PATCH") for r in fake_fpp.app.state.requests)

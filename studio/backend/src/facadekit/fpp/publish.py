@@ -1,8 +1,10 @@
 """Publish a rendered MP4 to a Falcon Player (FPP): check, upload, verify, playlist, start.
 
-Values that spike S-1 has not confirmed are the constants below (the plan's values,
-docs/05-interfaces.md section 7). They are only defaults: read them through the accessor
-functions, which apply the user's ``config.json`` (see ``facadekit.config.load_overrides``).
+The constants below are the plan's values (docs/05-interfaces.md section 7). They match the
+FPP 10.4 source [V, docs/17-fpp-integration-audit.md] but spike S-1 has not recorded them
+from a real player yet, so they stay configurable. They are only defaults: read them through
+the accessor functions, which apply the user's ``config.json``
+(see ``facadekit.config.load_overrides``).
 """
 
 from __future__ import annotations
@@ -14,15 +16,15 @@ from pathlib import Path
 from typing import Any
 
 from facadekit.config import override_str
-from facadekit.errors import FkError
+from facadekit.errors import FPP_AUTH_REQUIRED, FPP_UNREACHABLE, FkError
 from facadekit.fpp.client import FppClient
 
-VIDEO_DIR = "videos"  # FPP media directory for video files [assumption; spike S-1]
-SEQUENCES_DIR = "sequences"  # FPP directory for light sequence files (.fseq) [assumption]
+VIDEO_DIR = "videos"  # FPP directory key for video files [V source; S-1 on a Pi pending]
+SEQUENCES_DIR = "sequences"  # FPP directory key for .fseq files [V source]
 MIN_FPP_MAJOR = 10
 NAME_PREFIX = "fk_"
 FALLBACK_STEM = "show"
-ENTRY_TYPE_MEDIA = "media"  # playlist entry types [assumption; spike S-1]
+ENTRY_TYPE_MEDIA = "media"  # playlist entry types [V source; S-1 on a Pi pending]
 ENTRY_TYPE_BOTH = "both"
 ENTRY_VIDEO_OUT = "--Default--"
 
@@ -35,6 +37,7 @@ _P_START = (0.98, 1.0)
 
 _BAD_CHARS = re.compile(r"[^A-Za-z0-9._-]")
 _MULTI_UNDERSCORE = re.compile(r"_+")
+_MULTI_DOT = re.compile(r"\.{2,}")  # FPP refuses any name containing ".." [V]
 _ALNUM = re.compile(r"[A-Za-z0-9]")
 
 ProgressFn = Callable[[float, str], None]
@@ -51,8 +54,8 @@ def sequences_dir() -> str:
 
 
 def sanitize_name(name: str) -> str:
-    """Make a file name safe for FPP: [A-Za-z0-9._-] only, prefixed with ``fk_``."""
-    cleaned = _MULTI_UNDERSCORE.sub("_", _BAD_CHARS.sub("_", name))
+    """Make a file name safe for FPP: [A-Za-z0-9._-] only, no "..", prefixed with ``fk_``."""
+    cleaned = _MULTI_DOT.sub(".", _MULTI_UNDERSCORE.sub("_", _BAD_CHARS.sub("_", name)))
     stem, ext = os.path.splitext(cleaned)
     core = stem[len(NAME_PREFIX) :] if stem.startswith(NAME_PREFIX) else stem
     if _ALNUM.search(core) is None:
@@ -78,33 +81,40 @@ def media_entry(media_name: str, sequence_name: str | None = None) -> dict[str, 
 
 
 def probe_fpp(host: str) -> dict[str, Any]:
-    """Check that FPP answers and is new enough. Never raises."""
+    """Check that FPP answers and is new enough. Never raises.
+
+    ``problems`` holds one sentence that says what went wrong and what to do;
+    ``reason`` is the short cause from :class:`FppError` (null when all is well).
+    """
     result: dict[str, Any] = {
         "reachable": False,
         "version": None,
         "major": None,
         "ok": False,
         "problems": [],
+        "reason": None,
     }
     client: FppClient | None = None
     try:
         client = FppClient(host)
         version = client.version()
     except FkError as exc:
-        if exc.code == "FPP_BAD_RESPONSE":
+        result["reason"] = getattr(exc, "reason", None)
+        if exc.code == FPP_UNREACHABLE:
+            result["problems"] = [exc.message]
+        elif exc.code == FPP_AUTH_REQUIRED or getattr(exc, "reason", "") == "not_fpp":
+            result["reachable"] = True
+            result["problems"] = [exc.message]
+        else:
             result["reachable"] = True
             result["problems"] = [f"FPP at {host} gave an unexpected answer: {exc.message}"]
-        else:
-            result["problems"] = [
-                f"Could not reach FPP at {host}. "
-                "Check the address and that the Pi is on the same network."
-            ]
         return result
     finally:
         if client is not None:
             client.close()
     result.update(reachable=True, version=version.version, major=version.major)
     if version.major < MIN_FPP_MAJOR:
+        result["reason"] = "too_old"
         result["problems"] = [
             f"FPP {version.version} is too old. Update FPP to version {MIN_FPP_MAJOR} or newer."
         ]
@@ -144,6 +154,8 @@ def publish_render(
                 "FPP_TOO_OLD",
                 f"FPP {version.version} found. FacadeKit needs FPP {MIN_FPP_MAJOR} or newer.",
             )
+        # An unknown directory would only fail at the first chunk; say so before uploading.
+        client.list_files(target_dir)
         _report(progress, _P_VERSION, 1.0, "Checking FPP")
 
         _report(progress, _P_UPLOAD, 0.0, "Uploading")
