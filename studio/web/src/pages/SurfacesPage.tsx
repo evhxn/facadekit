@@ -18,6 +18,7 @@ import MaskEditor from "./surfaces/MaskEditor";
 import MeshEditor from "./surfaces/MeshEditor";
 import { gridPolylines } from "./surfaces/meshMath";
 import SurfaceList from "./surfaces/SurfaceList";
+import VerifyPanel from "./surfaces/VerifyPanel";
 import { estimateAspect, flipHorizontal, rotateCorners, type Quad } from "./surfaces/geometry";
 import styles from "./SurfacesPage.module.css";
 
@@ -36,6 +37,10 @@ export default function SurfacesPage() {
   const [remoteOpen, setRemoteOpen] = useState(false);
   const [testPattern, setTestPattern] = useState(true);
   const [manualCalib, setManualCalib] = useState(false);
+  const [projConnected, setProjConnected] = useState(false);
+  // Magic select -> check the new surface on the house right away (docs/13).
+  const [autoCheck, setAutoCheck] = useState(true);
+  const [autoVerifyId, setAutoVerifyId] = useState<string | null>(null);
   const calibId = project?.calibration_id ?? null;
   const projId = project?.id ?? "";
 
@@ -67,7 +72,10 @@ export default function SurfacesPage() {
     let cancelled = false;
     projectorStatus()
       .then((s) => {
-        if (!cancelled && s.connected) setOutlines(true);
+        if (!cancelled && s.connected) {
+          setOutlines(true);
+          setProjConnected(true);
+        }
       })
       .catch(() => {});
     return () => {
@@ -81,6 +89,7 @@ export default function SurfacesPage() {
     running: false,
     again: false,
     dead: false,
+    verifying: false, // a surface check holds the projector: do not draw outlines over it
   });
   const latest = useRef({
     projectId: "",
@@ -97,6 +106,7 @@ export default function SurfacesPage() {
 
   const runSync = useCallback(async () => {
     const st = sync.current;
+    if (st.verifying) return;
     if (st.running) {
       st.again = true;
       return;
@@ -218,6 +228,7 @@ export default function SurfacesPage() {
 
   const createMagic = (quad: Quad, mask: Mask | null) => {
     const id = newId("srf");
+    if (autoCheck && projConnected && !manualCalib) setAutoVerifyId(id);
     update((d) => {
       d.surfaces.push({
         id,
@@ -272,6 +283,14 @@ export default function SurfacesPage() {
                 }}
               />{" "}
               Show outlines on projector
+            </label>
+            <label className={styles.toggle}>
+              <input
+                type="checkbox"
+                checked={autoCheck}
+                onChange={(e) => setAutoCheck(e.target.checked)}
+              />{" "}
+              Check on the house after Magic select
             </label>
             <button type="button" onClick={() => setRemoteOpen(true)}>
               Use phone as remote
@@ -357,6 +376,29 @@ export default function SurfacesPage() {
               onFeather={(f) => patch(selected.id, (s) => (s.feather_px = f))}
               onFlip={() => patch(selected.id, (s) => (s.quad = flipHorizontal(s.quad)))}
               onRotate={() => patch(selected.id, (s) => (s.quad = rotateCorners(s.quad)))}
+            />
+          )}
+          {selected && (
+            <VerifyPanel
+              key={`verify-${selected.id}`}
+              projectId={project.id}
+              surface={selected}
+              {...(manualCalib
+                ? { disabledReason: "Checking needs a camera scan (not available in manual mode)." }
+                : {})}
+              autoStart={autoVerifyId === selected.id}
+              onAutoStarted={() => setAutoVerifyId(null)}
+              prepare={() => useProjectStore.getState().saveNow()}
+              onApply={(quad, mask) =>
+                patch(selected.id, (s) => {
+                  s.quad = quad;
+                  if (mask && s.mask) s.mask = mask;
+                })
+              }
+              onBusy={(busy) => {
+                sync.current.verifying = busy;
+                if (!busy && outlines) void runSync();
+              }}
             />
           )}
           {selected && (

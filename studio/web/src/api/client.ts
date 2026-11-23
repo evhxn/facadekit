@@ -16,6 +16,7 @@ import type {
   ProjectSummary,
   RenderInfo,
   Asset,
+  VerificationRecord,
 } from "./types";
 
 const BASE = "/api/v1";
@@ -337,6 +338,16 @@ export const publish = (
     sequence_name?: string;
   },
 ) => request<{ job_id: string }>("POST", `/projects/${enc(pid)}/publish`, body);
+
+/** Verify surface: rig check, and with surface_id that surface too (docs/13). Job result
+ * {verification: VerificationRecord}. */
+export const startVerify = (pid: string, surfaceId: string | null) =>
+  request<{ job_id: string }>("POST", `/projects/${enc(pid)}/verify`, { surface_id: surfaceId });
+/** The latest saved check of a surface (`rig` for a rig-only check); 404 when there is none. */
+export const getVerification = (pid: string, rid: string) =>
+  request<VerificationRecord>("GET", `/projects/${enc(pid)}/verifications/${enc(rid)}`);
+export const verificationOverlayUrl = (pid: string, rid: string, version: string) =>
+  `${BASE}/projects/${enc(pid)}/verifications/${enc(rid)}/overlay.jpg?v=${enc(version)}`;
 
 export const getJob = (id: string) => request<Job>("GET", `/jobs/${enc(id)}`);
 export const cancelJob = (id: string) => request<Job>("POST", `/jobs/${enc(id)}/cancel`);
