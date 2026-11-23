@@ -150,6 +150,77 @@ export interface Calibration {
   /** Scan strategy picked by scan memory; null or missing when the caller fixed the settings. */
   strategy?: string | null;
 }
+/** Verify surface (docs/13-surface-verification.md). Distances in projector px. */
+export type RigVerdict =
+  | "stable"
+  | "camera_moved"
+  | "projector_moved"
+  | "both_moved"
+  | "moved"
+  | "unknown";
+export interface RigCheck {
+  verdict: RigVerdict;
+  camera: "stable" | "moved" | "unknown";
+  projector: "stable" | "moved" | "unknown";
+  camera_shift_px: number | null;
+  projector_shift_px: number | null;
+  total_shift_px: number | null;
+  confidence: number;
+  dots_expected: number;
+  dots_found: number;
+  texture_matches: number;
+  texture_method: string | null;
+  drift: number[][] | null;
+  message: string;
+  recommendation: string;
+}
+export interface EdgeReport {
+  side: "top" | "right" | "bottom" | "left";
+  /** + light past the object's edge, - light stops short of it. */
+  spill_px: number | null;
+  drift_px: number | null;
+  lit_px: number | null;
+  spill_range_px: number[] | null;
+  samples: number;
+  advice: string;
+}
+export type SurfaceVerdict = "pass" | "warn" | "fail";
+export interface SurfaceCheck {
+  surface_id: string;
+  verdict: SurfaceVerdict;
+  iou_intended: number | null;
+  iou_object: number | null;
+  leakage: number | null;
+  uncovered: number | null;
+  max_edge_px: number | null;
+  object_confidence: number;
+  parallax_px: number | null;
+  inner_residual_px: number | null;
+  flatness_warning: boolean;
+  outline_measured: number;
+  edges: EdgeReport[];
+  suggested_quad: Pt[] | null;
+  suggested_mask: Mask | null;
+  suggestion_note: string;
+  message: string;
+}
+export interface VerificationRecord {
+  id: string;
+  created_at: string;
+  calibration_id: string;
+  camera_id: string;
+  surface_id: string | null;
+  surface_quad: Pt[] | null;
+  surface_mask: Mask | null;
+  level: number;
+  exposure_locked: boolean;
+  shots: number;
+  duration_s: number;
+  rig: RigCheck;
+  surface: SurfaceCheck | null;
+  overlay: boolean;
+  injected: Record<string, number> | null;
+}
 export type JobState = "queued" | "running" | "succeeded" | "failed" | "cancelled";
 /** POST /projects/{pid}/phone-scans */
 export interface PhoneScanStart {

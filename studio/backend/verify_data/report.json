@@ -1,0 +1,448 @@
+{
+  "scenes": 60,
+  "runs": 1530,
+  "errors": 0,
+  "thresholds": {
+    "proj": 1.35,
+    "cam": 0.7,
+    "pass": 2.8
+  },
+  "held-out scenes": {
+    "rig": {
+      "projector 0 (none)": [
+        0,
+        280
+      ],
+      "projector 1e-06\u20130.75": [
+        0,
+        14
+      ],
+      "projector 0.75\u20131.5": [
+        22,
+        22
+      ],
+      "projector 1.5\u20133": [
+        20,
+        20
+      ],
+      "projector 3\u20136": [
+        14,
+        14
+      ],
+      "projector >= 6": [
+        14,
+        14
+      ],
+      "camera 0 (none)": [
+        0,
+        280
+      ],
+      "camera 1e-06\u20130.75": [
+        0,
+        14
+      ],
+      "camera 0.75\u20131.5": [
+        22,
+        22
+      ],
+      "camera 1.5\u20133": [
+        20,
+        20
+      ],
+      "camera 3\u20136": [
+        14,
+        14
+      ],
+      "camera >= 6": [
+        14,
+        14
+      ],
+      "confusion": {
+        "stable": {
+          "stable": 280,
+          "camera_moved": 0,
+          "projector_moved": 0,
+          "both_moved": 0,
+          "moved": 0,
+          "unknown": 0
+        },
+        "camera": {
+          "stable": 0,
+          "camera_moved": 65,
+          "projector_moved": 0,
+          "both_moved": 2,
+          "moved": 0,
+          "unknown": 0
+        },
+        "projector": {
+          "stable": 0,
+          "camera_moved": 0,
+          "projector_moved": 56,
+          "both_moved": 0,
+          "moved": 0,
+          "unknown": 0
+        },
+        "both": {
+          "stable": 0,
+          "camera_moved": 0,
+          "projector_moved": 0,
+          "both_moved": 25,
+          "moved": 3,
+          "unknown": 0
+        }
+      },
+      "proj_err": [
+        0.11026374220121515,
+        0.5161233184871951,
+        95
+      ],
+      "cam_err": [
+        0.024088435831431054,
+        0.10365832858624939,
+        95
+      ],
+      "texture_unknown": [
+        7,
+        476
+      ]
+    },
+    "surface": {
+      "edge_error all": [
+        0.5299999999999842,
+        2.48842221768679,
+        3.16890939976525,
+        1764,
+        1861
+      ],
+      "edge_error flat door": [
+        0.39000000000001006,
+        0.7808184808753111,
+        0.8850428553151583,
+        1184,
+        1210
+      ],
+      "edge_error door standing out (parallax)": [
+        1.8441760743963131,
+        3.4009999999999896,
+        3.581278669831981,
+        580,
+        651
+      ],
+      "edge_error textured door": [
+        0.5600000000001351,
+        2.7554687604311128,
+        3.224160182768201,
+        653,
+        664
+      ],
+      "edge_error plain wall (no brick)": [
+        1.8300000000000356,
+        2.3980000000000974,
+        2.4578962902491805,
+        133,
+        136
+      ],
+      "edge_error rig stable": [
+        0.537516199250857,
+        2.4500000000000535,
+        3.180000000000076,
+        1021,
+        1085
+      ],
+      "edge_error projector moved": [
+        0.5251611761093904,
+        2.5077770657589213,
+        3.113462142896761,
+        418,
+        440
+      ],
+      "edge_error camera moved": [
+        0.5208652716789387,
+        2.587575449184486,
+        3.11570777927861,
+        430,
+        444
+      ],
+      "edge_error auto-exposure camera": [
+        0.48999999999995314,
+        2.5260000000000367,
+        3.253499999999919,
+        98,
+        106
+      ],
+      "edge_error dim (ambient 0.35)": [
+        0.5249999999999231,
+        2.6949999999999794,
+        3.292499999999974,
+        46,
+        50
+      ],
+      "edge_error bright (gain 1.6)": [
+        0.5500000000000398,
+        2.4040000000002157,
+        3.0659999999999923,
+        53,
+        56
+      ],
+      "verdict_confusion": {
+        "pass": {
+          "pass": 103,
+          "warn": 155,
+          "fail": 0
+        },
+        "warn": {
+          "pass": 0,
+          "warn": 92,
+          "fail": 24
+        },
+        "fail": {
+          "pass": 0,
+          "warn": 6,
+          "fail": 96
+        }
+      },
+      "suggestion": {
+        "offered": 91,
+        "needed": 218,
+        "after_median": 0.9609075777068773,
+        "after_p90": 1.314549706065354,
+        "worse": 0
+      }
+    }
+  },
+  "train scenes": {
+    "rig": {
+      "projector 0 (none)": [
+        0,
+        620
+      ],
+      "projector 1e-06\u20130.75": [
+        0,
+        31
+      ],
+      "projector 0.75\u20131.5": [
+        53,
+        54
+      ],
+      "projector 1.5\u20133": [
+        39,
+        39
+      ],
+      "projector 3\u20136": [
+        31,
+        31
+      ],
+      "projector >= 6": [
+        31,
+        31
+      ],
+      "camera 0 (none)": [
+        0,
+        620
+      ],
+      "camera 1e-06\u20130.75": [
+        0,
+        31
+      ],
+      "camera 0.75\u20131.5": [
+        47,
+        47
+      ],
+      "camera 1.5\u20133": [
+        46,
+        46
+      ],
+      "camera 3\u20136": [
+        31,
+        31
+      ],
+      "camera >= 6": [
+        31,
+        31
+      ],
+      "confusion": {
+        "stable": {
+          "stable": 620,
+          "camera_moved": 0,
+          "projector_moved": 0,
+          "both_moved": 0,
+          "moved": 0,
+          "unknown": 0
+        },
+        "camera": {
+          "stable": 0,
+          "camera_moved": 129,
+          "projector_moved": 0,
+          "both_moved": 7,
+          "moved": 0,
+          "unknown": 0
+        },
+        "projector": {
+          "stable": 0,
+          "camera_moved": 0,
+          "projector_moved": 123,
+          "both_moved": 0,
+          "moved": 1,
+          "unknown": 0
+        },
+        "both": {
+          "stable": 0,
+          "camera_moved": 0,
+          "projector_moved": 0,
+          "both_moved": 59,
+          "moved": 3,
+          "unknown": 0
+        }
+      },
+      "proj_err": [
+        0.08148433498377727,
+        0.44162878422840457,
+        213
+      ],
+      "cam_err": [
+        0.02100416281447015,
+        0.11033290294653877,
+        214
+      ],
+      "texture_unknown": [
+        5,
+        1054
+      ]
+    },
+    "surface": {
+      "edge_error all": [
+        0.36999999999990807,
+        0.9382389620874483,
+        1.856928883721905,
+        4084,
+        4145
+      ],
+      "edge_error flat door": [
+        0.33262596554330237,
+        0.7900000000000847,
+        0.9199999999999396,
+        3725,
+        3769
+      ],
+      "edge_error door standing out (parallax)": [
+        1.8839286869635008,
+        4.612000000000093,
+        4.8902389695105235,
+        359,
+        376
+      ],
+      "edge_error textured door": [
+        0.41000000000008663,
+        2.046671079927062,
+        2.9499999999998243,
+        1696,
+        1735
+      ],
+      "edge_error plain wall (no brick)": [
+        0.2399999999999511,
+        0.6505930334404564,
+        0.7710000000002013,
+        679,
+        679
+      ],
+      "edge_error rig stable": [
+        0.36000000000002635,
+        0.9338492807555614,
+        2.039999999999784,
+        2400,
+        2437
+      ],
+      "edge_error projector moved": [
+        0.35718493901480636,
+        0.954537648699884,
+        1.5132205203839677,
+        964,
+        982
+      ],
+      "edge_error camera moved": [
+        0.3800000000000482,
+        0.9119999999999806,
+        1.5429999999999426,
+        959,
+        971
+      ],
+      "edge_error auto-exposure camera": [
+        0.3600000000000009,
+        0.8700000000000434,
+        1.316000000000058,
+        237,
+        241
+      ],
+      "edge_error dim (ambient 0.35)": [
+        0.39999999999990865,
+        0.8129999999999494,
+        1.5894999999999544,
+        118,
+        120
+      ],
+      "edge_error bright (gain 1.6)": [
+        0.34999999999997966,
+        0.8690000000001383,
+        1.6250000000000473,
+        122,
+        124
+      ],
+      "verdict_confusion": {
+        "pass": {
+          "pass": 405,
+          "warn": 178,
+          "fail": 3
+        },
+        "warn": {
+          "pass": 0,
+          "warn": 224,
+          "fail": 25
+        },
+        "fail": {
+          "pass": 0,
+          "warn": 3,
+          "fail": 216
+        }
+      },
+      "suggestion": {
+        "offered": 380,
+        "needed": 468,
+        "after_median": 0.8989327982225868,
+        "after_p90": 1.4924614453948455,
+        "worse": 1
+      }
+    }
+  },
+  "ml": {
+    "projector moved": {
+      "rule": 0.9956709956709957,
+      "ml": 0.9913419913419913,
+      "diff": -0.004329004329004329,
+      "ci": [
+        -0.015151515151515152,
+        0.008658008658008658
+      ],
+      "n": 462
+    },
+    "surface needs fixing (rule: verdict is not pass)": {
+      "rule": 0.6743697478991597,
+      "ml": 0.9516806722689075,
+      "diff": 0.2773109243697479,
+      "ci": [
+        0.15961134453781511,
+        0.39705882352941174
+      ],
+      "n": 476
+    },
+    "surface needs fixing (rule: worst edge > PASS_EDGE_PX)": {
+      "rule": 0.8340336134453782,
+      "ml": 0.9516806722689075,
+      "diff": 0.11764705882352941,
+      "ci": [
+        0.04411764705882353,
+        0.20168067226890757
+      ],
+      "n": 476
+    }
+  }
+}

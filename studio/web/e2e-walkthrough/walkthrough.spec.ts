@@ -85,6 +85,12 @@ test("from no project to a finished scan", async ({ page }, info) => {
   await expect(page.getByRole("heading", { name: "Surfaces (1)" })).toBeVisible();
   await page.waitForLoadState("networkidle");
   await shot(page, who, "09-surfaces");
+  // Check the surface on the (simulated) house: camera and projector still, light on target.
+  await page.getByRole("button", { name: "Check on the house" }).click();
+  await expect(
+    page.getByRole("status").filter({ hasText: /On target|Check it|Off target/ }),
+  ).toBeVisible({ timeout: 60000 });
+  await shot(page, who, "09b-surfaces-checked");
 
   await page.getByRole("link", { name: "Arrange →" }).click();
   await expect(page).toHaveURL(/\/arrange$/);

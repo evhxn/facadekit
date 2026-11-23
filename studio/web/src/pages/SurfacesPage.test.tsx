@@ -6,15 +6,17 @@ import type { Project } from "../api/types";
 import { useProjectStore } from "../state/projectStore";
 import SurfacesPage from "./SurfacesPage";
 
-const { projectorShow, projectorStatus } = vi.hoisted(() => ({
+const { projectorShow, projectorStatus, getVerification } = vi.hoisted(() => ({
   projectorShow: vi.fn(),
   projectorStatus: vi.fn(),
+  getVerification: vi.fn(),
 }));
 
 vi.mock("../api/client", async (orig) => ({
   ...(await orig<typeof import("../api/client")>()),
   projectorShow,
   projectorStatus,
+  getVerification,
 }));
 
 import { ApiError } from "../api/client";
@@ -91,6 +93,7 @@ describe("SurfacesPage", () => {
     vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
     projectorShow.mockReset().mockResolvedValue({});
     projectorStatus.mockReset().mockResolvedValue({ connected: false });
+    getVerification.mockReset().mockRejectedValue(new ApiError("NOT_FOUND", "none", 404));
     useProjectStore.setState({
       project: projectWithSurface(),
       dirty: false,
@@ -111,6 +114,37 @@ describe("SurfacesPage", () => {
     expect(quad()[0]).toEqual([101, 100]);
     fireEvent.keyDown(canvas, { key: "ArrowDown", shiftKey: true });
     expect(quad()[0]).toEqual([101, 110]);
+  });
+
+  it("applies the fix suggested by the house check", async () => {
+    const suggested = [
+      [104, 100],
+      [300, 100],
+      [300, 200],
+      [104, 200],
+    ];
+    getVerification.mockResolvedValue({
+      id: "vrf_1",
+      surface_quad: quad(),
+      surface_mask: null,
+      overlay: false,
+      rig: { verdict: "stable", message: "", recommendation: "" },
+      surface: {
+        verdict: "fail",
+        message: "The light misses the object by up to 4 px (left edge).",
+        edges: [{ side: "left", advice: "Left edge spills 4 px past the object: pull it in." }],
+        leakage: 0.02,
+        uncovered: 0,
+        max_edge_px: 4,
+        suggested_quad: suggested,
+        suggested_mask: null,
+        suggestion_note: "",
+      },
+    });
+    renderPage();
+    fireEvent.click(await screen.findByText("Door"));
+    fireEvent.click(await screen.findByRole("button", { name: "Apply suggested fix" }));
+    expect(quad()).toEqual(suggested);
   });
 
   it("flips horizontally", async () => {

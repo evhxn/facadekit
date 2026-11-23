@@ -17,7 +17,9 @@ from facadekit.ids import slugify
 
 DEFAULT_PORT = 8137
 
-COMMANDS = ["serve", "new", "calibrate", "render", "publish", "doctor", "sim", "phone-scan"]
+COMMANDS = [
+    "serve", "new", "calibrate", "render", "publish", "doctor", "sim", "phone-scan", "verify",
+]  # fmt: skip
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -64,6 +66,15 @@ def build_parser() -> argparse.ArgumentParser:
             sim_sub = sp.add_subparsers(dest="sim_command", required=True)
             e2e = sim_sub.add_parser("e2e")
             e2e.add_argument("--workdir", default=None)
+        elif name == "verify":
+            sp.add_argument("project_dir", help="a .fkproj folder (its name is the project id)")
+            sp.add_argument("--surface", default=None, help="surface id; none = rig only")
+            sp.add_argument("--sim", action="store_true", help="use the simulator in-process")
+            sp.add_argument("--server", default=None, help="running FacadeKit (default local)")
+            sp.add_argument("--self-test", action="store_true")
+            sp.add_argument("--bundle", default=None, metavar="ZIP")
+            sp.add_argument("--apply", action="store_true", help="apply the suggested outline")
+            sp.add_argument("--json", action="store_true")
         elif name == "phone-scan":
             phone_sub = sp.add_subparsers(dest="phone_command", required=True)
             analyse = phone_sub.add_parser("analyse")
@@ -353,6 +364,7 @@ def _cmd_sim(args: argparse.Namespace) -> int:
     result = run_e2e(workdir, log=lambda m: print(m, file=sys.stderr))
     print(f"max corner error: {result.max_corner_error_px:.2f} px")
     print(f"coverage: {result.coverage * 100:.0f} %")
+    print(f"verify: rig {result.verify_rig}, surface {result.verify_surface}")
     print(result.render_path)
     if result.max_corner_error_px >= MAX_CORNER_ERROR_PX:
         raise FkError(INTERNAL, f"corner error {result.max_corner_error_px:.2f} px is too large")
@@ -400,6 +412,21 @@ def _cmd_phone_scan(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_verify(args: argparse.Namespace) -> int:
+    from facadekit.verify_cli import DEFAULT_SERVER, run_cli
+
+    return run_cli(
+        args.project_dir,
+        sim=args.sim,
+        server=args.server or DEFAULT_SERVER,
+        surface=args.surface,
+        self_test=args.self_test,
+        bundle=args.bundle,
+        apply=args.apply,
+        as_json=args.json,
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args, _ = parser.parse_known_args(argv)
@@ -417,5 +444,6 @@ def main(argv: list[str] | None = None) -> int:
         "doctor": _cmd_doctor,
         "sim": _cmd_sim,
         "phone-scan": _cmd_phone_scan,
+        "verify": _cmd_verify,
     }
     return _run(lambda: handlers[args.command](args))

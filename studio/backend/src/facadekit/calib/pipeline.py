@@ -36,7 +36,7 @@ from facadekit.devices.base import Camera, ProjectorDisplay
 from facadekit.devices.cropped import CroppedCamera
 from facadekit.errors import FkError
 from facadekit.ids import new_id
-from facadekit.models.calibration import CalibQuality, Calibration, CalibSettings
+from facadekit.models.calibration import CalibQuality, Calibration, CalibSettings, CameraRoi
 from facadekit.models.jobs import utc_now_iso
 from facadekit.models.project import ProjectorSpec
 
@@ -209,6 +209,28 @@ def _contrast_stats(capture: CaptureSet, crop_check: bool = False) -> dict[str, 
     return stats
 
 
+def _reference_pictures(
+    capture: CaptureSet, roi: CameraRoi | None, camera_w: int, camera_h: int
+) -> dict[str, np.ndarray]:
+    """The camera's own black and white pictures, full frame, for "Verify surface" (it
+    compares the wall's texture now with these to tell a camera move from a projector move).
+    Left out for a binned crop (phone videos), whose pixels are not the camera's."""
+    if roi is not None and roi.bin != 1:
+        return {}
+    out: dict[str, np.ndarray] = {}
+    for name, kind in (("cam_black.png", "black"), ("cam_white.png", "white")):
+        idx = next((i for i, f in enumerate(capture.frames) if f.kind == kind), None)
+        if idx is None:
+            return {}
+        img = np.clip(np.rint(capture.images[idx]), 0, 255).astype(np.uint8)
+        if roi is not None:
+            full = np.zeros((camera_h, camera_w), np.uint8)
+            full[roi.y : roi.y + img.shape[0], roi.x : roi.x + img.shape[1]] = img
+            img = full
+        out[name] = img
+    return out
+
+
 def _white_gray(capture: CaptureSet) -> np.ndarray:
     for i, frame in enumerate(capture.frames):
         if frame.kind == "white":
@@ -337,16 +359,14 @@ def _decode_capture(
         strategy=strategy,
     )
     report(0.97, "Saving")
-    _commit(
-        project_dir,
-        cal,
-        {
-            "proj_view.png": proj_view,
-            "p2c.npy": maps.p2c.astype(np.float32),
-            "measured_mask.png": maps.measured.astype(np.uint8) * 255,
-            "reasons.png": reasons * np.uint8(PNG_STEP),
-        },
-    )
+    files: dict[str, np.ndarray] = {
+        "proj_view.png": proj_view,
+        "p2c.npy": maps.p2c.astype(np.float32),
+        "measured_mask.png": maps.measured.astype(np.uint8) * 255,
+        "reasons.png": reasons * np.uint8(PNG_STEP),
+    }
+    files.update(_reference_pictures(capture, roi, camera_w, camera_h))
+    _commit(project_dir, cal, files)
     report(1.0, "Saving")
     return cal
 

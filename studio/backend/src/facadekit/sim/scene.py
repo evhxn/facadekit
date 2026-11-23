@@ -50,6 +50,13 @@ class SimScene:
     blur_sigma: float = 1.0
     noise_sigma: float = 2.0
     seed: int = 0
+    # Verification scenes (docs/13). Defaults leave every earlier scene unchanged.
+    mortar: bool = True  # False: a plain wall with no brick pattern (little texture)
+    feature_texture: float = 0.0  # 0..1: seeded blotchy pattern painted on the features
+    # Features that stand out from the wall: name -> (dx, dy) world px. The projector sees
+    # such a feature shifted by (dx, dy) against where the camera sees it (parallax); the
+    # wall behind it is in its shadow.
+    raised: dict[str, tuple[float, float]] = field(default_factory=dict)
     _albedo_f32: np.ndarray | None = field(default=None, init=False, repr=False, compare=False)
     _albedo_u8: np.ndarray | None = field(default=None, init=False, repr=False, compare=False)
 
@@ -86,12 +93,13 @@ class SimScene:
         img = np.empty((wh, ww, 3), dtype=np.uint8)
         img[:] = (60, 70, 150)
         mortar = (120, 120, 120)
-        for y in range(0, wh, 24):
-            img[y : y + 2, :] = mortar
-        for row, y in enumerate(range(0, wh, 24)):
-            offset = 30 if row % 2 else 0
-            for x in range(offset, ww, 60):
-                img[y : y + 24, x : x + 2] = mortar
+        if self.mortar:
+            for y in range(0, wh, 24):
+                img[y : y + 2, :] = mortar
+            for row, y in enumerate(range(0, wh, 24)):
+                offset = 30 if row % 2 else 0
+                for x in range(offset, ww, 60):
+                    img[y : y + 24, x : x + 2] = mortar
         for name, (x0, y0, x1, y1) in self.features_world.items():
             ix0, iy0, ix1, iy1 = (int(round(v)) for v in (x0, y0, x1, y1))
             # The 6 px dark frame sits just outside the feature rectangle, so the light fill
@@ -99,10 +107,19 @@ class SimScene:
             img[max(iy0 - 6, 0) : iy1 + 6, max(ix0 - 6, 0) : ix1 + 6] = (30, 30, 30)
             fill = (200, 200, 200) if name == "garage_door" else (90, 60, 40)
             img[iy0:iy1, ix0:ix1] = fill
+            if self.feature_texture > 0 and iy1 > iy0 and ix1 > ix0:
+                rng = np.random.default_rng(self.seed * 7919 + len(name))
+                small = rng.uniform(-1, 1, (max((iy1 - iy0) // 12, 2), max((ix1 - ix0) // 12, 2)))
+                blot = cv2.resize(small.astype(np.float32), (ix1 - ix0, iy1 - iy0))
+                amp = 70.0 * self.feature_texture
+                patch = img[iy0:iy1, ix0:ix1].astype(np.float32) + amp * blot[:, :, None]
+                img[iy0:iy1, ix0:ix1] = np.clip(patch, 0, 255).astype(np.uint8)
         return img
 
     def feature_quad_proj(self, name: str) -> list[Point]:
         x0, y0, x1, y1 = self.features_world[name]
+        dx, dy = self.raised.get(name, (0.0, 0.0))
+        x0, x1, y0, y1 = x0 + dx, x1 + dx, y0 + dy, y1 + dy  # where the projector meets it
         pts = np.array([[(x0, y0), (x1, y0), (x1, y1), (x0, y1)]], dtype=np.float64)
         out = cv2.perspectiveTransform(pts, np.linalg.inv(self.h_p2w))[0]
         return [(float(p[0]), float(p[1])) for p in out]
@@ -122,6 +139,8 @@ class SimScene:
         for ox0, oy0, ox1, oy1 in self.occluders_world:
             x0, y0 = max(int(round(ox0)), 0), max(int(round(oy0)), 0)
             light[y0 : max(int(round(oy1)), 0), x0 : max(int(round(ox1)), 0)] = 0
+        if self.raised:
+            light = self._raise(light)
         radiance = self._albedo_float() * (self.ambient + self.gain * light)
         cam = cv2.warpPerspective(
             radiance.astype(np.float32),
@@ -133,6 +152,27 @@ class SimScene:
             cam = cv2.GaussianBlur(cam, (0, 0), self.blur_sigma)
         noise = rng.normal(0, self.noise_sigma, cam.shape)
         return np.asarray(np.clip(cam * 255 + noise, 0, 255).astype(np.uint8))
+
+    def _raise(self, light: np.ndarray) -> np.ndarray:
+        """Light on raised features: a raised feature at world rect R catches the projector
+        light meant for R + (dx, dy) on the wall; the wall there is in its shadow."""
+        before = light
+        out = light.copy()
+        wh, ww = light.shape[:2]
+        for name, (dx, dy) in self.raised.items():
+            x0, y0, x1, y1 = self.features_world[name]
+            sx0, sy0 = int(round(x0 + dx)), int(round(y0 + dy))
+            sx1, sy1 = int(round(x1 + dx)), int(round(y1 + dy))
+            out[max(sy0, 0) : max(sy1, 0), max(sx0, 0) : max(sx1, 0)] = 0  # shadow on the wall
+        for name, (dx, dy) in self.raised.items():
+            x0, y0, x1, y1 = self.features_world[name]
+            m = np.array([[1, 0, -dx], [0, 1, -dy]], dtype=np.float64)
+            moved = cv2.warpAffine(before, m, (ww, wh), flags=cv2.INTER_LINEAR)
+            if moved.ndim == 2:
+                moved = moved[:, :, None]
+            ix0, iy0, ix1, iy1 = (int(round(v)) for v in (x0, y0, x1, y1))
+            out[max(iy0, 0) : iy1, max(ix0, 0) : ix1] = moved[max(iy0, 0) : iy1, max(ix0, 0) : ix1]
+        return out
 
 
 def default_scene() -> SimScene:
