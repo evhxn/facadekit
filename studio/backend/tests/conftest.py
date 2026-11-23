@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import socket
 import threading
 import time
@@ -121,6 +122,20 @@ def client(tmp_path: Path) -> Iterator[TestClient]:
 
     with TestClient(create_app(data_dir=tmp_path, testing=True)) as test_client:
         yield test_client
+
+
+@pytest.fixture(autouse=True)
+def _isolated_data_dir(
+    monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    """Tests must never read or write the owner's real ~/FacadeKit (projects, models, logs).
+
+    Without this, files installed there (for example Magic select models) change test
+    outcomes. The opt-in real-model tests (FK_TEST_MODELS=1) need the real data folder.
+    """
+    if os.environ.get("FK_TEST_MODELS") == "1":
+        return
+    monkeypatch.setenv("FACADEKIT_DATA", str(tmp_path_factory.mktemp("fk_data")))
 
 
 @pytest.fixture(autouse=True)
