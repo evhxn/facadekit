@@ -246,6 +246,33 @@ def create_fake_fpp(
         target.unlink()
         return _json({"status": "OK", "file": name, "dir": dir_name})
 
+    @app.get("/api/media")
+    async def media_list() -> JSONResponse:
+        names: list[str] = []
+        for media_dir in MEDIA_DIRS:
+            folder = state_dir / media_dir
+            if folder.is_dir():
+                names += [
+                    p.name
+                    for p in folder.iterdir()
+                    if p.is_file() and not p.name.startswith(_PARTIAL_PREFIX)
+                ]
+        return JSONResponse(sorted(names))
+
+    @app.get("/api/openapi.json")
+    async def openapi_doc() -> JSONResponse:
+        # A small excerpt of FPP's www/api/openapi.json (paths carry the /api prefix there).
+        paths = [
+            "/fppd/version", "/fppd/status", "/system/info", "/files/{DirName}",
+            "/file/{DirName}", "/file/{DirName}/{Name}", "/media", "/media/{MediaName}/duration",
+            "/playlist/{PlaylistName}", "/playlist/{PlaylistName}/start", "/playlists",
+            "/playlists/stop",
+        ]  # fmt: skip
+        return JSONResponse(
+            {"openapi": "3.0.3", "info": {"title": "FPP API", "version": version},
+             "paths": {f"/api{p}": {} for p in paths}}
+        )  # fmt: skip
+
     @app.get("/api/media/{name}/duration")
     async def media_duration(name: str) -> Response:
         if _is_safe_name(name) and any(
