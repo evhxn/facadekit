@@ -96,7 +96,8 @@ def test_bundled_registry_points_at_pinned_upstream_files() -> None:
     for name, entry in entries.items():
         assert pinned.match(entry["url"]), name
         assert "evhxn" not in entry["url"]
-        assert entry["sha256"].startswith("TO_BE_FILLED"), name  # filled in after S-6 phase 2
+        # S-6 phase 2: filled in after the downloaded bytes matched the published LFS id
+        assert entry["sha256"] == entry["upstream_sha256"], name
         assert re.fullmatch(r"[0-9a-f]{64}", entry["upstream_sha256"]), name
         assert entry["size_bytes"] > 0
         assert entry["licence"] == "Apache-2.0"
@@ -105,7 +106,7 @@ def test_bundled_registry_points_at_pinned_upstream_files() -> None:
     for info in found.values():
         assert info.adapter in adapters.ADAPTERS
         assert info.roles() == set(adapters.ADAPTERS[info.adapter].roles)
-        assert not info.published
+        assert info.published
     assert found["efficientsam_ti"].download_bytes == 24799761 + 16565728
 
 

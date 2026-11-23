@@ -211,13 +211,20 @@ def test_checksum_mismatch_refuses_and_leaves_nothing(
     assert status["active"] == "grabcut" and status["engines"][0]["installed"] is False
 
 
-def test_placeholder_engine_cannot_be_downloaded(sim_client: TestClient) -> None:
+def test_placeholder_engine_cannot_be_downloaded(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, host: FakeModelHost, sim_client: TestClient
+) -> None:
+    entries = _served_registry(tmp_path, monkeypatch, host)
+    for entry in entries.values():
+        entry["sha256"] = "TO_BE_FILLED_BY_SPIKE_S6"
+    use_registry(tmp_path / "registry.json", entries)
+    total = sum(e["size_bytes"] for e in entries.values())
     resp = sim_client.post(
-        f"{API}/ai/models/efficientsam_ti/download",
-        json={"confirm": True, "expected_bytes": 24799761 + 16565728},
+        f"{API}/ai/models/smart/download", json={"confirm": True, "expected_bytes": total}
     )
     assert resp.status_code == 500
     assert resp.json()["error"]["code"] == "AI_UNAVAILABLE"
+    assert host.requests == []
 
 
 # --- segment route --------------------------------------------------------------------------
