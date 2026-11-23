@@ -5,7 +5,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
 
-JobKind = Literal["calibration", "render", "publish", "analyze"]
+JobKind = Literal["calibration", "render", "publish", "analyze", "download"]
 JobState = Literal["queued", "running", "succeeded", "failed", "cancelled"]
 
 
