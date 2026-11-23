@@ -185,12 +185,18 @@ def sim_samples() -> list[Sample]:
     return out
 
 
-def generate(folder: Path, count: int = 24, seed: int = 0, sim: bool = False) -> list[Path]:
+def generate(
+    folder: Path,
+    count: int = 24,
+    seed: int = 0,
+    sim: bool = False,
+    size: tuple[int, int] = (960, 540),
+) -> list[Path]:
     folder.mkdir(parents=True, exist_ok=True)
     rng = np.random.default_rng(seed)
     samples = []
     for i in range(count):
-        sample = synthetic_sample(rng)
+        sample = synthetic_sample(rng, size)
         sample.name = f"shelf_{i:03d}"
         samples.append(sample)
     if sim:
@@ -345,6 +351,9 @@ def main(argv: list[str] | None = None) -> int:
     gen.add_argument("folder", type=Path)
     gen.add_argument("--count", type=int, default=24)
     gen.add_argument("--seed", type=int, default=0)
+    gen.add_argument(
+        "--size", default="960x540", help="picture size WxH; 1920x1080 is a projector view"
+    )
     gen.add_argument("--sim", action="store_true", help="also add the simulator scene features")
     run = sub.add_parser("run", help="report IoU and clicks per engine")
     run.add_argument("folder", type=Path)
@@ -355,7 +364,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.cmd == "generate":
-        written = generate(args.folder, count=args.count, seed=args.seed, sim=args.sim)
+        w, h = (int(v) for v in args.size.lower().split("x"))
+        written = generate(args.folder, count=args.count, seed=args.seed, sim=args.sim, size=(w, h))
         print(f"Wrote {len(written)} pictures with masks to {args.folder}")
         return 0
 
