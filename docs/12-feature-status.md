@@ -30,6 +30,7 @@ tests. It does not mean it was tried on hardware: only the owner's first hardwar
 | Masks with holes, feathering | Real | |
 | Mesh editor (bend a surface) | Real | Covered by the parity test |
 | Magic select | **GrabCut only** | MobileSAM is wired up but its model files were never published: the registry checksums still read `TO_BE_FILLED_BY_SPIKE_S6`, so it never loads |
+| Verify surface (rig moved? light on the object?) | Real, simulator only | `docs/13`. Never run on a camera, projector or house; `facadekit verify --self-test` is the procedure for the first hardware run |
 | Surfaces on non-flat objects (3D) | Missing | Only flat four-corner surfaces plus the mesh bend |
 
 ## Arrange

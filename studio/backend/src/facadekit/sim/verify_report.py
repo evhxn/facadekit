@@ -94,6 +94,8 @@ def rig_tables(rows: list[Row]) -> tuple[str, dict[str, Any]]:
     # which device: truth class against the verdict, moves of at least 1 px only
     def truth_class(r: Row) -> str | None:
         c, p = r["truth"]["cam_shift"], r["truth"]["proj_shift"]
+        c = 0.0 if c < 1e-6 else c
+        p = 0.0 if p < 1e-6 else p
         if (0 < c < 1.0) or (0 < p < 1.0):
             return None
         return {
