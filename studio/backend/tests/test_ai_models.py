@@ -230,19 +230,25 @@ def test_bundled_registry_lists_mobilesam_models(monkeypatch: pytest.MonkeyPatch
     entries = registry()
 
     assert {"mobilesam_encoder", "mobilesam_decoder"} <= set(entries)
+    # Spike S-6 phase 2: the checksums of the files the owner approved, verified on download.
+    assert entries["mobilesam_encoder"]["sha256"] == (
+        "580f5fb648ea1062c0aabc26217aed56921985f03f0cbbd852bba81d760cc749"
+    )
+    assert entries["mobilesam_decoder"]["sha256"] == (
+        "8976b90a87ba50a6a72217a5ff994f7d25ce16f2229fcc1ed259e1294c622ffe"
+    )
     for name in ("mobilesam_encoder", "mobilesam_decoder"):
-        assert entries[name]["sha256"].startswith("TO_BE_FILLED")
         # Spike S-6: the upstream file at a pinned revision, never a FacadeKit release.
         assert str(entries[name]["url"]).startswith(
             "https://huggingface.co/Acly/MobileSAM/resolve/0d3b403339b4674a82493d5e97964dd78089ddc8/"
         )
 
 
-def test_bundled_models_are_not_published(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_bundled_models_are_published(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("FACADEKIT_MODEL_REGISTRY", raising=False)
 
-    assert models.is_published("mobilesam_encoder") is False
-    assert models.is_published("mobilesam_decoder") is False
+    assert models.is_published("mobilesam_encoder") is True
+    assert models.is_published("mobilesam_decoder") is True
     assert models.is_published("no_such_model") is False
 
 
@@ -272,6 +278,20 @@ def _fake_modules(monkeypatch: pytest.MonkeyPatch, *, onnxruntime: bool, librosa
 
 
 def test_capabilities_with_placeholder_registry_is_grabcut_only(
+    client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, source: Path
+) -> None:
+    placeholder = _entry(source.as_uri(), "TO_BE_FILLED_BY_SPIKE_S6")
+    _use_registry(
+        tmp_path, monkeypatch, {"mobilesam_encoder": placeholder, "mobilesam_decoder": placeholder}
+    )
+    _fake_modules(monkeypatch, onnxruntime=True, librosa=True)
+
+    body = client.get(f"{API}/ai/capabilities").json()
+
+    assert body == {"segment_engines": ["grabcut"], "beats": True}
+
+
+def test_capabilities_with_bundled_registry_lists_every_model(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.delenv("FACADEKIT_MODEL_REGISTRY", raising=False)
@@ -279,7 +299,10 @@ def test_capabilities_with_placeholder_registry_is_grabcut_only(
 
     body = client.get(f"{API}/ai/capabilities").json()
 
-    assert body == {"segment_engines": ["grabcut"], "beats": True}
+    assert body == {
+        "segment_engines": ["sam2_1_tiny", "efficientsam_ti", "mobilesam", "grabcut"],
+        "beats": True,
+    }
 
 
 def test_capabilities_lists_mobilesam_when_published_and_onnxruntime_present(

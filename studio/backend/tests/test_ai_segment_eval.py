@@ -112,3 +112,10 @@ def test_cli_generate(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> Non
     assert main(["generate", str(tmp_path), "--count", "1"]) == 0
     assert "Wrote 1 pictures" in capsys.readouterr().out
     assert segment_eval.load_set(tmp_path)
+
+
+def test_cli_generate_projector_size(tmp_path: Path) -> None:
+    assert main(["generate", str(tmp_path), "--count", "1", "--size", "1920x1080"]) == 0
+    (sample,) = load_set(tmp_path)
+    assert sample.image.shape == (1080, 1920, 3)
+    assert sample.mask.mean() < 0.003  # a small object in a projector-size picture

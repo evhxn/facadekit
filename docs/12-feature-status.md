@@ -29,7 +29,7 @@ tests. It does not mean it was tried on hardware: only the owner's first hardwar
 | Add surface, rectangle, drag corners | Real | |
 | Masks with holes, feathering | Real | |
 | Mesh editor (bend a surface) | Real | Covered by the parity test |
-| Magic select | **GrabCut until a model is approved** | Spike S-6 phase 1 (`docs/16`): SAM 2.1 tiny, EfficientSAM-Ti and MobileSAM are wired through registry entries and adapters, tested only with stub models. The registry points at the upstream files at pinned commits; checksums stay `TO_BE_FILLED_BY_SPIKE_S6` until the owner approves the downloads. The toolbar says "Simple selector (GrabCut)". Box prompts ("Add rectangle") and small-object clean-up work with GrabCut now |
+| Magic select | **Real, smart model optional** | Spike S-6 (`docs/16`). Default model SAM 2.1 tiny, with EfficientSAM-Ti and MobileSAM also available. Each is downloaded only after the user confirms "Download model (NN MB)", from the pinned upstream files, with SHA-256 checks. Until then the toolbar says "Simple selector (GrabCut)". On synthetic small objects in clutter, SAM 2.1 tiny needs 1.25 clicks on average to reach IoU 0.85; GrabCut never gets there from clicks alone. Box prompts ("Add rectangle") work with every engine. Never tried on the owner's real photos or hardware |
 | Verify surface (rig moved? light on the object?) | Real, simulator only | `docs/13`. Never run on a camera, projector or house; `facadekit verify --self-test` is the procedure for the first hardware run |
 | Surfaces on non-flat objects (3D) | Missing | Only flat four-corner surfaces plus the mesh bend |
 
@@ -63,5 +63,5 @@ tests. It does not mean it was tried on hardware: only the owner's first hardwar
 
 1. Run the hardware spikes (S-1, S-2, S-8): everything Publish-side is unverified.
 2. A second hardware run of Setup with the merged fixes, keeping the new log.
-3. Approve the model downloads listed in `docs/16` §7 and run spike S-6 phase 2, so Magic select picks small objects by shape.
+3. Try Magic select with SAM 2.1 tiny on real house and shelf photos (spike S-6 measured synthetic pictures only).
 4. Try the exposure lock and dimmed projection with a real C920 (only the simulator has run it).

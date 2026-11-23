@@ -82,8 +82,11 @@ def test_grabcut_garage_door() -> None:
     assert _iou(result.quad, door, (img.shape[1], img.shape[0])) > 0.8
 
 
-def test_auto_falls_back_to_grabcut() -> None:
-    # The bundled registry holds placeholders, so MobileSAM cannot load.
+def test_auto_falls_back_to_grabcut(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # No model files are installed in this data folder, so no model can load (and none is
+    # downloaded: the bundled registry is published since spike S-6 phase 2).
+    monkeypatch.setenv("FACADEKIT_DATA", str(tmp_path / "data"))
+    monkeypatch.delenv("FACADEKIT_MODEL_REGISTRY", raising=False)
     assert isinstance(get_segmenter("auto"), GrabCutSegmenter)
 
 
