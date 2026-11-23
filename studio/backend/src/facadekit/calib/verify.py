@@ -244,7 +244,7 @@ def assess_rig(
     cam_shift: float | None = None
     if motion is not None:
         cam_shift = rc.mean_shift(motion.h, lit)
-        if cam_shift > rc.CAM_MOVED_PX and cam_shift > 2.0 * total_cam + 1.0:
+        if cam_shift > rc.CAM_MOVED_PX and total_cam < 0.5 * cam_shift:
             # The texture says the camera moved, but the dots (which move with the camera)
             # hardly did: the texture match is wrong. Do not use it.
             log.info("verify: camera motion %.2f px contradicts the dots (%.2f px); ignored",
@@ -262,15 +262,21 @@ def assess_rig(
         base.confidence = round(frac * (0.5 + 0.5 * margin) * (0.6 if moved else 1.0), 2)
     else:
         cam_moved = cam_shift > rc.CAM_MOVED_PX
+        # what is left of the dots' motion once the camera's own motion is taken out
+        if m_fit is not None:
+            proj_c = rc.shift_of(np.linalg.inv(motion.h) @ m_fit, e, e, s)
+        else:
+            proj_c = rc.shift_of(None, e, apply_h(np.linalg.inv(motion.h), o), s)
         if cam_moved:
             h_cam = motion.h
-            # what is left of the dots' motion once the camera's own motion is taken out
-            if m_fit is not None:
-                proj_shift = rc.shift_of(np.linalg.inv(motion.h) @ m_fit, e, e, s)
-            else:
-                proj_shift = rc.shift_of(None, e, apply_h(np.linalg.inv(motion.h), o), s)
+            proj_shift = proj_c
         else:
-            proj_shift = total  # the camera stayed: every bit of dot motion is the projector's
+            # A camera shift too small to report may still be real (then the dots moved with
+            # it) or texture noise (then they did not): take the explanation in which the
+            # projector moved least.
+            proj_shift = min(proj_c, total)
+            if proj_c < total:
+                h_cam = motion.h
         proj_moved = proj_shift > moved_at
         base.camera_shift_px = round(cam_shift, 3)
         base.projector_shift_px = round(proj_shift, 3)
@@ -691,8 +697,18 @@ def run_verify(
     ref_img, ref_lit, ref_source = reference_texture(folder, pmap, cam_size)
     ref_hp, ref_mask = rc.texture(ref_img, ref_lit)
     cur_hp, cur_mask = rc.texture(exposure.white.gray, exposure.lit)
-    motion = rc.camera_motion(ref_hp, ref_mask, cur_hp, cur_mask)
     observed = rc.find_dots(q_dots, v_dots, layout.radius * scale)
+    # The dots' own motion is one more start for the texture match: when only the camera
+    # moved they moved exactly as the wall did (a large move is then not mistaken for a
+    # shift by one brick).
+    expected, ok_exp = pmap.to_cam(layout.points)
+    pre = rc.match_dots(expected[ok_exp], observed, cam_size, layout.spacing * scale)
+    h_pre = (
+        rc.fit_h(expected[ok_exp][pre.idx_expected], pre.observed)
+        if len(pre.idx_expected) >= rc.MIN_DOTS
+        else None
+    )
+    motion = rc.camera_motion(ref_hp, ref_mask, cur_hp, cur_mask, extra_start=h_pre)
     rig = assess_rig(pmap, layout, scale, observed, cam_size, motion, exposure.lit)
     log.info(
         "verify rig: %s (camera %s px, projector %s px, dots %d/%d, texture %s/%d, ref %s)",

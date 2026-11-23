@@ -219,12 +219,17 @@ def _to_u8(hp: np.ndarray, mask: np.ndarray) -> np.ndarray:
 class CameraMotion:
     h: np.ndarray  # reference camera px -> current camera px
     inliers: int
-    method: str  # "features" | "ecc" | "phase": how the search was started
+    method: str  # "features" | "ecc" | "phase" | "dots": how the search was started
     score: float  # ECC correlation after refinement (0..1)
 
 
 def camera_motion(
-    ref_hp: np.ndarray, ref_mask: np.ndarray, cur_hp: np.ndarray, cur_mask: np.ndarray
+    ref_hp: np.ndarray,
+    ref_mask: np.ndarray,
+    cur_hp: np.ndarray,
+    cur_mask: np.ndarray,
+    *,
+    extra_start: np.ndarray | None = None,
 ) -> CameraMotion | None:
     """How the wall moved in the camera picture since the scan; None when the wall has too
     little texture to tell."""
@@ -266,6 +271,9 @@ def camera_motion(
         (dx, dy), resp = cv2.phaseCorrelate(ref_hp * both, cur_hp * both, win)
         if resp >= 0.02 and np.hypot(dx, dy) > 1.0:
             starts.append(("phase", np.array([[1, 0, dx], [0, 1, dy], [0, 0, 1]], dtype=float)))
+    if extra_start is not None and plausible(extra_start):
+        # given in pixel-corner coordinates; ECC works in pixel-index coordinates
+        starts.append(("dots", _HALF_OUT @ extra_start @ _HALF_OUT_INV))
     best: CameraMotion | None = None
     for name, start in starts:
         found = _refine(ref_hp, cur_hp, ref_mask, start, inliers, name)
@@ -285,14 +293,18 @@ def _refine(
     # Sub-pixel refinement. ECC (enhanced correlation coefficient) is invariant to brightness
     # and contrast. findTransformECC(template, input) finds W with input(W x) ~ template(x);
     # with template = current and input = reference, W maps current -> reference.
-    warp = np.linalg.inv(h0)
-    warp = (warp / warp[2, 2]).astype(np.float32)
+    # An affine model (6 numbers): a bumped camera turns and shifts a little, and the texture
+    # often covers only part of the picture, where a full homography's perspective terms are
+    # poorly pinned down and extrapolate badly to the rest of the wall.
+    inv = np.linalg.inv(h0)
+    inv = inv / inv[2, 2]
+    warp = inv[:2].astype(np.float32)
     try:
         score, warp = cv2.findTransformECC(
             cur_hp,
             ref_hp,
             warp,
-            cv2.MOTION_HOMOGRAPHY,
+            cv2.MOTION_AFFINE,
             (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 80, 1e-6),
             mask.astype(np.uint8) * 255,
             3,
@@ -301,7 +313,7 @@ def _refine(
         return None  # no reliable sub-pixel answer: say "unknown" rather than guess
     if float(score) < MIN_ECC_SCORE:
         return None
-    h_index = np.linalg.inv(np.asarray(warp, dtype=np.float64))
+    h_index = np.linalg.inv(np.vstack([np.asarray(warp, dtype=np.float64), [0.0, 0.0, 1.0]]))
     # OpenCV works in pixel-index coordinates (integer = pixel centre); this module uses
     # pixel-corner coordinates.
     h = _HALF_OUT_INV @ h_index @ _HALF_OUT
