@@ -379,20 +379,64 @@ export interface SegmentPoint {
   y: number;
   label: 0 | 1;
 }
+/** A box prompt in projector px (spike S-6). */
+export interface SegmentBox {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
 export interface SegmentResult {
   outer: Pt[];
   quad: Pt[];
   score: number;
-  engine: "mobilesam" | "grabcut";
+  /** "grabcut" or a model engine id such as "efficientsam_ti". */
+  engine: string;
+  engine_label?: string;
 }
 export const segment = (
   pid: string,
   points: SegmentPoint[],
-  prefer?: "auto" | "mobilesam" | "grabcut",
+  prefer?: string,
+  box?: SegmentBox | null,
 ) =>
   request<SegmentResult>("POST", `/projects/${enc(pid)}/segment`, {
     points,
     ...(prefer ? { prefer } : {}),
+    ...(box ? { box } : {}),
+  });
+
+export interface SegmentEngineFile {
+  name: string;
+  role: string;
+  url: string;
+  host: string;
+  size_bytes: number;
+  installed: boolean;
+}
+export interface SegmentEngine {
+  id: string;
+  label: string;
+  adapter: string;
+  licence: string;
+  source: string;
+  published: boolean;
+  installed: boolean;
+  download_bytes: number;
+  files: SegmentEngineFile[];
+}
+export interface SegmentEngines {
+  /** The engine Magic select uses now: "grabcut" or an installed model. */
+  active: string;
+  onnxruntime: boolean;
+  engines: SegmentEngine[];
+}
+export const getSegmentEngines = () => request<SegmentEngines>("GET", "/ai/segment/engines");
+/** Starts the user-confirmed model download; `expectedBytes` is the size the user saw. */
+export const downloadSegmentModel = (engine: string, expectedBytes: number) =>
+  request<{ job_id: string }>("POST", `/ai/models/${enc(engine)}/download`, {
+    confirm: true,
+    expected_bytes: expectedBytes,
   });
 
 export const analyzeAsset = (pid: string, aid: string) =>

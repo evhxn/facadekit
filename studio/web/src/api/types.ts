@@ -229,7 +229,7 @@ export interface PhoneScanStart {
 }
 export interface Job {
   id: string;
-  kind: "calibration" | "render" | "publish" | "analyze";
+  kind: "calibration" | "render" | "publish" | "analyze" | "download";
   state: JobState;
   progress: number;
   message: string;

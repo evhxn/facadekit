@@ -13,7 +13,8 @@ import {
 } from "./geometry";
 import { addHole, maskIsSimple, removeMaskVertex, translateMask } from "./MaskEditor";
 import { controlPoint, gridPolylines, setControlPoint } from "./meshMath";
-import { drawMagic, MagicControls, useMagicSelect, type MagicProps } from "./MagicSelect";
+import { boxFrom, drawMagic, MagicControls, useMagicSelect, type MagicProps } from "./MagicSelect";
+import type { SegmentBox } from "../../api/client";
 import { insertVertex, nearestEdge, pointInPolygon } from "./polygon";
 import styles from "./SurfaceCanvas.module.css";
 
@@ -59,7 +60,8 @@ type Drag =
   | { kind: "move"; id: string; start: Pt; quad: Quad; mask: Mask | null }
   | { kind: "vertex"; id: string; ring: number; index: number }
   | { kind: "mesh"; id: string; i: number; j: number }
-  | { kind: "pan"; start: Pt; panX: number; panY: number };
+  | { kind: "pan"; start: Pt; panX: number; panY: number }
+  | { kind: "mbox"; start: Pt };
 
 export default function SurfaceCanvas(props: Props) {
   const { imageUrl, imgW, imgH, surfaces, selectedId, corner } = props;
@@ -81,6 +83,7 @@ export default function SurfaceCanvas(props: Props) {
   const [msel, setMsel] = useState<{ i: number; j: number } | null>(null);
   const [notice, setNotice] = useState("");
   const ms = useMagicSelect(props.magic);
+  const [draftBox, setDraftBox] = useState<SegmentBox | null>(null);
   const selectedSurface = surfaces.find((x) => x.id === selectedId);
   const hasMask = !!selectedSurface?.mask;
   const hasMesh = !!selectedSurface?.mesh;
@@ -322,7 +325,7 @@ export default function SurfaceCanvas(props: Props) {
       ctx.fillStyle = "#ffcc00";
       ctx.fill();
     }
-    if (ms.active) drawMagic(ctx, view, ms);
+    if (ms.active) drawMagic(ctx, view, ms, draftBox);
     if (adding && adding.length > 0) {
       const pts = cursor ? [...adding, cursor] : adding;
       path(pts, false);
@@ -345,6 +348,7 @@ export default function SurfaceCanvas(props: Props) {
     vsel,
     holeDraft,
     ms,
+    draftBox,
   ]);
 
   const toolPoint = useCallback(
@@ -389,6 +393,12 @@ export default function SurfaceCanvas(props: Props) {
       return;
     }
     if (ms.active) {
+      if (ms.boxMode && e.button === 0) {
+        // "Add rectangle" in Magic select: drag a box prompt around the object.
+        dragRef.current = { kind: "mbox", start: clampPt(view.toProjector(sp), imgW, imgH) };
+        canvasRef.current?.setPointerCapture?.(e.pointerId);
+        return;
+      }
       if (e.button === 0 || e.button === 2) {
         const p = clampPt(view.toProjector(sp), imgW, imgH);
         ms.addPoint(p, e.button === 2 || e.altKey ? 0 : 1);
@@ -530,6 +540,10 @@ export default function SurfaceCanvas(props: Props) {
       return;
     }
     const p = view.toProjector(sp);
+    if (drag.kind === "mbox") {
+      setDraftBox(boxFrom(drag.start, clampPt(p, imgW, imgH), 0));
+      return;
+    }
     if (drag.kind === "corner") {
       const s = surfaces.find((x) => x.id === drag.id);
       if (!s) return;
@@ -575,6 +589,16 @@ export default function SurfaceCanvas(props: Props) {
 
   const endDrag = () => {
     dragRef.current = null;
+  };
+
+  const onPointerUp = (e: RPointerEvent<HTMLCanvasElement>) => {
+    const drag = dragRef.current;
+    dragRef.current = null;
+    if (drag?.kind !== "mbox") return;
+    setDraftBox(null);
+    const end = clampPt(view.toProjector(toolPoint(e)), imgW, imgH);
+    const bx = boxFrom(drag.start, end);
+    if (bx) ms.setBox(bx);
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLCanvasElement>) => {
@@ -665,7 +689,9 @@ export default function SurfaceCanvas(props: Props) {
 
   const selected = selectedSurface;
   const hint = ms.active
-    ? "Click to include, right-click or Alt+click to exclude. Enter creates, Esc cancels."
+    ? ms.boxMode
+      ? "Drag a rectangle around the object."
+      : "Click to include, right-click or Alt+click to exclude, or Add rectangle around it. Enter creates, Esc cancels."
     : holeDraft
       ? "Click the hole's points; click the first point or press Enter to close. Esc cancels."
       : notice
@@ -697,7 +723,18 @@ export default function SurfaceCanvas(props: Props) {
         <button type="button" onClick={() => setAdding([])} disabled={adding !== null}>
           Add surface
         </button>
-        <button type="button" onClick={() => props.onCreate(rectQuad(imgW, imgH, 0.4))}>
+        <button
+          type="button"
+          onClick={() =>
+            ms.active ? ms.toggleBoxMode() : props.onCreate(rectQuad(imgW, imgH, 0.4))
+          }
+          aria-pressed={ms.active ? ms.boxMode : undefined}
+          title={
+            ms.active
+              ? "Drag a rectangle around the object; the selector looks inside it"
+              : undefined
+          }
+        >
           Add rectangle
         </button>
         {selected?.mask && (
@@ -742,7 +779,7 @@ export default function SurfaceCanvas(props: Props) {
           tabIndex={0}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
-          onPointerUp={endDrag}
+          onPointerUp={onPointerUp}
           onPointerCancel={endDrag}
           onKeyDown={onKeyDown}
           onKeyUp={(e) => {
