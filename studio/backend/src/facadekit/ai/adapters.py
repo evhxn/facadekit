@@ -203,7 +203,8 @@ class EfficientSamAdapter:
     ``image_embeddings``, ``batched_point_coords`` ``(1, 1, n, 2)`` in input pixels,
     ``batched_point_labels`` ``(1, 1, n)`` (1 include, 0 exclude, 2/3 box corners),
     ``orig_im_size`` int64 ``[h, w]``; outputs ``output_masks`` ``(1, 1, 3, h, w)`` logits and
-    ``iou_predictions`` ``(1, 1, 3)``. At most 6 prompt points are used by the model.
+    ``iou_predictions`` ``(1, 1, 3)``. At most 6 prompt points are used by the model, and it
+    has no embedding for exclude clicks (label 0), so those are not sent.
     """
 
     roles = ("encoder", "decoder")
@@ -236,7 +237,10 @@ class EfficientSamAdapter:
         prompt: list[tuple[float, float, float]] = []
         if box is not None:
             prompt += [(box[0] * s, box[1] * s, 2.0), (box[2] * s, box[3] * s, 3.0)]
-        prompt += [(p[0] * s, p[1] * s, float(p[2])) for p in points]
+        # EfficientSAM's prompt encoder has learned embeddings only for labels 1 (object),
+        # 2/3 (box corners) and -1 (padding); a 0 ("not this") would be an untyped point.
+        # Exclude clicks are therefore not sent; post-processing still uses them.
+        prompt += [(p[0] * s, p[1] * s, 1.0) for p in points if p[2] == 1]
         if len(prompt) > EFFICIENTSAM_MAX_POINTS:
             # Keep the box, the first include click and the most recent clicks.
             log.info("EfficientSAM uses at most %d prompt points", EFFICIENTSAM_MAX_POINTS)

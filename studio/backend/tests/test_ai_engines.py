@@ -101,7 +101,7 @@ def test_bundled_registry_points_at_pinned_upstream_files() -> None:
         assert entry["size_bytes"] > 0
         assert entry["licence"] == "Apache-2.0"
     found = {e.id: e for e in engines.list_engines(check_files=False)}
-    assert list(found) == ["efficientsam_ti", "sam2_1_tiny", "mobilesam"]
+    assert list(found) == ["sam2_1_tiny", "efficientsam_ti", "mobilesam"]
     for info in found.values():
         assert info.adapter in adapters.ADAPTERS
         assert info.roles() == set(adapters.ADAPTERS[info.adapter].roles)
@@ -238,10 +238,13 @@ def test_efficientsam_caps_prompt_points(tmp_path: Path, monkeypatch: pytest.Mon
     img, _ = _scene()
     seg = get_segmenter("m")
     seg.set_image(img)
-    clicks = [(486.0, 281.0, 1)] + [(10.0 + i, 10.0, 0) for i in range(8)]
+    clicks = [(486.0, 281.0, 1)] + [(480.0 + i, 280.0, 1) for i in range(8)] + [(9.0, 9.0, 0)]
     seg.segment(clicks, (468.0, 258.0, 504.0, 304.0))
-    labels = fake_onnx.SESSIONS[1].calls[0]["batched_point_labels"][0, 0].tolist()
-    assert labels == [2, 3, 1, 0, 0, 0]
+    call = fake_onnx.SESSIONS[1].calls[0]
+    assert call["batched_point_labels"][0, 0].tolist() == [2, 3, 1, 1, 1, 1]
+    # the box, the first click and the most recent include clicks; exclude clicks are not sent
+    assert call["batched_point_coords"][0, 0, 2].tolist() == [486.0, 281.0]
+    assert call["batched_point_coords"][0, 0, 5].tolist() == [487.0, 280.0]
 
 
 def test_sam2_box_only_sends_empty_points(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
