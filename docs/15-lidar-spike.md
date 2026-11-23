@@ -46,8 +46,9 @@ For each: Gray-code scan plus LiDAR capture, same session, camera not moved.
 
 An App Store app, Raspberry Pi projector node, multi-projector timecode sync, any cloud service. Those are separate roadmap items (see `docs/14-illumibot-comparison.md`).
 
-## 6. Open decisions for the owner
+## 6. Owner decisions (2026-11-22)
 
-- Which iPhone and iPad models are available for testing?
-- Is a native iOS app acceptable long-term (developer account, App Store or TestFlight), or should Android and mobile web be kept in view?
-- Pro-only LiDAR versus photogrammetry-first: start with photogrammetry for house-scale scenes?
+- **Test device:** iPhone 17 Pro (LiDAR [A]: confirm in the spike that ARKit reports scene depth on this device). The M2 iPad Pro is gone; no iPad testing.
+- **Scope:** the LiDAR feature is iOS-only and optional. The core (scan, surfaces, arrange, render, publish) stays cross-platform and does not depend on it. Without a LiDAR device FacadeKit keeps using the plane-based mapping.
+- **Phone as camera (no LiDAR)** remains a separate, later track: it works on any phone via the existing record-and-upload path (`docs/08`), and could later be added to the iOS app for non-Pro iPhones. Android and mobile web are not ruled out for that track.
+- **Still open:** native iOS long term means an Apple developer account and TestFlight or App Store distribution; decide before Part B ships to anyone but the owner. Photogrammetry-first for house-scale scenes beyond LiDAR range is still undecided.
