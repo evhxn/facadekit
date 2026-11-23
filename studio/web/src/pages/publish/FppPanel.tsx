@@ -161,7 +161,7 @@ export default function FppPanel({
         setProblems(
           probe.problems.length > 0
             ? probe.problems
-            : [userMessage("FPP_UNREACHABLE", "The Falcon Player (FPP) could not be reached.")],
+            : [userMessage("FPP_UNREACHABLE", "")],
         );
       }
     } catch (e) {
