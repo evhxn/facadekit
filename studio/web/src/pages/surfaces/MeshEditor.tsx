@@ -26,9 +26,9 @@ export default function MeshEditor({ surface, onChange, testPattern, onTestPatte
       <h2>
         Bend to fit
         <InfoTip term="Bend to fit">
-          For a surface that is not flat, such as a curved wall or a column. Pick a grid size,
-          then drag the grid points on the picture until the grid follows the surface. Most doors
-          and windows do not need this.
+          For a surface that is not flat, such as a curved wall or a column. Pick a grid size, then
+          drag the grid points on the picture until the grid follows the surface. Most doors and
+          windows do not need this.
         </InfoTip>
       </h2>
       <label>

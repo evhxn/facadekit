@@ -756,10 +756,10 @@ export default function SurfaceCanvas(props: Props) {
                 : selected?.mask && editMask
                   ? "Drag the outline's points; click an edge to add a point."
                   : selected
-                  ? "Drag the white corners onto the real corners. Arrow keys nudge, Tab picks a corner."
-                  : surfaces.length > 0
-                    ? "Click a surface to select it."
-                    : "Start with Magic select, or Add rectangle.";
+                    ? "Drag the white corners onto the real corners. Arrow keys nudge, Tab picks a corner."
+                    : surfaces.length > 0
+                      ? "Click a surface to select it."
+                      : "Start with Magic select, or Add rectangle.";
   const readout =
     selected?.mesh && meshMode && msel
       ? `Point ${msel.i},${msel.j}: ${controlPoint(selected, msel.i, msel.j)
@@ -775,9 +775,9 @@ export default function SurfaceCanvas(props: Props) {
         {props.magic && <MagicControls ms={ms} />}
         {props.magic && !ms.active ? (
           <InfoTip term="Magic select">
-            Click once on a door, window or panel in the picture and FacadeKit finds its outline
-            for you. Click more spots to add to it, right-click to leave a spot out, then press
-            Create surface.
+            Click once on a door, window or panel in the picture and FacadeKit finds its outline for
+            you. Click more spots to add to it, right-click to leave a spot out, then press Create
+            surface.
           </InfoTip>
         ) : null}
         <button
@@ -871,9 +871,9 @@ export default function SurfaceCanvas(props: Props) {
         {showTip && surfaces.length > 0 && !ms.active && !adding ? (
           <div className={styles.tip} role="note" aria-label="Tip">
             <p>
-              <strong>Tip:</strong> drag the white corner squares onto the real corners of the
-              door or window. Drag inside a surface to move it. Scroll or use + and − to zoom in
-              for a precise fit.
+              <strong>Tip:</strong> drag the white corner squares onto the real corners of the door
+              or window. Drag inside a surface to move it. Scroll or use + and − to zoom in for a
+              precise fit.
             </p>
             <button type="button" className="primary" onClick={dismissTip}>
               Got it

@@ -47,8 +47,8 @@ export default function MaskEditor({ surface, onChange }: Props) {
         Shape
         <InfoTip term="Shape">
           A surface has four corners by default. Choose Custom outline for an arched window or any
-          shape that is not a four-sided one: you can then add points along the edge, and holes
-          for parts that must stay dark.
+          shape that is not a four-sided one: you can then add points along the edge, and holes for
+          parts that must stay dark.
         </InfoTip>
       </h2>
       <label>
@@ -78,7 +78,11 @@ export default function MaskEditor({ surface, onChange }: Props) {
             Drag points, click an edge to add one, Delete removes the selected point (at least 3
             stay).
           </small>
-          {!maskIsSimple(mask) && <p role="alert">The outline crosses itself. Drag its points apart until the lines no longer cross.</p>}
+          {!maskIsSimple(mask) && (
+            <p role="alert">
+              The outline crosses itself. Drag its points apart until the lines no longer cross.
+            </p>
+          )}
           <ul>
             {mask.holes.map((_, k) => (
               <li key={k}>

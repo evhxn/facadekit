@@ -206,12 +206,8 @@ describe("undo", () => {
   it("buttons are disabled when there is nothing to undo or redo", () => {
     useProjectStore.setState({ canUndo: false, canRedo: false });
     render(<UndoButtons />);
-    expect((screen.getByRole("button", { name: /Undo/ }) as HTMLButtonElement).disabled).toBe(
-      true,
-    );
-    expect((screen.getByRole("button", { name: /Redo/ }) as HTMLButtonElement).disabled).toBe(
-      true,
-    );
+    expect((screen.getByRole("button", { name: /Undo/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: /Redo/ }) as HTMLButtonElement).disabled).toBe(true);
   });
 });
 

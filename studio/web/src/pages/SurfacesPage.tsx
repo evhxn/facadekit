@@ -300,7 +300,10 @@ export default function SurfacesPage() {
         run: () => {
           // Only when nothing else changed since: otherwise Undo would take back something else.
           if (useProjectStore.getState().project === after) useProjectStore.getState().undo();
-          else toast("Other changes came after the delete. Use Undo at the top of the page.", { kind: "info" });
+          else
+            toast("Other changes came after the delete. Use Undo at the top of the page.", {
+              kind: "info",
+            });
         },
       },
     });
@@ -315,7 +318,9 @@ export default function SurfacesPage() {
         todo={
           !hasSurfaces ? (
             manualCalib ? (
-              <>Press <strong>Add rectangle</strong>, then drag its corners onto a door or window.</>
+              <>
+                Press <strong>Add rectangle</strong>, then drag its corners onto a door or window.
+              </>
             ) : (
               <>
                 Press <strong>Magic select</strong>, then click on a door or window in the picture.
@@ -566,8 +571,8 @@ function Properties({
       <span className={styles.labelRow}>
         <span>Soft edges</span>
         <InfoTip term="Soft edges">
-          Fades the picture out towards the outline, so small mistakes in the outline do not show
-          as a hard line of light. 0 is a sharp edge.
+          Fades the picture out towards the outline, so small mistakes in the outline do not show as
+          a hard line of light. 0 is a sharp edge.
         </InfoTip>
       </span>
       <label>
