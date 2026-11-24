@@ -3,6 +3,9 @@ import { Link, useParams } from "react-router-dom";
 import {
   ApiError,
   getCalibration,
+  getReferencePhoto,
+  referencePhotoViewUrl,
+  type ReferencePhotoInfo,
   projectorShow,
   projectorStatus,
   projViewUrl,
@@ -18,6 +21,7 @@ import MaskEditor from "./surfaces/MaskEditor";
 import MeshEditor from "./surfaces/MeshEditor";
 import { gridPolylines } from "./surfaces/meshMath";
 import SurfaceList from "./surfaces/SurfaceList";
+import ReferencePhotoPanel from "./surfaces/ReferencePhotoPanel";
 import VerifyPanel from "./surfaces/VerifyPanel";
 import { estimateAspect, flipHorizontal, rotateCorners, type Quad } from "./surfaces/geometry";
 import styles from "./SurfacesPage.module.css";
@@ -37,12 +41,28 @@ export default function SurfacesPage() {
   const [remoteOpen, setRemoteOpen] = useState(false);
   const [testPattern, setTestPattern] = useState(true);
   const [manualCalib, setManualCalib] = useState(false);
+  const [refPhoto, setRefPhoto] = useState<ReferencePhotoInfo | null>(null);
   const [projConnected, setProjConnected] = useState(false);
   // Magic select -> check the new surface on the house right away (docs/13).
   const [autoCheck, setAutoCheck] = useState(true);
   const [autoVerifyId, setAutoVerifyId] = useState<string | null>(null);
   const calibId = project?.calibration_id ?? null;
   const projId = project?.id ?? "";
+
+  // Manual mode may have a reference photo (by eye, not measured) behind the surfaces.
+  useEffect(() => {
+    setRefPhoto(null);
+    if (!projId || !manualCalib) return;
+    let cancelled = false;
+    getReferencePhoto(projId)
+      .then((info) => {
+        if (!cancelled) setRefPhoto(info);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [projId, manualCalib]);
 
   // Magic select needs a camera photo, so it is off for manual calibrations.
   useEffect(() => {
@@ -316,7 +336,11 @@ export default function SurfacesPage() {
       <div className={styles.page}>
         <div className={styles.canvasArea}>
           <SurfaceCanvas
-            imageUrl={projViewUrl(project.id, project.calibration_id)}
+            imageUrl={
+              manualCalib && refPhoto
+                ? referencePhotoViewUrl(project.id, refPhoto.updated_at)
+                : projViewUrl(project.id, project.calibration_id)
+            }
             imgW={width}
             imgH={height}
             surfaces={project.surfaces}
@@ -348,6 +372,12 @@ export default function SurfacesPage() {
             }}
             onDelete={remove}
           />
+          {manualCalib && refPhoto ? (
+            <p className={styles.note} role="note">
+              Background: your reference photo, by eye, not measured. The outlines show where you
+              placed them on the photo, not where the projector shines.
+            </p>
+          ) : null}
         </div>
         <aside className={styles.panel}>
           <h2 className={styles.panelHeading}>Surfaces ({project.surfaces.length})</h2>
@@ -361,6 +391,9 @@ export default function SurfacesPage() {
             onRename={(id, name) => patch(id, (s) => (s.name = name))}
             onDelete={remove}
           />
+          {manualCalib ? (
+            <ReferencePhotoPanel projectId={project.id} photo={refPhoto} onChange={setRefPhoto} />
+          ) : null}
           {selected && (
             <Properties
               key={selected.id}
