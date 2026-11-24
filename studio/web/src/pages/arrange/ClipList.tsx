@@ -1,5 +1,6 @@
 import type { Asset, Clip, Project } from "../../api/types";
 import { SecondsInput } from "./ClipForm";
+import { GENERATOR_LABELS } from "../../gl/generators";
 import styles from "./ClipList.module.css";
 
 export interface ClipRow {
@@ -27,7 +28,8 @@ export function assetName(project: Project, assetId: string | null): string {
 
 /** Label for a clip: its file name, or the effect type for generator clips. */
 export function clipLabel(project: Project, clip: Clip): string {
-  if (clip.generator) return `Effect: ${clip.generator.type}`;
+  if (clip.generator)
+    return `Effect: ${GENERATOR_LABELS[clip.generator.type] ?? clip.generator.type}`;
   return assetName(project, clip.asset_id);
 }
 
@@ -92,7 +94,9 @@ export default function ClipList({
         </button>
       </div>
       {project.timeline.audio_asset_id === null ? (
-        <p className={styles.hint}>To find beats, pick a song or video under &quot;Show audio&quot;.</p>
+        <p className={styles.hint}>
+          To find beats, pick a song or video under &quot;Show audio&quot;.
+        </p>
       ) : null}
       {beats.error ? <p role="alert">{beats.error}</p> : null}
       <div className={styles.bar}>

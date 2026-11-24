@@ -141,7 +141,8 @@ def _clip(
         {
             "id": new_id("clip"), "asset_id": asset, "generator": gen, "surface_id": surface,
             "start_ms": round(start_s * 1000), "duration_ms": round(dur_s * 1000),
-            "fit": fit, "opacity": opacity, "fade_in_ms": round(fade_s * 1000),
+            "fit": fit, "opacity": opacity,
+            "fade_in_ms": 0 if start_s == 0 else round(fade_s * 1000),
             "fade_out_ms": round(fade_s * 1000), "blend": blend,
         }
     )  # fmt: skip
