@@ -38,7 +38,15 @@ def build_parser() -> argparse.ArgumentParser:
             sp.add_argument("--lan", action="store_true")
         elif name == "new":
             sp.add_argument("project_dir")
-            sp.add_argument("--name", required=True)
+            sp.add_argument("--name", default=None, help="required unless --sample")
+            sp.add_argument(
+                "--sample",
+                nargs="?",
+                const="halloween",
+                default=None,
+                choices=("halloween", "winter"),
+                help="make a sample project on a simulated house (no hardware needed)",
+            )
             sp.add_argument("--width", type=int, default=1920)
             sp.add_argument("--height", type=int, default=1080)
             sp.add_argument("--fps", type=int, default=30)
@@ -211,6 +219,24 @@ def _cmd_new(args: argparse.Namespace) -> int:
         raise FkError(BAD_REQUEST, "PROJECT_DIR must end with .fkproj")
     if path.exists():
         raise FkError(BAD_REQUEST, f"{path} already exists")
+    if args.sample is not None:
+        from facadekit.samples import create_sample
+
+        try:
+            sample = create_sample(
+                path, slugify(path.stem), args.sample, name=args.name,
+                progress=lambda f, m: print(f"{f * 100:3.0f} % {m}", file=sys.stderr),
+            )  # fmt: skip
+        except BaseException:
+            import shutil
+
+            shutil.rmtree(path, ignore_errors=True)
+            raise
+        print(f"created {path}: {sample.name}")
+        print("This is a simulated house. Render it with: facadekit render " + str(path))
+        return 0
+    if args.name is None:
+        raise FkError(BAD_REQUEST, "--name is required (or use --sample)")
     try:
         projector = ProjectorSpec(width=args.width, height=args.height, fps=args.fps)
     except ValidationError as exc:
