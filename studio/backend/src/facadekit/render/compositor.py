@@ -127,7 +127,9 @@ class Compositor:
         fit = clip.fit
         if clip.generator is not None:
             # Generators are evaluated in the surface unit square and drawn like stretched media.
-            img = render_generator(clip.generator, (t_ms - clip.start_ms) / 1000.0)
+            img = render_generator(
+                clip.generator, (t_ms - clip.start_ms) / 1000.0, aspect=cache.surface.aspect
+            )
             src_h, src_w = img.shape[:2]
             fit = "stretch"
         elif clip.asset_id is not None:
