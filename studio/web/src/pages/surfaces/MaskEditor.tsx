@@ -1,4 +1,5 @@
 import type { Mask, Pt, Surface } from "../../api/types";
+import InfoTip from "../../components/InfoTip";
 import { MIN_VERTICES, isSimple, removeVertex, translate } from "./polygon";
 
 /** Custom outline initialised from the quad corners. */
@@ -42,7 +43,14 @@ export default function MaskEditor({ surface, onChange }: Props) {
   const mask = surface.mask;
   return (
     <section aria-label="Shape">
-      <h2>Shape</h2>
+      <h2>
+        Shape
+        <InfoTip term="Shape">
+          A surface has four corners by default. Choose Custom outline for an arched window or any
+          shape that is not a four-sided one: you can then add points along the edge, and holes
+          for parts that must stay dark.
+        </InfoTip>
+      </h2>
       <label>
         <input
           type="radio"

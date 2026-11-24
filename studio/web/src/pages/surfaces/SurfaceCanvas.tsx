@@ -16,6 +16,7 @@ import { controlPoint, gridPolylines, setControlPoint } from "./meshMath";
 import { boxFrom, drawMagic, MagicControls, useMagicSelect, type MagicProps } from "./MagicSelect";
 import type { SegmentBox } from "../../api/client";
 import { insertVertex, nearestEdge, pointInPolygon } from "./polygon";
+import InfoTip from "../../components/InfoTip";
 import styles from "./SurfaceCanvas.module.css";
 
 function setVertex(m: Mask, ring: number, index: number, v: Pt): Mask {
@@ -31,8 +32,19 @@ function isMeshCorner(mesh: Mesh, p: { i: number; j: number }): boolean {
 }
 
 const CORNER_NAMES = ["top-left", "top-right", "bottom-right", "bottom-left"];
-const HANDLE = 8;
-const HIT_RADIUS = 10;
+// Big enough to see on a photo and to grab with a trackpad or a finger.
+const HANDLE = 12;
+const HIT_RADIUS = 14;
+const ZOOM_STEP = 1.25;
+const TIP_KEY = "fk.tip.surfaces";
+
+function tipSeen(): boolean {
+  try {
+    return window.localStorage.getItem(TIP_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 8;
 
@@ -82,6 +94,7 @@ export default function SurfaceCanvas(props: Props) {
   const [editMesh, setEditMesh] = useState(false);
   const [msel, setMsel] = useState<{ i: number; j: number } | null>(null);
   const [notice, setNotice] = useState("");
+  const [showTip, setShowTip] = useState(() => !tipSeen());
   const ms = useMagicSelect(props.magic);
   const [draftBox, setDraftBox] = useState<SegmentBox | null>(null);
   const selectedSurface = surfaces.find((x) => x.id === selectedId);
@@ -110,6 +123,44 @@ export default function SurfaceCanvas(props: Props) {
   });
   const viewRef = useRef(view);
   viewRef.current = view;
+
+  /** Zoom by a factor around a point on the canvas (the centre for the buttons). */
+  const zoomBy = useCallback(
+    (factor: number, at?: Pt) => {
+      const sx = at ? at[0] : size.w / 2;
+      const sy = at ? at[1] : size.h / 2;
+      setZoom((z) => {
+        const nz = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z * factor));
+        if (nz === z) return z;
+        const anchor = viewRef.current.toProjector([sx, sy]);
+        const base = makeView({
+          imgW,
+          imgH,
+          viewW: size.w,
+          viewH: size.h,
+          zoom: nz,
+          panX: 0,
+          panY: 0,
+        });
+        const p = base.toScreen(anchor);
+        setPan(nz === MIN_ZOOM ? { x: 0, y: 0 } : { x: sx - p[0], y: sy - p[1] });
+        return nz;
+      });
+    },
+    [imgW, imgH, size.w, size.h],
+  );
+  const resetView = () => {
+    setZoom(MIN_ZOOM);
+    setPan({ x: 0, y: 0 });
+  };
+  const dismissTip = () => {
+    setShowTip(false);
+    try {
+      window.localStorage.setItem(TIP_KEY, "1");
+    } catch {
+      // Storage blocked: the tip simply shows again next time.
+    }
+  };
 
   // Load the photo once per URL.
   useEffect(() => {
@@ -143,30 +194,11 @@ export default function SurfaceCanvas(props: Props) {
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       const rect = canvas.getBoundingClientRect();
-      const sx = e.clientX - rect.left;
-      const sy = e.clientY - rect.top;
-      setZoom((z) => {
-        const nz = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
-        if (nz === z) return z;
-        const cur = viewRef.current;
-        const anchor = cur.toProjector([sx, sy]);
-        const base = makeView({
-          imgW,
-          imgH,
-          viewW: size.w,
-          viewH: size.h,
-          zoom: nz,
-          panX: 0,
-          panY: 0,
-        });
-        const at = base.toScreen(anchor);
-        setPan(nz === MIN_ZOOM ? { x: 0, y: 0 } : { x: sx - at[0], y: sy - at[1] });
-        return nz;
-      });
+      zoomBy(e.deltaY < 0 ? 1.15 : 1 / 1.15, [e.clientX - rect.left, e.clientY - rect.top]);
     };
     canvas.addEventListener("wheel", onWheel, { passive: false });
     return () => canvas.removeEventListener("wheel", onWheel);
-  }, [imgW, imgH, size.w, size.h]);
+  }, [zoomBy]);
 
   // Esc cancels adding, even when focus left the canvas.
   useEffect(() => {
@@ -607,6 +639,21 @@ export default function SurfaceCanvas(props: Props) {
       e.preventDefault();
       return;
     }
+    if (e.key === "+" || e.key === "=") {
+      e.preventDefault();
+      zoomBy(ZOOM_STEP);
+      return;
+    }
+    if (e.key === "-" || e.key === "_") {
+      e.preventDefault();
+      zoomBy(1 / ZOOM_STEP);
+      return;
+    }
+    if (e.key === "0") {
+      e.preventDefault();
+      resetView();
+      return;
+    }
     if (ms.active) return;
     if (e.key === "Escape") {
       setAdding(null);
@@ -706,7 +753,13 @@ export default function SurfaceCanvas(props: Props) {
                 ? msel && isMeshCorner(selected.mesh, msel)
                   ? "To move the whole corner, edit the surface corners instead."
                   : "Drag a grid point to bend the surface. Arrow keys nudge the selected point."
-                : "Scroll to zoom, Space or middle button to pan.";
+                : selected?.mask && editMask
+                  ? "Drag the outline's points; click an edge to add a point."
+                  : selected
+                  ? "Drag the white corners onto the real corners. Arrow keys nudge, Tab picks a corner."
+                  : surfaces.length > 0
+                    ? "Click a surface to select it."
+                    : "Start with Magic select, or Add rectangle.";
   const readout =
     selected?.mesh && meshMode && msel
       ? `Point ${msel.i},${msel.j}: ${controlPoint(selected, msel.i, msel.j)
@@ -720,8 +773,20 @@ export default function SurfaceCanvas(props: Props) {
     <div className={styles.root}>
       <div className={styles.toolbar}>
         {props.magic && <MagicControls ms={ms} />}
-        <button type="button" onClick={() => setAdding([])} disabled={adding !== null}>
-          Add surface
+        {props.magic && !ms.active ? (
+          <InfoTip term="Magic select">
+            Click once on a door, window or panel in the picture and FacadeKit finds its outline
+            for you. Click more spots to add to it, right-click to leave a spot out, then press
+            Create surface.
+          </InfoTip>
+        ) : null}
+        <button
+          type="button"
+          onClick={() => setAdding([])}
+          disabled={adding !== null}
+          title="Click the four corners of a door or window on the picture, one after another"
+        >
+          Click 4 corners
         </button>
         <button
           type="button"
@@ -732,7 +797,7 @@ export default function SurfaceCanvas(props: Props) {
           title={
             ms.active
               ? "Drag a rectangle around the object; the selector looks inside it"
-              : undefined
+              : "Put a rectangle in the middle of the picture, then drag its corners into place"
           }
         >
           Add rectangle
@@ -766,16 +831,61 @@ export default function SurfaceCanvas(props: Props) {
             {meshMode ? "Done bending" : "Edit bend"}
           </button>
         )}
-        <span className={styles.hint} role="status">
+        <span className={styles.hint} role="status" id="surface-canvas-hint">
           {hint}
         </span>
         <span className={styles.readout}>{readout}</span>
       </div>
       <div className={styles.wrap} ref={wrapRef}>
+        <div className={styles.zoom} role="group" aria-label="View">
+          <button
+            type="button"
+            onClick={() => zoomBy(1 / ZOOM_STEP)}
+            disabled={zoom <= MIN_ZOOM}
+            aria-label="Zoom out"
+            title="Zoom out (−)"
+          >
+            −
+          </button>
+          <span className={styles.zoomValue} aria-live="off">
+            {Math.round(zoom * 100)} %
+          </span>
+          <button
+            type="button"
+            onClick={() => zoomBy(ZOOM_STEP)}
+            disabled={zoom >= MAX_ZOOM}
+            aria-label="Zoom in"
+            title="Zoom in (+)"
+          >
+            +
+          </button>
+          <button
+            type="button"
+            onClick={resetView}
+            disabled={zoom === MIN_ZOOM && pan.x === 0 && pan.y === 0}
+            title="Show the whole picture (0)"
+          >
+            Reset view
+          </button>
+        </div>
+        {showTip && surfaces.length > 0 && !ms.active && !adding ? (
+          <div className={styles.tip} role="note" aria-label="Tip">
+            <p>
+              <strong>Tip:</strong> drag the white corner squares onto the real corners of the
+              door or window. Drag inside a surface to move it. Scroll or use + and − to zoom in
+              for a precise fit.
+            </p>
+            <button type="button" className="primary" onClick={dismissTip}>
+              Got it
+            </button>
+          </div>
+        ) : null}
         <canvas
           ref={canvasRef}
           className={styles.canvas}
           aria-label="Surface canvas"
+          aria-describedby="surface-canvas-hint"
+          aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Tab Delete + - 0"
           tabIndex={0}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
