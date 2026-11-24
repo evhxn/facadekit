@@ -1,0 +1,120 @@
+{
+  "solid": {
+    "label": "Solid colour",
+    "clamp": false,
+    "params": [{ "key": "color", "label": "Colour", "kind": "color", "def": "#ffffff" }]
+  },
+  "wash": {
+    "label": "Colour wash",
+    "clamp": false,
+    "params": [
+      { "key": "color_a", "label": "Colour A", "kind": "color", "def": "#ff0000" },
+      { "key": "color_b", "label": "Colour B", "kind": "color", "def": "#0000ff" },
+      { "key": "period_s", "label": "Period (s)", "kind": "number", "def": 4, "step": 0.5, "min": 0.1 },
+      { "key": "angle_deg", "label": "Angle (deg)", "kind": "number", "def": 0, "step": 5 }
+    ]
+  },
+  "outline": {
+    "label": "Outline trace",
+    "clamp": false,
+    "params": [
+      { "key": "color", "label": "Colour", "kind": "color", "def": "#ffffff" },
+      { "key": "width", "label": "Width", "kind": "number", "def": 0.03, "step": 0.01, "min": 0 },
+      { "key": "speed", "label": "Speed (laps/s)", "kind": "number", "def": 0.5, "step": 0.1 },
+      { "key": "tail", "label": "Tail", "kind": "number", "def": 0.35, "step": 0.05, "min": 0 }
+    ]
+  },
+  "strobe": {
+    "label": "Strobe",
+    "clamp": false,
+    "params": [
+      { "key": "color", "label": "Colour", "kind": "color", "def": "#ffffff" },
+      { "key": "rate_hz", "label": "Rate (Hz)", "kind": "number", "def": 8, "step": 1, "min": 0 },
+      { "key": "duty", "label": "Duty", "kind": "number", "def": 0.5, "step": 0.05, "min": 0 }
+    ]
+  },
+  "chase": {
+    "label": "Marching border",
+    "clamp": true,
+    "params": [
+      { "key": "color", "label": "Colour", "kind": "color", "def": "#ffd040" },
+      { "key": "width", "label": "Width", "kind": "number", "def": 0.05, "step": 0.01, "min": 0.01, "max": 0.25 },
+      { "key": "dashes", "label": "Dashes", "kind": "number", "def": 16, "step": 1, "min": 2, "max": 64 },
+      { "key": "speed", "label": "Speed (dashes/s)", "kind": "number", "def": 2, "step": 0.5, "min": -10, "max": 10 }
+    ]
+  },
+  "rings": {
+    "label": "Pulsing rings",
+    "clamp": true,
+    "params": [
+      { "key": "color_a", "label": "Colour A", "kind": "color", "def": "#ff6a00" },
+      { "key": "color_b", "label": "Colour B", "kind": "color", "def": "#2a0050" },
+      { "key": "count", "label": "Rings", "kind": "number", "def": 4, "step": 0.5, "min": 0.5, "max": 20 },
+      { "key": "speed", "label": "Speed (rings/s)", "kind": "number", "def": 0.5, "step": 0.1, "min": -5, "max": 5 }
+    ]
+  },
+  "stars": {
+    "label": "Starfield",
+    "clamp": true,
+    "params": [
+      { "key": "color", "label": "Colour", "kind": "color", "def": "#ffffff" },
+      { "key": "density", "label": "Density", "kind": "number", "def": 12, "step": 1, "min": 4, "max": 40 },
+      { "key": "size", "label": "Star size", "kind": "number", "def": 0.3, "step": 0.05, "min": 0.1, "max": 0.45 },
+      { "key": "twinkle_hz", "label": "Twinkle (Hz)", "kind": "number", "def": 0.5, "step": 0.1, "min": 0, "max": 2 },
+      { "key": "seed", "label": "Seed", "kind": "number", "def": 1, "step": 1, "min": 0, "max": 999999 }
+    ]
+  },
+  "snow": {
+    "label": "Snowfall",
+    "clamp": true,
+    "params": [
+      { "key": "color", "label": "Colour", "kind": "color", "def": "#ffffff" },
+      { "key": "density", "label": "Density", "kind": "number", "def": 10, "step": 1, "min": 4, "max": 30 },
+      { "key": "size", "label": "Flake size", "kind": "number", "def": 0.3, "step": 0.05, "min": 0.1, "max": 0.45 },
+      { "key": "speed", "label": "Fall speed", "kind": "number", "def": 0.15, "step": 0.05, "min": 0, "max": 1 },
+      { "key": "drift", "label": "Drift", "kind": "number", "def": 0.4, "step": 0.1, "min": 0, "max": 1 },
+      { "key": "seed", "label": "Seed", "kind": "number", "def": 2, "step": 1, "min": 0, "max": 999999 }
+    ]
+  },
+  "sweep": {
+    "label": "Light sweep",
+    "clamp": true,
+    "params": [
+      { "key": "color", "label": "Colour", "kind": "color", "def": "#ffffff" },
+      { "key": "width", "label": "Width", "kind": "number", "def": 0.15, "step": 0.05, "min": 0.02, "max": 1 },
+      { "key": "period_s", "label": "Period (s)", "kind": "number", "def": 3, "step": 0.5, "min": 0.5, "max": 60 },
+      { "key": "angle_deg", "label": "Angle (deg)", "kind": "number", "def": 0, "step": 15, "min": -360, "max": 360 }
+    ]
+  },
+  "cycle": {
+    "label": "Colour cycle",
+    "clamp": true,
+    "params": [
+      { "key": "period_s", "label": "Period (s)", "kind": "number", "def": 8, "step": 1, "min": 0.5, "max": 120 },
+      { "key": "spread", "label": "Spread", "kind": "number", "def": 0.5, "step": 0.1, "min": 0, "max": 3 },
+      { "key": "angle_deg", "label": "Angle (deg)", "kind": "number", "def": 0, "step": 15, "min": -360, "max": 360 },
+      { "key": "saturation", "label": "Saturation", "kind": "number", "def": 1, "step": 0.1, "min": 0, "max": 1 },
+      { "key": "brightness", "label": "Brightness", "kind": "number", "def": 1, "step": 0.1, "min": 0, "max": 1 }
+    ]
+  },
+  "plasma": {
+    "label": "Plasma waves",
+    "clamp": true,
+    "params": [
+      { "key": "color_a", "label": "Colour A", "kind": "color", "def": "#ff00aa" },
+      { "key": "color_b", "label": "Colour B", "kind": "color", "def": "#00e0ff" },
+      { "key": "scale", "label": "Scale", "kind": "number", "def": 3, "step": 0.5, "min": 0.5, "max": 10 },
+      { "key": "speed", "label": "Speed", "kind": "number", "def": 0.5, "step": 0.1, "min": 0, "max": 3 }
+    ]
+  },
+  "flicker": {
+    "label": "Gentle flicker",
+    "clamp": true,
+    "params": [
+      { "key": "color", "label": "Colour", "kind": "color", "def": "#ffb040" },
+      { "key": "rate_hz", "label": "Changes per second", "kind": "number", "def": 2, "step": 0.5, "min": 0.1, "max": 3 },
+      { "key": "depth", "label": "Depth", "kind": "number", "def": 0.6, "step": 0.1, "min": 0, "max": 1 },
+      { "key": "seed", "label": "Seed", "kind": "number", "def": 3, "step": 1, "min": 0, "max": 999999 }
+    ]
+  }
+}

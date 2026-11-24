@@ -6,7 +6,19 @@ export type Rgb = [number, number, number];
 export interface SceneClip {
   asset?: string; // omitted for generator clips
   generator?: {
-    type: "solid" | "wash" | "outline" | "strobe";
+    type:
+      | "solid"
+      | "wash"
+      | "outline"
+      | "strobe"
+      | "chase"
+      | "rings"
+      | "stars"
+      | "snow"
+      | "sweep"
+      | "cycle"
+      | "plasma"
+      | "flicker";
     params: Record<string, number | string>;
   };
   surface: string; // key into scene.surfaces, or "canvas"
@@ -88,6 +100,31 @@ const blendScene = (name: string, blend: "add" | "screen"): Scene => ({
     { asset: "base", surface: "a", track: 0, fit: "stretch" },
     { asset: "top", surface: "b", track: 1, fit: "stretch", opacity: 0.6, blend },
   ],
+});
+
+/** A generator alone on a slanted wide quad (aspect 1.6), as on a garage door. */
+const genScene = (
+  name: string,
+  t_ms: number,
+  type: NonNullable<SceneClip["generator"]>["type"],
+  params: Record<string, number | string>,
+  blend: SceneClip["blend"] = "normal",
+): Scene => ({
+  name,
+  t_ms,
+  surfaces: {
+    s: {
+      quad: [
+        [80, 35],
+        [400, 50],
+        [425, 240],
+        [60, 225],
+      ],
+      aspect: 1.6,
+    },
+  },
+  assets: {},
+  clips: [{ generator: { type, params }, surface: "s", track: 0, fit: "fill", blend }],
 });
 
 export const scenes: Scene[] = [
@@ -282,5 +319,77 @@ export const scenes: Scene[] = [
     },
     assets: { checker: checker() },
     clips: [{ asset: "checker", surface: "s", track: 0, fit: "stretch" }],
+  },
+  genScene("gen-chase", 1300, "chase", { color: "#ffd040", width: 0.06, dashes: 14, speed: 1.5 }),
+  genScene("gen-rings", 1700, "rings", {
+    color_a: "#ff6a00",
+    color_b: "#2a0050",
+    count: 3,
+    speed: 0.4,
+  }),
+  genScene("gen-stars", 2300, "stars", {
+    color: "#fff6d0",
+    density: 9,
+    size: 0.35,
+    twinkle_hz: 0.6,
+    seed: 4,
+  }),
+  genScene("gen-snow", 3100, "snow", {
+    color: "#ffffff",
+    density: 8,
+    size: 0.35,
+    speed: 0.2,
+    drift: 0.5,
+    seed: 11,
+  }),
+  genScene("gen-sweep", 1100, "sweep", {
+    color: "#80c0ff",
+    width: 0.2,
+    period_s: 2.5,
+    angle_deg: 30,
+  }),
+  genScene("gen-cycle", 2600, "cycle", {
+    period_s: 6,
+    spread: 0.8,
+    angle_deg: 45,
+    saturation: 0.9,
+    brightness: 1,
+  }),
+  genScene("gen-plasma", 1900, "plasma", {
+    color_a: "#ff00aa",
+    color_b: "#00e0ff",
+    scale: 3,
+    speed: 0.7,
+  }),
+  genScene("gen-flicker", 1234, "flicker", { color: "#ffb040", rate_hz: 3, depth: 0.7, seed: 5 }),
+  // Stars over a wash with "add": an effect layered on another, as the samples do.
+  {
+    ...genScene("gen-stars-over-wash", 900, "wash", {
+      color_a: "#101040",
+      color_b: "#301050",
+      period_s: 5,
+      angle_deg: 90,
+    }),
+    clips: [
+      {
+        generator: {
+          type: "wash",
+          params: { color_a: "#101040", color_b: "#301050", period_s: 5, angle_deg: 90 },
+        },
+        surface: "s",
+        track: 0,
+        fit: "fill",
+      },
+      {
+        generator: {
+          type: "stars",
+          params: { color: "#ffffff", density: 10, size: 0.35, twinkle_hz: 0.5, seed: 8 },
+        },
+        surface: "s",
+        track: 1,
+        fit: "fill",
+        blend: "add",
+      },
+    ],
   },
 ];

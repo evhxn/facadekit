@@ -96,4 +96,32 @@ describe("ClipForm source switch", () => {
       },
     });
   });
+
+  it("lists the new effects and keeps a number inside its range", () => {
+    const onPatch = renderForm({
+      ...clip,
+      asset_id: null,
+      generator: { type: "stars", params: { color: "#ffffff", density: 12, seed: 1 } },
+    });
+    const select = screen.getByLabelText("Effect", { selector: "select" });
+    const labels = [...select.querySelectorAll("option")].map((o) => o.textContent);
+    expect(labels).toEqual(
+      expect.arrayContaining(["Starfield", "Snowfall", "Marching border", "Gentle flicker"]),
+    );
+    fireEvent.change(screen.getByLabelText("Density"), { target: { value: "500" } });
+    expect(onPatch).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText("Seed"), { target: { value: "7" } });
+    expect(onPatch).toHaveBeenCalledWith({
+      generator: { type: "stars", params: { color: "#ffffff", density: 12, seed: 7 } },
+    });
+  });
+
+  it("warns about a fast strobe (photosensitivity)", () => {
+    renderForm({
+      ...clip,
+      asset_id: null,
+      generator: { type: "strobe", params: { color: "#ffffff", rate_hz: 8, duty: 0.5 } },
+    });
+    expect(screen.getByRole("alert").textContent).toMatch(/photosensitive epilepsy/);
+  });
 });

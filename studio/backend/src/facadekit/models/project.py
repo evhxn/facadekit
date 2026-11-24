@@ -85,7 +85,10 @@ class Asset(BaseModel):
 class Generator(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    type: Literal["solid", "wash", "outline", "strobe"]
+    type: Literal[
+        "solid", "wash", "outline", "strobe",
+        "chase", "rings", "stars", "snow", "sweep", "cycle", "plasma", "flicker",
+    ]  # fmt: skip
     params: dict[str, float | str] = Field(default_factory=dict)
 
 

@@ -5,6 +5,7 @@ import {
   GENERATOR_PARAMS,
   GENERATOR_TYPES,
   defaultGenerator,
+  flashWarning,
   type GeneratorType,
   type ParamSpec,
 } from "../../gl/generators";
@@ -80,11 +81,18 @@ function NumberParam({
         type="number"
         step={spec.step}
         min={spec.min}
+        max={spec.max}
         value={text}
         onChange={(e) => {
           setText(e.target.value);
           const v = parseFloat(e.target.value);
-          if (Number.isFinite(v) && (spec.min === undefined || v >= spec.min)) onCommit(v);
+          if (
+            Number.isFinite(v) &&
+            (spec.min === undefined || v >= spec.min) &&
+            (spec.max === undefined || v <= spec.max)
+          ) {
+            onCommit(v);
+          }
         }}
       />
     </label>
@@ -100,6 +108,7 @@ function EffectFields({
 }) {
   const setParam = (key: string, v: number | string) =>
     onChange({ ...generator, params: { ...generator.params, [key]: v } });
+  const warning = flashWarning(generator);
   return (
     <>
       <label>
@@ -137,6 +146,11 @@ function EffectFields({
           );
         })}
       </div>
+      {warning ? (
+        <p role="alert" className={styles.warning}>
+          {warning}
+        </p>
+      ) : null}
     </>
   );
 }

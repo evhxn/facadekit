@@ -4,6 +4,8 @@ This guide takes you from a new install to a video playing on your house from FP
 
 Before you begin, install FacadeKit by following the [install steps in the README](../../README.md#install). Terms in **bold** are explained in the [glossary](glossary.md).
 
+No projector yet? [Try a sample project](effects-and-samples.md) on a simulated house first.
+
 From a source install, run commands as `uv run facadekit …` inside `studio/backend`. Where this guide says `facadekit serve`, you can also run `make run` from the repository root.
 
 ## Before you begin: check your FPP version

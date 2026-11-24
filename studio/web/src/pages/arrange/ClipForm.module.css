@@ -53,3 +53,11 @@
   align-items: start;
   gap: var(--space-1);
 }
+.warning {
+  margin: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--warn);
+  border-radius: 4px;
+  background: var(--warn-bg);
+  font-size: 13px;
+}

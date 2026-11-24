@@ -81,4 +81,12 @@ describe("ProjectsPage", () => {
     expect(screen.queryByRole("region", { name: /Welcome/ })).toBeNull();
     expect(screen.getByText("How FacadeKit works (4 steps)")).toBeTruthy();
   });
+
+  it("first-run guide points to the sample project", async () => {
+    m.listProjects.mockResolvedValue([]);
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "See a sample show" }));
+    expect(document.activeElement).toBe(screen.getByLabelText("Theme"));
+    expect(screen.getByRole("button", { name: "Try a sample project" })).toBeTruthy();
+  });
 });

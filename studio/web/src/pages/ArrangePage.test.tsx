@@ -245,9 +245,9 @@ describe("ArrangePage", () => {
     const clip = project().timeline.tracks[0]!.clips[0]!;
     expect(clip.asset_id).toBeNull();
     expect(clip.generator?.type).toBe("solid");
-    expect(screen.getByRole("button", { name: "Clip Effect: solid" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Clip Effect: Solid colour" })).toBeTruthy();
     expect(screen.queryByText("Missing file")).toBeNull();
-    expect(screen.getAllByText("Effect: solid")).toHaveLength(2);
+    expect(screen.getAllByText("Effect: Solid colour")).toHaveLength(2);
   });
 
   it("adds a user marker at the playhead when M is pressed", () => {

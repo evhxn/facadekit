@@ -6,6 +6,7 @@ import type { ProjectSummary } from "../api/types";
 import ErrorBanner from "../components/ErrorBanner";
 import WelcomeGuide from "../components/WelcomeGuide";
 import styles from "./ProjectsPage.module.css";
+import TrySample from "./projects/TrySample";
 
 const PRESETS = ["1920x1080", "1280x720", "1280x800", "854x480", "800x480"];
 const FPS = 30;
@@ -100,6 +101,11 @@ export default function ProjectsPage() {
             const field = document.getElementById("project-name");
             field?.scrollIntoView?.({ block: "center" });
             field?.focus();
+          }}
+          onTrySample={() => {
+            const box = document.getElementById("try-sample");
+            box?.scrollIntoView?.({ block: "center" });
+            document.getElementById("try-sample-theme")?.focus();
           }}
         />
       ) : null}
@@ -196,6 +202,7 @@ export default function ProjectsPage() {
           </button>
         </form>
       </div>
+      <TrySample />
     </main>
   );
 }
