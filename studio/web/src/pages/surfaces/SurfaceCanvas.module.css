@@ -78,3 +78,6 @@
   margin: 0;
   font-size: 0.9rem;
 }
+.tip button {
+  white-space: nowrap;
+}

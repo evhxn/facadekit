@@ -109,14 +109,12 @@ export default function ClipList({
             <th>Surface</th>
             <th>Start</th>
             <th>Length</th>
-            <th>Loop</th>
-            <th>Blend</th>
           </tr>
         </thead>
         <tbody>
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={7}>
+              <td colSpan={5}>
                 No clips yet. Press &quot;Add clip&quot; to put a video, picture or effect on the
                 timeline.
               </td>
@@ -141,8 +139,6 @@ export default function ClipList({
               <td>{surfaceName(project, clip.surface_id)}</td>
               <td>{sec(clip.start_ms)} s</td>
               <td>{sec(clip.duration_ms)} s</td>
-              <td>{clip.loop ? "Yes" : "No"}</td>
-              <td>{clip.blend}</td>
             </tr>
           ))}
         </tbody>
