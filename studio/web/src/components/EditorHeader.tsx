@@ -10,15 +10,22 @@ interface Props {
   next?: { to: string; label: string; ready: boolean; hint?: string };
   /** Small controls that belong to the whole page (toggles, remote). */
   tools?: ReactNode;
+  /** What to do now, in one short line: changes with the state of the page. */
+  todo?: ReactNode;
 }
 
 /** The top line of an editor page: what it is for, page tools, and the way on. */
-export default function EditorHeader({ title, help, next, tools }: Props) {
+export default function EditorHeader({ title, help, next, tools, todo }: Props) {
   return (
     <header className={styles.header}>
       <div className={styles.text}>
         <h1 className={styles.title}>{title}</h1>
         <p className={styles.help}>{help}</p>
+        {todo ? (
+          <p className={styles.todo} data-testid="next-step">
+            <span className={styles.todoLabel}>Next step:</span> {todo}
+          </p>
+        ) : null}
       </div>
       {tools ? <div className={styles.tools}>{tools}</div> : null}
       {next ? (

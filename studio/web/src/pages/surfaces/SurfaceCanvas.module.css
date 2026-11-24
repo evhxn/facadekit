@@ -35,3 +35,49 @@
   outline-offset: -2px;
   touch-action: none;
 }
+.zoom {
+  position: absolute;
+  z-index: 2;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.zoom button {
+  min-width: var(--target);
+  padding: 0 var(--space-2);
+}
+.zoomValue {
+  min-width: 3.5em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85rem;
+}
+.tip {
+  position: absolute;
+  z-index: 2;
+  left: 8px;
+  top: 8px;
+  max-width: min(26rem, calc(100% - 16px));
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+.tip p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+.tip button {
+  white-space: nowrap;
+}

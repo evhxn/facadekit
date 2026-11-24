@@ -1,0 +1,40 @@
+.steps {
+  margin: 0 0 var(--space-3);
+  padding-left: 1.4rem;
+  display: grid;
+  gap: var(--space-2);
+}
+.time,
+.note {
+  color: var(--muted);
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 var(--space-3);
+  font-size: 0.95rem;
+}
+.table caption {
+  text-align: left;
+  font-weight: 600;
+  padding: var(--space-2) 0;
+}
+.table th {
+  text-align: left;
+  font-weight: 400;
+  width: 40%;
+  padding: 2px var(--space-3) 2px 0;
+  vertical-align: top;
+}
+.table td {
+  padding: 2px 0;
+}
+.table kbd {
+  font-family: ui-monospace, monospace;
+  font-size: 0.85rem;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--surface-2);
+}

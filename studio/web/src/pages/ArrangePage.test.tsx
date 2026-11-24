@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Asset, Project } from "../api/types";
+import { useToasts } from "../components/toast";
 import { useProjectStore } from "../state/projectStore";
 import ArrangePage from "./ArrangePage";
 
@@ -86,6 +87,7 @@ function renderPage() {
 }
 
 const project = () => useProjectStore.getState().project!;
+const clips = () => project().timeline.tracks.flatMap((t) => t.clips);
 
 describe("ArrangePage", () => {
   beforeEach(() => {
@@ -144,12 +146,64 @@ describe("ArrangePage", () => {
 
   it("shows the specified message when the asset is in use", async () => {
     mocks.deleteAsset.mockRejectedValue(new ApiError("ASSET_IN_USE", "in use", 409));
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     renderPage();
     fireEvent.click(screen.getByLabelText("Delete clip.mp4"));
     await waitFor(() =>
       expect(screen.getByText("Remove the clips that use this file first.")).toBeTruthy(),
     );
     expect(project().assets).toHaveLength(2);
+    confirm.mockRestore();
+  });
+
+  it("asks before deleting a media file, and keeps it when declined", () => {
+    mocks.deleteAsset.mockClear();
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    renderPage();
+    fireEvent.click(screen.getByLabelText("Delete clip.mp4"));
+    expect(confirm).toHaveBeenCalled();
+    expect(mocks.deleteAsset).not.toHaveBeenCalled();
+    confirm.mockRestore();
+  });
+
+  it("removing a clip offers Undo, which brings it back", () => {
+    useToasts.setState({ toasts: [] });
+    renderPage();
+    fireEvent.click(screen.getByText("Add clip"));
+    fireEvent.click(screen.getByText("Add to timeline"));
+    expect(clips()).toHaveLength(1);
+    fireEvent.click(screen.getByText("Remove clip"));
+    expect(clips()).toHaveLength(0);
+    const t = useToasts.getState().toasts.find((x) => x.message === "Clip removed.");
+    expect(t?.action?.label).toBe("Undo");
+    t?.action?.run();
+    expect(clips()).toHaveLength(1);
+  });
+
+  it("a timeline clip is reachable by keyboard: Enter opens it, Delete removes it", () => {
+    useToasts.setState({ toasts: [] });
+    renderPage();
+    fireEvent.click(screen.getByText("Add clip"));
+    fireEvent.click(screen.getByText("Add to timeline"));
+    fireEvent.click(screen.getByText("Close"));
+    const bar = screen.getByRole("button", { name: "Clip clip.mp4" });
+    expect(bar.tabIndex).toBe(0);
+    fireEvent.keyDown(bar, { key: "Enter" });
+    expect(screen.getByRole("form", { name: "Clip" })).toBeTruthy();
+    fireEvent.click(screen.getByText("Close"));
+    fireEvent.keyDown(screen.getByRole("button", { name: "Clip clip.mp4" }), { key: "Delete" });
+    expect(clips()).toHaveLength(0);
+    expect(useToasts.getState().toasts.some((x) => x.message === "Clip removed.")).toBe(true);
+  });
+
+  it("the timeline has visible zoom buttons", () => {
+    renderPage();
+    const zoomIn = screen.getByRole("button", { name: "Zoom in the timeline" });
+    const before = screen.getAllByText(/^\d+s$/).length;
+    fireEvent.click(zoomIn);
+    fireEvent.click(zoomIn);
+    fireEvent.click(zoomIn);
+    expect(screen.getAllByText(/^\d+s$/).length).not.toBe(before);
   });
 
   it("drops a media-library asset on the timeline to create a clip", () => {

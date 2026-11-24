@@ -12,7 +12,9 @@ import { waitForJob } from "../../api/events";
 import { userMessage } from "../../api/errors";
 import type { FppProbe, FppStatus, Job, Project } from "../../api/types";
 import ErrorBanner from "../../components/ErrorBanner";
+import InfoTip from "../../components/InfoTip";
 import JobProgress from "../../components/JobProgress";
+import { toast } from "../../components/toast";
 import { useProjectStore } from "../../state/projectStore";
 import styles from "./Panels.module.css";
 
@@ -159,15 +161,15 @@ export default function FppPanel({
         setSequence((cur) => (found.includes(cur) ? cur : ""));
       } else {
         setProblems(
-          probe.problems.length > 0
-            ? probe.problems
-            : [userMessage("FPP_UNREACHABLE", "")],
+          probe.problems.length > 0 ? probe.problems : [userMessage("FPP_UNREACHABLE", "")],
         );
       }
     } catch (e) {
       if (mounted.current)
         setConnectError(
-          e instanceof ApiError ? userMessage(e.code, e.message) : "The connection failed. Check the address and try Connect again.",
+          e instanceof ApiError
+            ? userMessage(e.code, e.message)
+            : "The connection failed. Check the address and try Connect again.",
         );
     }
   };
@@ -207,13 +209,23 @@ export default function FppPanel({
         const name =
           typeof final.result?.playlist_name === "string" ? final.result.playlist_name : playlist;
         setSent(name);
+        toast(`Sent. Playlist “${name}” is on your FPP.`);
         await reloadProject();
       } else if (final.state === "failed") {
-        setSendError(failureMessage(final, "Sending to FPP failed. Check the connection to the Pi, then try again."));
+        setSendError(
+          failureMessage(
+            final,
+            "Sending to FPP failed. Check the connection to the Pi, then try again.",
+          ),
+        );
       }
     } catch (e) {
       if (mounted.current)
-        setSendError(e instanceof ApiError ? userMessage(e.code, e.message) : "Sending failed. Check the connection to the Pi, then press Send to FPP again.");
+        setSendError(
+          e instanceof ApiError
+            ? userMessage(e.code, e.message)
+            : "Sending failed. Check the connection to the Pi, then press Send to FPP again.",
+        );
     } finally {
       if (mounted.current) setSending(false);
     }
@@ -237,7 +249,9 @@ export default function FppPanel({
       if (rendered.state !== "succeeded") {
         setAlignJob(null);
         if (rendered.state === "failed")
-          setAlignError(failureMessage(rendered, "Rendering the alignment check failed. Try it again."));
+          setAlignError(
+            failureMessage(rendered, "Rendering the alignment check failed. Try it again."),
+          );
         return;
       }
       const rid = typeof rendered.result?.render_id === "string" ? rendered.result.render_id : "";
@@ -251,12 +265,19 @@ export default function FppPanel({
         setAlignDone(true);
         await reloadProject();
       } else if (sentJob.state === "failed") {
-        setAlignError(failureMessage(sentJob, "Sending the alignment check failed. Check the connection to the Pi, then try again."));
+        setAlignError(
+          failureMessage(
+            sentJob,
+            "Sending the alignment check failed. Check the connection to the Pi, then try again.",
+          ),
+        );
       }
     } catch (e) {
       if (mounted.current)
         setAlignError(
-          e instanceof ApiError ? userMessage(e.code, e.message) : "The alignment check failed. Try it again.",
+          e instanceof ApiError
+            ? userMessage(e.code, e.message)
+            : "The alignment check failed. Try it again.",
         );
     } finally {
       if (mounted.current) setAligning(false);
@@ -305,7 +326,13 @@ export default function FppPanel({
   return (
     <>
       <section className={styles.panel}>
-        <h2>Send to Falcon Player</h2>
+        <h2>
+          Send to Falcon Player
+          <InfoTip term="Falcon Player (FPP)">
+            Free show software that runs on a Raspberry Pi next to the projector. Once the show is
+            on it, the Pi plays it every night by itself; this computer can then be switched off.
+          </InfoTip>
+        </h2>
         <div className={styles.row}>
           <label>
             FPP address{" "}
@@ -328,6 +355,11 @@ export default function FppPanel({
           >
             Connect
           </button>
+          <InfoTip term="FPP address">
+            The name or number of the Raspberry Pi on your home network. Try fpp.local first. If
+            that does not work, open your router&apos;s list of devices, or look at the Pi&apos;s
+            screen, for a number like 192.168.1.40.
+          </InfoTip>
         </div>
         {connectError ? <ErrorBanner message={connectError} /> : null}
         {problems.length > 0 ? <ErrorBanner message={problems.join(" ")} /> : null}
@@ -401,6 +433,13 @@ export default function FppPanel({
           >
             Send to FPP
           </button>
+          {!isConnected || !selectedRenderId ? (
+            <span className={styles.note}>
+              {!selectedRenderId
+                ? "Render the show above first."
+                : "Type the FPP address above and press Connect first."}
+            </span>
+          ) : null}
         </div>
         {sendJob ? <JobProgress job={sendJob} onCancel={cancel(sendJob)} /> : null}
         {sendError ? <ErrorBanner message={sendError} /> : null}
@@ -427,6 +466,7 @@ export default function FppPanel({
         >
           Render and send alignment check
         </button>
+        {!isConnected ? <span className={styles.note}> Connect to FPP above first.</span> : null}
         {aligning && alignStage ? <p>{alignStage}</p> : null}
         {alignJob ? <JobProgress job={alignJob} onCancel={cancel(alignJob)} /> : null}
         {alignError ? <ErrorBanner message={alignError} /> : null}

@@ -1,5 +1,6 @@
 import type { Mesh, Surface } from "../../api/types";
 import { MESH_SIZES, identityMesh, resampleMesh } from "./meshMath";
+import InfoTip from "../../components/InfoTip";
 
 interface Props {
   surface: Surface;
@@ -22,7 +23,14 @@ export default function MeshEditor({ surface, onChange, testPattern, onTestPatte
   const size = mesh ? mesh.cols : 0;
   return (
     <section aria-label="Bend (mesh)">
-      <h2>Bend (mesh)</h2>
+      <h2>
+        Bend to fit
+        <InfoTip term="Bend to fit">
+          For a surface that is not flat, such as a curved wall or a column. Pick a grid size, then
+          drag the grid points on the picture until the grid follows the surface. Most doors and
+          windows do not need this.
+        </InfoTip>
+      </h2>
       <label>
         Grid size{" "}
         <select value={size} onChange={(e) => onChange(meshForSize(mesh, Number(e.target.value)))}>
@@ -51,9 +59,9 @@ export default function MeshEditor({ surface, onChange, testPattern, onTestPatte
               checked={testPattern}
               onChange={(e) => onTestPattern(e.target.checked)}
             />{" "}
-            Test pattern
+            Show the grid on the projector
           </label>
-          <small>Draws the bent grid on the projector, so you can match it to the house.</small>
+          <small>Match the projected grid to the house while you bend.</small>
         </div>
       )}
     </section>

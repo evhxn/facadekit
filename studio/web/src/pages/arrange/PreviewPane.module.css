@@ -7,6 +7,8 @@
 .stage {
   position: relative;
   width: 100%;
+  /* Keeps the timeline in view under it on a laptop screen; the picture letterboxes. */
+  max-height: 42vh;
   background: #000;
 }
 .canvas,
@@ -43,4 +45,13 @@
 .note {
   color: var(--warn);
   margin: 0;
+}
+.play {
+  min-width: 7.5rem;
+  font-size: 1.05rem;
+}
+.houseHelp {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
 }

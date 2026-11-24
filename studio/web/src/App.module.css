@@ -18,6 +18,12 @@
 .brand:hover {
   color: var(--accent);
 }
+.projectBox {
+  display: inline-flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
 .project {
   color: var(--muted);
   max-width: 16rem;
@@ -91,6 +97,9 @@
 
 .tools {
   margin-left: auto;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
 
 .main {

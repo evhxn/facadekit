@@ -109,14 +109,12 @@ export default function ClipList({
             <th>Surface</th>
             <th>Start</th>
             <th>Length</th>
-            <th>Loop</th>
-            <th>Blend</th>
           </tr>
         </thead>
         <tbody>
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={7}>
+              <td colSpan={5}>
                 No clips yet. Press &quot;Add clip&quot; to put a video, picture or effect on the
                 timeline.
               </td>
@@ -127,15 +125,20 @@ export default function ClipList({
               key={clip.id}
               className={clip.id === selectedId ? styles.selected : undefined}
               aria-selected={clip.id === selectedId}
+              tabIndex={0}
               onClick={() => onSelect(clip.id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onSelect(clip.id);
+                }
+              }}
             >
               <td>{trackIndex + 1}</td>
               <td>{clipLabel(project, clip)}</td>
               <td>{surfaceName(project, clip.surface_id)}</td>
               <td>{sec(clip.start_ms)} s</td>
               <td>{sec(clip.duration_ms)} s</td>
-              <td>{clip.loop ? "Yes" : "No"}</td>
-              <td>{clip.blend}</td>
             </tr>
           ))}
         </tbody>

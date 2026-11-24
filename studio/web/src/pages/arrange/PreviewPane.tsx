@@ -226,11 +226,25 @@ export default function PreviewPane({
             onError={() => setExact(null)}
           />
         ) : null}
-        {exact?.loaded ? <span className={styles.badge}>exact</span> : null}
+        {exact?.loaded ? (
+          <span
+            className={styles.badge}
+            title="This still frame is exactly what the finished video will show. While playing, a quicker preview is shown."
+          >
+            Final quality
+          </span>
+        ) : null}
       </div>
       {audioId ? <audio ref={audioRef} src={assetUrl(pid, audioId)} preload="auto" /> : null}
       <div className={styles.transport}>
-        <button type="button" onClick={() => (playing ? transport.pause() : transport.play())}>
+        <button
+          type="button"
+          className={`primary ${styles.play}`}
+          onClick={() => (playing ? transport.pause() : transport.play())}
+          aria-keyshortcuts="Space"
+          title={playing ? "Pause (Space)" : "Play (Space)"}
+        >
+          <span aria-hidden="true">{playing ? "❚❚ " : "▶ "}</span>
           {playing ? "Pause" : "Play"}
         </button>
         <button
@@ -240,7 +254,7 @@ export default function PreviewPane({
             transport.seek(0);
           }}
         >
-          Stop
+          Back to start
         </button>
         <span className={styles.time} aria-label="Time">
           {formatDuration(t)}
@@ -254,6 +268,9 @@ export default function PreviewPane({
         />
         Show on house
       </label>
+      <p className={styles.houseHelp}>
+        Plays the preview on the real projector too, so you can watch it on the house.
+      </p>
       {note ? (
         <p role="alert" className={styles.note}>
           {note}

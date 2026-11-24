@@ -46,3 +46,10 @@
   padding: 0;
   margin-bottom: 2px;
 }
+/* A field with a "What is this?" button beside its caption. */
+.withTip {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-1);
+}

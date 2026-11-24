@@ -118,3 +118,31 @@
   pointer-events: none;
   z-index: 4;
 }
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--border);
+}
+.toolHint {
+  flex: 1 1 18rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.toolCheck {
+  font-size: 0.9rem;
+}
+.zoom {
+  display: inline-flex;
+  gap: var(--space-1);
+}
+.zoom button {
+  min-width: var(--target);
+  padding: 0 var(--space-2);
+}
+.bar:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 1px;
+}

@@ -1,0 +1,75 @@
+.card {
+  margin: 0 0 var(--space-5);
+  padding: var(--space-4) var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+}
+.title {
+  margin: 0 0 var(--space-2);
+}
+.lead {
+  margin: 0 0 var(--space-4);
+  color: var(--muted);
+  max-width: 70ch;
+}
+.steps {
+  list-style: none;
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--space-3);
+}
+.step {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--surface-2);
+  border-radius: var(--radius);
+}
+.num {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 700;
+}
+.name,
+.what,
+.time {
+  display: block;
+}
+.name {
+  font-size: 1.05rem;
+}
+.what {
+  font-size: 0.92rem;
+}
+.time {
+  margin-top: var(--space-1);
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.start {
+  min-height: 44px;
+  font-size: 1.05rem;
+}
+.fold {
+  margin: 0 0 var(--space-4);
+}
+.fold summary {
+  cursor: pointer;
+  min-height: var(--target);
+  display: flex;
+  align-items: center;
+  color: var(--accent);
+}
+.fold .steps {
+  margin-top: var(--space-2);
+}

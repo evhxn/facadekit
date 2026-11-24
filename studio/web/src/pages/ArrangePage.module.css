@@ -1,15 +1,23 @@
+/*
+ * Preview and timeline first: they are what you look at and work in. The clip list and the
+ * clip settings sit in a column on the right, spanning both rows so a long form never pushes
+ * the timeline down. Media is a narrow column on the left.
+ */
 .page {
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr) minmax(300px, 420px);
+  grid-template-columns: 220px minmax(0, 1fr) 360px;
+  grid-template-rows: auto 1fr;
   grid-template-areas:
-    "library centre preview"
-    "strip strip strip";
+    "library preview centre"
+    "strip strip centre";
   gap: 16px;
   align-items: start;
 }
 .library {
   grid-area: library;
   min-width: 0;
+  max-height: 60vh;
+  overflow-y: auto;
 }
 .centre {
   grid-area: centre;
@@ -17,6 +25,10 @@
   flex-direction: column;
   gap: 12px;
   min-width: 0;
+  padding: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
 }
 .preview {
   grid-area: preview;
@@ -27,13 +39,28 @@
   min-width: 0;
 }
 
+@media (max-width: 1100px) {
+  .page {
+    grid-template-columns: minmax(0, 1fr) 320px;
+    grid-template-rows: auto auto 1fr;
+    grid-template-areas:
+      "preview centre"
+      "strip centre"
+      "library centre";
+  }
+  .library {
+    max-height: none;
+  }
+}
+
 @media (max-width: 900px) {
   .page {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
     grid-template-areas:
       "preview"
+      "strip"
       "centre"
-      "library"
-      "strip";
+      "library";
   }
 }

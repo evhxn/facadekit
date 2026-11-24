@@ -13,6 +13,9 @@ import {
 import { newId } from "../api/types";
 import type { Mask, Mesh, Pt, Surface } from "../api/types";
 import EditorHeader from "../components/EditorHeader";
+import InfoTip from "../components/InfoTip";
+import { toast } from "../components/toast";
+import UndoButtons, { useUndoShortcuts } from "../components/UndoButtons";
 import PageState from "../components/PageState";
 import RemoteDialog from "../components/RemoteDialog";
 import { useProjectStore } from "../state/projectStore";
@@ -47,6 +50,7 @@ export default function SurfacesPage() {
   const [autoCheck, setAutoCheck] = useState(true);
   const [autoVerifyId, setAutoVerifyId] = useState<string | null>(null);
   const calibId = project?.calibration_id ?? null;
+  useUndoShortcuts();
   const projId = project?.id ?? "";
 
   // Manual mode may have a reference photo (by eye, not measured) behind the surfaces.
@@ -223,11 +227,16 @@ export default function SurfacesPage() {
   const selected = project.surfaces.find((s) => s.id === selectedId) ?? null;
   const { width, height } = project.projector;
 
-  const patch = (id: string, fn: (s: Surface) => void) =>
-    update((d) => {
-      const s = d.surfaces.find((x) => x.id === id);
-      if (s) fn(s);
-    });
+  const patch = (id: string, fn: (s: Surface) => void, coalesceKey?: string) =>
+    update(
+      (d) => {
+        const s = d.surfaces.find((x) => x.id === id);
+        if (s) fn(s);
+      },
+      coalesceKey ? { coalesceKey } : undefined,
+    );
+  // One drag (many pointer moves) is one undo step.
+  const shapeKey2 = (id: string) => `shape-${id}`;
 
   const create = (quad: Quad) => {
     const id = newId("srf");
@@ -275,14 +284,29 @@ export default function SurfacesPage() {
       );
       if (!ok) return;
     }
+    const name = project.surfaces.find((s) => s.id === id)?.name ?? "the surface";
     update((d) => {
       d.surfaces = d.surfaces.filter((s) => s.id !== id);
       for (const t of d.timeline.tracks) t.clips = t.clips.filter((c) => c.surface_id !== id);
     });
+    const after = useProjectStore.getState().project;
     if (selectedId === id) {
       setSelectedId(null);
       setCorner(null);
     }
+    toast(`Deleted ${name}.`, {
+      action: {
+        label: "Undo",
+        run: () => {
+          // Only when nothing else changed since: otherwise Undo would take back something else.
+          if (useProjectStore.getState().project === after) useProjectStore.getState().undo();
+          else
+            toast("Other changes came after the delete. Use Undo at the top of the page.", {
+              kind: "info",
+            });
+        },
+      },
+    });
   };
 
   const hasSurfaces = project.surfaces.length > 0;
@@ -291,8 +315,31 @@ export default function SurfacesPage() {
       <EditorHeader
         title="Surfaces"
         help="Mark each part of the house you want to project onto: a door, a window, a wall."
+        todo={
+          !hasSurfaces ? (
+            manualCalib ? (
+              <>
+                Press <strong>Add rectangle</strong>, then drag its corners onto a door or window.
+              </>
+            ) : (
+              <>
+                Press <strong>Magic select</strong>, then click on a door or window in the picture.
+              </>
+            )
+          ) : selected ? (
+            <>
+              Drag the corners of <strong>{selected.name}</strong> until it covers the real object,
+              or add another surface. When you are done, go to <strong>Arrange</strong>.
+            </>
+          ) : (
+            <>
+              Click a surface to adjust it, add another, or go on to <strong>Arrange</strong>.
+            </>
+          )
+        }
         tools={
           <>
+            <UndoButtons />
             <label className={styles.toggle}>
               <input
                 type="checkbox"
@@ -304,6 +351,10 @@ export default function SurfacesPage() {
               />{" "}
               Show outlines on projector
             </label>
+            <InfoTip term="Projector outlines">
+              Draws every surface as a white outline on the real house while you edit, so you can
+              see where the light will land.
+            </InfoTip>
             <label className={styles.toggle}>
               <input
                 type="checkbox"
@@ -312,6 +363,10 @@ export default function SurfacesPage() {
               />{" "}
               Check on the house after Magic select
             </label>
+            <InfoTip term="The house check">
+              After Magic select makes a surface, FacadeKit lights it up and uses the camera to
+              check that the light lands on the object.
+            </InfoTip>
             <button type="button" onClick={() => setRemoteOpen(true)}>
               Use phone as remote
             </button>
@@ -350,14 +405,18 @@ export default function SurfacesPage() {
               setSelectedId(id);
               setCorner(c);
             }}
-            onChangeQuad={(id, quad) => patch(id, (s) => (s.quad = quad))}
-            onChangeMask={(id, mask) => patch(id, (s) => (s.mask = mask))}
-            onChangeMesh={(id, mesh) => patch(id, (s) => (s.mesh = mesh))}
+            onChangeQuad={(id, quad) => patch(id, (s) => (s.quad = quad), shapeKey2(id))}
+            onChangeMask={(id, mask) => patch(id, (s) => (s.mask = mask), shapeKey2(id))}
+            onChangeMesh={(id, mesh) => patch(id, (s) => (s.mesh = mesh), shapeKey2(id))}
             onChangeShape={(id, quad, mask) =>
-              patch(id, (s) => {
-                s.quad = quad;
-                s.mask = mask;
-              })
+              patch(
+                id,
+                (s) => {
+                  s.quad = quad;
+                  s.mask = mask;
+                },
+                shapeKey2(id),
+              )
             }
             onCreate={create}
             magic={{
@@ -484,8 +543,15 @@ function Properties({
         Name
         <input value={surface.name} onChange={(e) => onName(e.target.value)} />
       </label>
+      <span className={styles.labelRow}>
+        <span>Real-world shape</span>
+        <InfoTip term="Real-world shape">
+          How wide the real door or window is compared with its height. Videos are fitted to this
+          shape so they do not look squashed. Measure it, or press Estimate from shape.
+        </InfoTip>
+      </span>
       <label>
-        Aspect
+        Width ÷ height
         <input
           type="number"
           step={0.01}
@@ -502,6 +568,13 @@ function Properties({
         Estimate from shape
       </button>
       <small>Real width ÷ height. A 16 ft × 7 ft garage door is 2.29.</small>
+      <span className={styles.labelRow}>
+        <span>Soft edges</span>
+        <InfoTip term="Soft edges">
+          Fades the picture out towards the outline, so small mistakes in the outline do not show as
+          a hard line of light. 0 is a sharp edge.
+        </InfoTip>
+      </span>
       <label>
         Edge softness ({surface.feather_px} px)
         <input
@@ -514,10 +587,14 @@ function Properties({
         />
       </label>
       <div className={styles.row}>
-        <button type="button" onClick={onFlip}>
+        <button type="button" onClick={onFlip} title="Mirrors the picture on this surface">
           Flip horizontally
         </button>
-        <button type="button" onClick={onRotate}>
+        <button
+          type="button"
+          onClick={onRotate}
+          title="Turns the picture on this surface a quarter turn"
+        >
           Rotate corners
         </button>
       </div>

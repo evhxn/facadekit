@@ -4,7 +4,9 @@ import { waitForJob } from "../../api/events";
 import { userMessage } from "../../api/errors";
 import type { Job, Project, RenderInfo } from "../../api/types";
 import ErrorBanner from "../../components/ErrorBanner";
+import InfoTip from "../../components/InfoTip";
 import JobProgress from "../../components/JobProgress";
+import { toast } from "../../components/toast";
 import { useProjectStore } from "../../state/projectStore";
 import styles from "./Panels.module.css";
 
@@ -45,9 +47,12 @@ export default function RenderPanel({
 
   const hasAudio = project.timeline.audio_asset_id !== null;
   const warnings: string[] = [];
-  if (!project.timeline.tracks.some((t) => t.clips.length > 0)) warnings.push("The show is empty. Add a clip on the Arrange page.");
-  if (project.surfaces.length === 0) warnings.push("There are no surfaces yet. Add one on the Surfaces page.");
-  if (!project.calibration_id) warnings.push("This project has no calibration. Scan the house on the Setup page.");
+  if (!project.timeline.tracks.some((t) => t.clips.length > 0))
+    warnings.push("The show is empty. Add a clip on the Arrange page.");
+  if (project.surfaces.length === 0)
+    warnings.push("There are no surfaces yet. Add one on the Surfaces page.");
+  if (!project.calibration_id)
+    warnings.push("This project has no calibration. Scan the house on the Setup page.");
 
   const render = async () => {
     setError(null);
@@ -67,16 +72,23 @@ export default function RenderPanel({
         const rid = typeof final.result?.render_id === "string" ? final.result.render_id : "";
         await onRendered(rid);
         if (mounted.current) setJob(null);
+        toast("The show video is ready. Send it to FPP below.");
       } else if (final.state === "failed") {
         setError(
-          final.error ? userMessage(final.error.code, final.error.message) : "Rendering failed. Try Render show again.",
+          final.error
+            ? userMessage(final.error.code, final.error.message)
+            : "Rendering failed. Try Render show again.",
         );
       } else if (final.state === "cancelled") {
         setJob(null);
       }
     } catch (e) {
       if (mounted.current)
-        setError(e instanceof ApiError ? userMessage(e.code, e.message) : "Rendering failed. Try Render show again.");
+        setError(
+          e instanceof ApiError
+            ? userMessage(e.code, e.message)
+            : "Rendering failed. Try Render show again.",
+        );
     } finally {
       if (mounted.current) setBusy(false);
     }
@@ -84,7 +96,13 @@ export default function RenderPanel({
 
   return (
     <section className={styles.panel}>
-      <h2>Render</h2>
+      <h2>
+        Render
+        <InfoTip term="Render">
+          Turns your show into one ordinary video file, at the projector&apos;s size, that the
+          Raspberry Pi can play. It takes about as long as the show itself, often less.
+        </InfoTip>
+      </h2>
       {warnings.map((w) => (
         <p key={w} className={styles.warn}>
           {w}
@@ -120,6 +138,13 @@ export default function RenderPanel({
       ) : null}
       {error ? <ErrorBanner message={error} /> : null}
       {renders.length > 0 ? (
+        <p className={styles.note}>
+          {renders.length === 1
+            ? "Your show video. This is the one Send to FPP sends."
+            : "Your show videos, newest first. Pick the one to send."}
+        </p>
+      ) : null}
+      {renders.length > 0 ? (
         <ul className={styles.list} aria-label="Renders">
           {renders.map((r) => (
             <li key={r.render_id}>
@@ -130,9 +155,9 @@ export default function RenderPanel({
                 checked={selectedId === r.render_id}
                 onChange={() => onSelect(r.render_id)}
               />
-              <span>{r.filename}</span>
+              <span>Made {new Date(r.modified_at).toLocaleString()}</span>
               <span>{(r.size_bytes / (1024 * 1024)).toFixed(1)} MB</span>
-              <span>{new Date(r.modified_at).toLocaleString()}</span>
+              <span className={styles.note}>{r.filename}</span>
               <a href={renderFileUrl(project.id, r.render_id)} target="_blank" rel="noreferrer">
                 Preview
               </a>
@@ -140,7 +165,7 @@ export default function RenderPanel({
           ))}
         </ul>
       ) : (
-        <p className={styles.note}>No renders yet.</p>
+        <p className={styles.note}>No renders yet. Press Render show to make the video.</p>
       )}
     </section>
   );

@@ -12,6 +12,7 @@ import { ASSET_DRAG_TYPE } from "./MediaLibrary";
 import Waveform, { WAVE_H } from "./Waveform";
 import { MAX_PX_PER_SEC, MIN_PX_PER_SEC, msToX, rulerTicks, snap, xToMs } from "./timelineMath";
 import { useTransportTime, type Transport } from "./transport";
+import InfoTip from "../../components/InfoTip";
 import styles from "./Timeline.module.css";
 
 const ROW_H = 40;
@@ -59,9 +60,18 @@ interface Props {
   onSelect: (ids: string[]) => void;
   /** Double-click on a clip: open it in the clip form. */
   onOpen: (id: string) => void;
+  /** Clips were removed with the Delete key (for an "Undo" note). */
+  onRemoved?: (count: number) => void;
 }
 
-export default function Timeline({ project, transport, selectedIds, onSelect, onOpen }: Props) {
+export default function Timeline({
+  project,
+  transport,
+  selectedIds,
+  onSelect,
+  onOpen,
+  onRemoved,
+}: Props) {
   const update = useProjectStore((s) => s.update);
   const t = useTransportTime(transport);
   const [pxPerSec, setPxPerSec] = useState(DEFAULT_PX_PER_SEC);
@@ -390,19 +400,63 @@ export default function Timeline({ project, transport, selectedIds, onSelect, on
     }
   }
 
+  /** Zoom by a factor, keeping the play line where it is on screen. */
+  function zoomBy(factor: number) {
+    const el = scrollerRef.current;
+    if (el) {
+      const x = msToX(tRef.current, ppmRef.current) - el.scrollLeft;
+      const inView = x >= 0 && x <= el.clientWidth;
+      const anchorX = inView ? x : el.clientWidth / 2;
+      zoomAnchor.current = { ms: xToMs(anchorX + el.scrollLeft, ppmRef.current), x: anchorX };
+    }
+    setPxPerSec((p) => Math.min(MAX_PX_PER_SEC, Math.max(MIN_PX_PER_SEC, p * factor)));
+  }
+
+  /** Zoom so the whole show fits the visible width. */
+  function zoomToFit() {
+    const el = scrollerRef.current;
+    const dur = projectRef.current.timeline.duration_ms;
+    if (!el || dur <= 0) return;
+    const pps = ((el.clientWidth - 80) / dur) * 1000;
+    setPxPerSec(Math.min(MAX_PX_PER_SEC, Math.max(MIN_PX_PER_SEC, pps)));
+    el.scrollLeft = 0;
+  }
+
   function onKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
-    if (selectedIds.length === 0) return;
+    if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (e.key === "+" || e.key === "=") {
+        e.preventDefault();
+        zoomBy(1.25);
+        return;
+      }
+      if (e.key === "-" || e.key === "_") {
+        e.preventDefault();
+        zoomBy(1 / 1.25);
+        return;
+      }
+    }
+    // Enter on a focused clip opens its settings.
+    const clipId = (e.target as HTMLElement).dataset?.clipId;
+    if (e.key === "Enter" && clipId) {
+      e.preventDefault();
+      onOpen(clipId);
+      return;
+    }
+    // With nothing selected, keys act on the clip that has the keyboard focus.
+    const targets = selectedIds.length > 0 ? selectedIds : clipId ? [clipId] : [];
+    if (targets.length === 0) return;
     const mod = e.ctrlKey || e.metaKey;
     if (e.key === "Delete" || e.key === "Backspace") {
       e.preventDefault();
-      const ids = selectedIds;
+      const ids = targets;
       update((d) => {
         for (const id of ids) removeClip(d, id);
       });
       onSelect([]);
+      onRemoved?.(ids.length);
     } else if (mod && e.key.toLowerCase() === "d") {
       e.preventDefault();
-      const ids = selectedIds;
+      const ids = targets;
       let created: string[] = [];
       update((d) => {
         created = duplicateClips(d, ids);
@@ -464,10 +518,15 @@ export default function Timeline({ project, transport, selectedIds, onSelect, on
       className={styles.root}
       tabIndex={0}
       aria-label="Timeline"
+      aria-describedby="timeline-hint"
       onKeyDown={onKeyDown}
     >
-      <div style={{ padding: "2px 6px", fontSize: 12 }}>
-        <label>
+      <div className={styles.toolbar}>
+        <span className={styles.toolHint} id="timeline-hint">
+          Drag a clip to move it, drag its edge to shorten it, double-click (or Enter) for its
+          settings. Click the ruler to move the play line.
+        </span>
+        <label className={styles.toolCheck}>
           <input
             type="checkbox"
             checked={showOnsets}
@@ -475,6 +534,33 @@ export default function Timeline({ project, transport, selectedIds, onSelect, on
           />{" "}
           Show onsets
         </label>
+        <InfoTip term="Onsets">
+          Every drum hit or note start found in the song, drawn as thin lines. Beats (the stronger
+          marks) appear after Find beats; clips snap to both.
+        </InfoTip>
+        <span className={styles.zoom} role="group" aria-label="Timeline zoom">
+          <button
+            type="button"
+            onClick={() => zoomBy(1 / 1.25)}
+            disabled={pxPerSec <= MIN_PX_PER_SEC}
+            aria-label="Zoom out the timeline"
+            title="Zoom out (−)"
+          >
+            −
+          </button>
+          <button
+            type="button"
+            onClick={() => zoomBy(1.25)}
+            disabled={pxPerSec >= MAX_PX_PER_SEC}
+            aria-label="Zoom in the timeline"
+            title="Zoom in (+)"
+          >
+            +
+          </button>
+          <button type="button" onClick={zoomToFit} title="Show the whole show">
+            Fit
+          </button>
+        </span>
       </div>
       <div ref={scrollerRef} className={styles.scroller}>
         <div
@@ -522,8 +608,11 @@ export default function Timeline({ project, transport, selectedIds, onSelect, on
                 <div
                   key={clip.id}
                   role="button"
+                  tabIndex={0}
                   aria-label={`Clip ${clipLabel(project, clip)}`}
+                  aria-pressed={selectedIds.includes(clip.id)}
                   data-clip-id={clip.id}
+
                   className={[
                     styles.bar,
                     selectedIds.includes(clip.id) ? styles.selected : "",

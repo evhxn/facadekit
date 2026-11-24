@@ -6,6 +6,8 @@ import { defaultGenerator } from "../gl/generators";
 import type { Asset, Clip } from "../api/types";
 import { newId } from "../api/types";
 import EditorHeader from "../components/EditorHeader";
+import { toast } from "../components/toast";
+import UndoButtons, { useUndoShortcuts } from "../components/UndoButtons";
 import PageState from "../components/PageState";
 import { useProjectStore } from "../state/projectStore";
 import ClipForm, { CANVAS_ID } from "./arrange/ClipForm";
@@ -62,19 +64,7 @@ export default function ArrangePage() {
   useEffect(() => () => transport.pause(), [transport]);
 
   // Undo / redo, everywhere on the page except while typing in a field.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.key.toLowerCase() !== "z") return;
-      const el = e.target as HTMLElement | null;
-      if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
-      e.preventDefault();
-      const s = useProjectStore.getState();
-      if (e.shiftKey) s.redo();
-      else s.undo();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  useUndoShortcuts();
 
   if (loadError) {
     return (
@@ -96,6 +86,23 @@ export default function ArrangePage() {
   const firstVisual = project.assets.find((a) => a.kind !== "audio");
   const found = selectedId ? findClip(project, selectedId) : null;
   const formClip = draft?.clip ?? found?.clip ?? null;
+
+  /** "Removed. Undo", taking back the removal only if nothing else changed since. */
+  function undoToast(message: string) {
+    const after = useProjectStore.getState().project;
+    toast(message, {
+      action: {
+        label: "Undo",
+        run: () => {
+          if (useProjectStore.getState().project === after) useProjectStore.getState().undo();
+          else
+            toast("Other changes came after this. Use Undo at the top of the page.", {
+              kind: "info",
+            });
+        },
+      },
+    });
+  }
 
   function startDraft() {
     if (!project) return;
@@ -128,6 +135,7 @@ export default function ArrangePage() {
     update((p) => addClip(p, clip, layer));
     setDraft(null);
     setSelectedId(clip.id);
+    toast("Clip added to the timeline. Press Play to watch it.");
   }
 
   function patch(p: Partial<Clip>) {
@@ -196,10 +204,29 @@ export default function ArrangePage() {
       : 0;
 
   const clipCount = project.timeline.tracks.reduce((n, t) => n + t.clips.length, 0);
+  const todo = draft ? (
+    <>Choose what to show and on which surface, then press &quot;Add to timeline&quot;.</>
+  ) : clipCount === 0 ? (
+    project.assets.length === 0 ? (
+      <>
+        &quot;Import&quot; a video or picture, or press &quot;Add clip&quot; to start with a
+        ready-made effect.
+      </>
+    ) : (
+      <>Press &quot;Add clip&quot;, or drag a file from Media onto the timeline.</>
+    )
+  ) : (
+    <>
+      Press &quot;Play&quot; to watch the show. Drag clips on the timeline to change when they play.
+      When it looks right, go to &quot;Publish&quot;.
+    </>
+  );
   return (
     <>
       <EditorHeader
         title="Arrange"
+        todo={todo}
+        tools={<UndoButtons />}
         help={
           project.surfaces.length === 0 ? (
             <>
@@ -266,6 +293,7 @@ export default function ArrangePage() {
                 const id = formClip.id;
                 update((p) => removeClip(p, id));
                 setSelectedId(null);
+                undoToast("Clip removed.");
               }}
             />
           ) : null}
@@ -286,6 +314,7 @@ export default function ArrangePage() {
               setDraft(null);
               setSelectedId(id);
             }}
+            onRemoved={(n) => undoToast(n === 1 ? "Clip removed." : `${n} clips removed.`)}
           />
         </div>
       </div>
