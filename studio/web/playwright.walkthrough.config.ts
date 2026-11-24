@@ -6,7 +6,8 @@ import { defineConfig, devices } from "@playwright/test";
 // The wizard from an empty data folder to a finished scan, in simulator mode, with a
 // screenshot of every screen (docs/10-ui.md). Separate from the parity run: other port,
 // other folder, and `--sim`.
-const PORT = 8198;
+// FACADEKIT_WALK_PORT lets two checkouts run the walkthrough at the same time.
+const PORT = Number(process.env.FACADEKIT_WALK_PORT ?? 8198);
 // Software WebGL, as in the parity run: headless Chrome has no GPU, and the Arrange preview
 // draws with WebGL.
 const gl = {
@@ -26,6 +27,15 @@ export default defineConfig({
   projects: [
     { name: "dark", use: { ...devices["Desktop Chrome"], ...gl, colorScheme: "dark" } },
     { name: "light", use: { ...devices["Desktop Chrome"], ...gl, colorScheme: "light" } },
+    {
+      name: "laptop",
+      use: {
+        ...devices["Desktop Chrome"],
+        ...gl,
+        colorScheme: "light",
+        viewport: { width: 1024, height: 700 },
+      },
+    },
     { name: "phone", use: { ...devices["Pixel 7"], ...gl, colorScheme: "dark" } },
   ],
   webServer: {

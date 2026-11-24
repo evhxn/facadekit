@@ -103,3 +103,25 @@ In priority order (see the PR for what was done and what was not):
 8. A4/A5 timeline zoom buttons, a hint line, keyboard-reachable clips and rows.
 9. U1/U3/U5 Publish: reasons on disabled buttons, plain render names, next-step line.
 10. X1/X3 reduced motion, and a contrast test on the theme tokens.
+
+## Status after this pass (2026-11-23)
+
+| Finding | Status |
+|---|---|
+| H1 save state | Fixed: header save line, `SaveProblem` banner with What to do and Try again |
+| S1, A2, S7 undo | Fixed: Undo/Redo buttons and shortcuts on Surfaces and Arrange, one step per drag, toasts with Undo after deleting a surface or removing clips |
+| A1 timeline below the fold | Fixed: preview and timeline first; the walkthrough checks the timeline is on screen at 1280x800 and 1024x700. On a phone it now comes right after the preview |
+| H2, S6, A4 shortcuts and help | Fixed: Help dialog (`?`), Help button in the header |
+| S2, A3, U2 jargon | Mostly fixed: InfoTips on Magic select, outlines, the house check, real-world shape, soft edges, Shape, Bend, Layer, Blend, onsets, Render, FPP, FPP address; plainer words for Aspect, Bend (mesh), In offset, Track, exact, Stop, Add surface. "Simple selector (GrabCut)" kept (tests pin the wording); Fit, Opacity, Fade and the effect controls unchanged (effect controls are being reworked separately) |
+| P1, P2 first run | Fixed: welcome guide with the four steps and Start |
+| S3, S4, S5 canvas | Fixed: "Click 4 corners", zoom −/+/Reset view and keys, 12 px handles, one-time tip |
+| A5 keyboard on the timeline | Fixed: clips and clip-list rows are focusable, Enter opens a clip, Delete removes the focused clip |
+| A6 media delete | Fixed: asks first |
+| A7 clip table cut off | Fixed: Loop and Blend columns dropped from the list (they are in the clip settings) |
+| A8, U4 feedback | Fixed: toasts after import, clip added, render ready, sent to FPP |
+| U1, U3, U5 Publish | Fixed: reasons beside disabled buttons, renders listed by date, Next step line |
+| X1 reduced motion | Fixed in `theme.css` |
+| X3 contrast | Checked: `src/theme.test.ts` (AA in both themes) |
+| S8, S9, H3 crowded tool rows and long panels at 1024 px and on phones | Not done |
+| P3, P4 | Not done (P4: the project delete still uses the browser's confirm box) |
+| Setup screens | Out of scope (separate work) |
