@@ -4,6 +4,7 @@ import { ApiError, createProject, deleteProject, listProjects } from "../api/cli
 import { userMessage } from "../api/errors";
 import type { ProjectSummary } from "../api/types";
 import ErrorBanner from "../components/ErrorBanner";
+import WelcomeGuide from "../components/WelcomeGuide";
 import styles from "./ProjectsPage.module.css";
 
 const PRESETS = ["1920x1080", "1280x720", "1280x800", "854x480", "800x480"];
@@ -92,6 +93,16 @@ export default function ProjectsPage() {
         and send the show to your Falcon Player.
       </p>
       {error ? <ErrorBanner message={error} /> : null}
+      {projects !== null ? (
+        <WelcomeGuide
+          first={projects.length === 0}
+          onStart={() => {
+            const field = document.getElementById("project-name");
+            field?.scrollIntoView?.({ block: "center" });
+            field?.focus();
+          }}
+        />
+      ) : null}
       <div className={styles.columns}>
         <section aria-label="Your projects">
           {projects === null && !error ? (
@@ -135,7 +146,13 @@ export default function ProjectsPage() {
           <h2>New project</h2>
           <label className={styles.field}>
             Project name
-            <input value={name} onChange={(e) => setName(e.target.value)} required />
+            <input
+              id="project-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="For example: Our house, Halloween"
+              required
+            />
           </label>
           <label className={styles.field}>
             Projector resolution

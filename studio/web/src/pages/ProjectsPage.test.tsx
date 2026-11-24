@@ -63,4 +63,22 @@ describe("ProjectsPage", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "Delete" })[0]!);
     await waitFor(() => expect(m.deleteProject).toHaveBeenCalledWith("p1"));
   });
+
+  it("a first visit shows the four steps and Start takes you to the name field", async () => {
+    m.listProjects.mockResolvedValue([]);
+    renderPage();
+    const guide = await screen.findByRole("region", { name: /Welcome/ });
+    for (const step of ["Setup", "Surfaces", "Arrange", "Publish"]) {
+      expect(guide.textContent).toContain(step);
+    }
+    fireEvent.click(screen.getByRole("button", { name: "Start your first project" }));
+    expect(document.activeElement).toBe(screen.getByLabelText("Project name"));
+  });
+
+  it("with projects, the steps are folded away", async () => {
+    renderPage();
+    await screen.findByText("Front yard");
+    expect(screen.queryByRole("region", { name: /Welcome/ })).toBeNull();
+    expect(screen.getByText("How FacadeKit works (4 steps)")).toBeTruthy();
+  });
 });
