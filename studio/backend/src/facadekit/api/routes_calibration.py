@@ -49,6 +49,7 @@ from facadekit.devices.cropped import CroppedCamera
 from facadekit.devices.display_ws import WsDisplay
 from facadekit.errors import (
     BAD_REQUEST,
+    CALIBRATION_BUSY,
     INTERNAL,
     NOT_FOUND,
     PROJECTOR_NOT_CONNECTED,
@@ -77,6 +78,60 @@ router = APIRouter()
 log = logging.getLogger(__name__)
 
 State = Annotated[AppState, Depends(get_state)]
+
+
+class _CalibrationSlots:
+    """One calibration job per project at a time (queued or running).
+
+    A second start request used to queue behind the first and run a second scan once the
+    first had finished. A job that was cancelled (queued, or running and asked to stop) no
+    longer holds the slot, so "cancel, then start again" works at once.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._held: dict[str, tuple[str, JobRunner]] = {}
+
+    @staticmethod
+    def _holder(held: tuple[str, JobRunner] | None) -> tuple[str, str] | None:
+        """(job id, state) of a job that still blocks the project, else None."""
+        if held is None:
+            return None
+        job_id, jobs = held
+        try:
+            job = jobs.get(job_id)
+            if job.state not in ("queued", "running") or jobs.cancel_requested(job_id):
+                return None
+        except FkError:
+            return None
+        return job_id, job.state
+
+    def check(self, pid: str) -> None:
+        with self._lock:
+            self._raise_if_busy(pid, self._held.get(pid))
+
+    @staticmethod
+    def _raise_if_busy(pid: str, held: tuple[str, JobRunner] | None) -> None:
+        busy = _CalibrationSlots._holder(held)
+        if busy is not None:
+            job_id, job_state = busy
+            raise FkError(
+                CALIBRATION_BUSY,
+                f"A scan for this project is already {job_state} (job {job_id}). "
+                "Wait for it to finish, or cancel it, then start again.",
+            )
+
+    def submit(
+        self, pid: str, jobs: JobRunner, fn: Callable[[Progress, Cancel], dict[str, Any]]
+    ) -> str:
+        with self._lock:
+            self._raise_if_busy(pid, self._held.get(pid))
+            job = jobs.submit("calibration", fn)
+            self._held[pid] = (job.id, jobs)
+            return job.id
+
+
+_CALIBRATIONS = _CalibrationSlots()
 
 
 class CalibrationRequest(BaseModel):
@@ -180,6 +235,7 @@ def start_calibration(pid: str, body: CalibrationRequest, state: State) -> dict[
     project_dir = state.store.project_dir(pid)
     project_size = (project.projector.width, project.projector.height)
     settings = body.settings or CalibSettings()
+    _CALIBRATIONS.check(pid)
 
     if body.mode == "manual":
 
@@ -187,7 +243,7 @@ def start_calibration(pid: str, body: CalibrationRequest, state: State) -> dict[
             cal = create_manual_calibration(project_dir, project.projector)
             return _finish(state, pid, cal.id)
 
-        return {"job_id": state.jobs.submit("calibration", manual_job).id}
+        return {"job_id": _CALIBRATIONS.submit(pid, state.jobs, manual_job)}
 
     camera_id = body.camera_id
     if not camera_id:
@@ -225,7 +281,7 @@ def start_calibration(pid: str, body: CalibrationRequest, state: State) -> dict[
             state.cameras.release(camera_id)
         return _finish(state, pid, cal.id)
 
-    return {"job_id": state.jobs.submit("calibration", scan_job).id}
+    return {"job_id": _CALIBRATIONS.submit(pid, state.jobs, scan_job)}
 
 
 def _submit_pi_scan(
@@ -308,7 +364,7 @@ def _submit_pi_scan(
         )
         return _finish(state, pid, cal.id)
 
-    return state.jobs.submit("calibration", pi_job).id
+    return _CALIBRATIONS.submit(pid, state.jobs, pi_job)
 
 
 def _finish(state: AppState, project_id: str, calibration_id: str) -> dict[str, Any]:

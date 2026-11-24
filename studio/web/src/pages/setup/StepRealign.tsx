@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { ApiError, cancelJob, getCalibration, projViewUrl, realign, startCalibration } from "../../api/client";
+import {
+  ApiError,
+  cancelJob,
+  getCalibration,
+  projViewUrl,
+  realign,
+  startCalibration,
+} from "../../api/client";
 import type { RealignResponse } from "../../api/client";
 import { userMessage } from "../../api/errors";
 import { waitForJob } from "../../api/events";
@@ -7,6 +14,7 @@ import type { Calibration, Job, Project } from "../../api/types";
 import ErrorBanner from "../../components/ErrorBanner";
 import JobProgress from "../../components/JobProgress";
 import { useProjectStore } from "../../state/projectStore";
+import { beginScan, endScan, useScanBusy } from "../../state/scanGuard";
 import styles from "../SetupPage.module.css";
 
 interface Props {
@@ -32,6 +40,7 @@ export default function StepRealign({ project, cameraId, onChooseCamera }: Props
   const [busy, setBusy] = useState(false);
   const [needsCamera, setNeedsCamera] = useState(false);
   const mounted = useRef(true);
+  const scanBusy = useScanBusy(pid);
 
   useEffect(() => {
     mounted.current = true;
@@ -41,11 +50,22 @@ export default function StepRealign({ project, cameraId, onChooseCamera }: Props
   }, []);
 
   const start = async () => {
+    if (!beginScan(pid)) return;
+    try {
+      await startScan();
+    } finally {
+      endScan(pid);
+    }
+  };
+
+  const startScan = async () => {
     const oldId = project.calibration_id;
     if (!oldId) return;
     if (!cameraId) {
       // The request used to go out without a camera and come back as an unexplained 422.
-      setError("No camera is chosen yet. Choose the camera that will watch the projection, then scan again.");
+      setError(
+        "No camera is chosen yet. Choose the camera that will watch the projection, then scan again.",
+      );
       setNeedsCamera(true);
       setPhase("failed");
       return;
@@ -94,13 +114,21 @@ export default function StepRealign({ project, cameraId, onChooseCamera }: Props
         setPhase("preview");
       } catch (e) {
         if (!mounted.current) return;
-        setError(e instanceof ApiError ? userMessage(e.code, e.message) : "Re-align failed. Keep the new scan and place the surfaces by hand.");
+        setError(
+          e instanceof ApiError
+            ? userMessage(e.code, e.message)
+            : "Re-align failed. Keep the new scan and place the surfaces by hand.",
+        );
         setPhase("failed");
         await useProjectStore.getState().load(pid);
       }
     } catch (e) {
       if (!mounted.current) return;
-      setError(e instanceof ApiError ? userMessage(e.code, e.message) : "The scan failed. Check that the camera and projector window are open, then try again.");
+      setError(
+        e instanceof ApiError
+          ? userMessage(e.code, e.message)
+          : "The scan failed. Check that the camera and projector window are open, then try again.",
+      );
       setPhase("failed");
     }
   };
@@ -118,7 +146,11 @@ export default function StepRealign({ project, cameraId, onChooseCamera }: Props
       if (mounted.current) setPhase("applied");
     } catch (e) {
       if (mounted.current) {
-        setError(e instanceof ApiError ? userMessage(e.code, e.message) : "Could not apply the change. Try Apply again, or place the surfaces by hand.");
+        setError(
+          e instanceof ApiError
+            ? userMessage(e.code, e.message)
+            : "Could not apply the change. Try Apply again, or place the surfaces by hand.",
+        );
         setPhase("failed");
       }
     } finally {
@@ -134,7 +166,7 @@ export default function StepRealign({ project, cameraId, onChooseCamera }: Props
   if (phase === "idle") {
     return (
       <section>
-        <button type="button" onClick={() => void start()}>
+        <button type="button" onClick={() => void start()} disabled={scanBusy}>
           Projector moved? Re-scan and re-align
         </button>
       </section>
