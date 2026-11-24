@@ -79,6 +79,18 @@ export default function PublishPage() {
       <EditorHeader
         title="Publish"
         help="Render the show as a video for the projector, then send it to Falcon Player (FPP) on your Raspberry Pi."
+        todo={
+          clipCount === 0 ? (
+            <>
+              The show is empty. Go back to <Link to={`/p/${project.id}/arrange`}>Arrange</Link> and
+              add a clip.
+            </>
+          ) : renders.length === 0 ? (
+            "Press Render show. When the video is ready, it appears in the list."
+          ) : (
+            "Type your FPP address (often fpp.local), press Connect, then Send to FPP."
+          )
+        }
       />
       <ol className={styles.steps}>
         <li data-done={clipCount > 0 || undefined}>
