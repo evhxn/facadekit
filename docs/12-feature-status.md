@@ -41,7 +41,8 @@ tests. It does not mean it was tried on hardware. Hardware evidence so far: the 
 |---|---|---|
 | Media import (video, image, audio) | Real | Size caps from AUDIT-02 |
 | Timeline, clips, fades, blend modes | Real | |
-| Effects (generators) | Thin | Three: `solid`, `wash`, `outline` |
+| Effects (generators) | Real, preview and render checked by the parity test only | Twelve: `solid`, `wash`, `outline`, `strobe`, plus `chase` (marching border), `rings`, `stars`, `snow`, `sweep`, `cycle`, `plasma`, `flicker` (seeded, deterministic). Each new one has a parity scene; none has been seen on a real house or projector. `flicker` is capped at 3 changes a second; `strobe` keeps its T-109 default of 8 Hz but the form warns above 3 Hz |
+| Sample projects | Real, simulator only | "Try a sample project" on Projects, or `facadekit new DIR.fkproj --sample [halloween\|winter]`: a simulated house (scan, door found on the scan, two windows) and a 12 s show of built-in effects and drawn pictures, labelled "simulated house". Reaches Publish with no hardware; the walkthrough runs it |
 | Live preview in the browser (WebGL) | Real | Approximate by design; the parity test keeps it close to the render |
 | Beat detection | Optional, off by default | Needs `librosa` (`facadekit[ai]`), which a normal install does not have |
 | Phone as a remote | Real | |
@@ -63,7 +64,7 @@ tests. It does not mean it was tried on hardware. Hardware evidence so far: the 
 
 ## Not built at all
 
-- Sample projects with CC0 content (`docs/06`, v1).
+- Sample projects on a photo of a real house (the samples use the simulated house only).
 - Everything v2: generative content (bring-your-own-key), the FPP plugin.
 - Installers: `packaging/` has a PyInstaller spec, launcher and smoke test, but no built or
   signed installer has been produced.
