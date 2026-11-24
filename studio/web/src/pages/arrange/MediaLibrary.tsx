@@ -3,6 +3,7 @@ import { ApiError, assetThumbUrl, deleteAsset, uploadAsset } from "../../api/cli
 import { userMessage } from "../../api/errors";
 import type { Asset } from "../../api/types";
 import { useProjectStore } from "../../state/projectStore";
+import { toast } from "../../components/toast";
 import styles from "./MediaLibrary.module.css";
 
 interface Upload {
@@ -65,6 +66,7 @@ export default function MediaLibrary({
         const result = await uploadAsset(projectId, file, (f) => patchUpload(key, { progress: f }));
         replace(result.project);
         setUploads((list) => list.filter((u) => u.key !== key));
+        toast(`Imported ${file.name}.`);
       } catch (e) {
         patchUpload(key, {
           error: e instanceof ApiError ? userMessage(e.code, e.message) : "Upload failed.",
@@ -74,6 +76,9 @@ export default function MediaLibrary({
   }
 
   async function remove(asset: Asset) {
+    // A deleted file cannot be brought back with Undo: ask first.
+    if (!window.confirm(`Remove "${asset.original_name}" from this project? This cannot be undone.`))
+      return;
     setDeleteError(null);
     try {
       await useProjectStore.getState().saveNow();

@@ -127,7 +127,14 @@ export default function ClipList({
               key={clip.id}
               className={clip.id === selectedId ? styles.selected : undefined}
               aria-selected={clip.id === selectedId}
+              tabIndex={0}
               onClick={() => onSelect(clip.id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onSelect(clip.id);
+                }
+              }}
             >
               <td>{trackIndex + 1}</td>
               <td>{clipLabel(project, clip)}</td>

@@ -8,6 +8,7 @@ import {
   type GeneratorType,
   type ParamSpec,
 } from "../../gl/generators";
+import InfoTip from "../../components/InfoTip";
 import styles from "./ClipForm.module.css";
 
 const FIT_HELP: Record<Clip["fit"], string> = {
@@ -231,20 +232,32 @@ export default function ClipForm({
           {!surfaceKnown ? <option value={clip.surface_id}>Missing surface</option> : null}
         </select>
       </label>
-      <label>
-        Layer
-        <select
-          value={String(layer)}
-          onChange={(e) => onLayer(e.target.value === "new" ? "new" : Number(e.target.value))}
-        >
-          {tracks.map((t, i) => (
-            <option key={t.id} value={i}>
-              {`Track ${i + 1}`}
-            </option>
-          ))}
-          <option value="new">New layer on top</option>
-        </select>
-      </label>
+      <div className={styles.withTip}>
+        <label>
+          Layer
+          <select
+            value={String(layer)}
+            onChange={(e) => onLayer(e.target.value === "new" ? "new" : Number(e.target.value))}
+          >
+            {tracks.map((t, i) => (
+              <option key={t.id} value={i}>
+                {`Layer ${i + 1}${
+                  tracks.length > 1 && i === 0
+                    ? " (bottom)"
+                    : tracks.length > 1 && i === tracks.length - 1
+                      ? " (top)"
+                      : ""
+                }`}
+              </option>
+            ))}
+            <option value="new">New layer on top</option>
+          </select>
+        </label>
+        <InfoTip term="Layer">
+          When two clips play on the same surface at the same time, the one on the higher layer is
+          in front.
+        </InfoTip>
+      </div>
       <div className={styles.row}>
         <SecondsInput
           label="Start (s)"
@@ -259,7 +272,7 @@ export default function ClipForm({
         />
         {isEffect ? null : (
           <SecondsInput
-            label="In offset (s)"
+            label="Skip first (s)"
             valueMs={clip.in_offset_ms}
             onCommit={(ms) => onPatch({ in_offset_ms: ms })}
           />
@@ -312,18 +325,25 @@ export default function ClipForm({
           onCommit={(ms) => onPatch({ fade_out_ms: ms })}
         />
       </div>
-      <label>
-        Blend
-        <select
-          value={clip.blend}
-          onChange={(e) => onPatch({ blend: e.target.value as Clip["blend"] })}
-        >
-          <option value="normal">Normal</option>
-          <option value="add">Add</option>
-          <option value="screen">Screen</option>
-        </select>
-        <small>Use Add or Screen for videos with a black background</small>
-      </label>
+      <div className={styles.withTip}>
+        <label>
+          Blend
+          <select
+            value={clip.blend}
+            onChange={(e) => onPatch({ blend: e.target.value as Clip["blend"] })}
+          >
+            <option value="normal">Normal</option>
+            <option value="add">Add</option>
+            <option value="screen">Screen</option>
+          </select>
+          <small>Use Add or Screen for videos with a black background</small>
+        </label>
+        <InfoTip term="Blend">
+          How this clip mixes with what is under it. Normal covers it. Add and Screen let the dark
+          parts disappear, so a flame or snow video on a black background shows only the flames or
+          flakes.
+        </InfoTip>
+      </div>
       {message ? (
         <p role="alert" className={styles.message}>
           {message}
