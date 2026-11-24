@@ -129,12 +129,14 @@ describe("PublishPage", () => {
   it("strips the scheme when probing and gates Send on ok", async () => {
     renderPage();
     await screen.findByText("old.mp4");
+    expect(screen.getByText("Type the FPP address above and press Connect first.")).toBeTruthy();
     await connect(false);
     expect(await screen.findByText("FPP 9.4 is too old…")).toBeTruthy();
     expect((screen.getByText("Send to FPP") as HTMLButtonElement).disabled).toBe(true);
     await connect(true);
     await screen.findByText("Connected to FPP 9.4");
     expect((screen.getByText("Send to FPP") as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.queryByText("Type the FPP address above and press Connect first.")).toBeNull();
     expect(useProjectStore.getState().project?.fpp.host).toBe("fpp.local");
   });
 
