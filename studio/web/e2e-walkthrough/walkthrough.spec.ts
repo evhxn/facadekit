@@ -253,3 +253,33 @@ test("from no project to a finished scan", async ({ page }, info) => {
   await check(page);
   expect(errors).toEqual([]);
 });
+
+test("sample project from Projects to a finished render, no hardware", async ({ page }, info) => {
+  const who = info.project.name;
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Try a sample project" })).toBeVisible();
+  await page.getByLabel("Theme").selectOption("winter");
+  await shot(page, who, "20-projects-sample");
+  await page.getByRole("button", { name: "Try a sample project" }).click();
+
+  // The simulated scan, surfaces and show are made in a job; the sample opens in Arrange.
+  await expect(page).toHaveURL(/\/arrange$/, { timeout: 120000 });
+  await page.waitForLoadState("networkidle");
+  await expect(page.getByAltText("Exact rendered frame")).toBeVisible({ timeout: 30000 });
+  await shot(page, who, "21-sample-arrange");
+  await expectNoSidewaysScroll(page);
+
+  await page.getByRole("link", { name: "Publish →" }).click();
+  await expect(page).toHaveURL(/\/publish$/);
+  await page.getByRole("button", { name: "Render show" }).click();
+  await expect(page.getByRole("list", { name: "Renders" })).toBeVisible({ timeout: 180000 });
+  await shot(page, who, "22-sample-publish");
+  await expectNoSidewaysScroll(page);
+
+  await page.goto("/");
+  await expect(page.getByText("Sample: Winter (simulated house)").first()).toBeVisible();
+  expect(errors).toEqual([]);
+});

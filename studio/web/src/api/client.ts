@@ -111,6 +111,10 @@ export const getDiagnostics = () => request<Record<string, unknown>>("GET", "/di
 export const listProjects = () => request<ProjectSummary[]>("GET", "/projects");
 export const createProject = (name: string, projector?: ProjectorSpec) =>
   request<Project>("POST", "/projects", { name, projector });
+export type SampleTheme = "halloween" | "winter";
+/** A project on the simulated house with a short show (no hardware); built in a job. */
+export const createSampleProject = (theme: SampleTheme) =>
+  request<{ job_id: string; project_id: string }>("POST", "/projects/samples", { theme });
 export const getProject = (id: string) => request<Project>("GET", `/projects/${enc(id)}`);
 export const putProject = (project: Project) =>
   request<Project>("PUT", `/projects/${enc(project.id)}`, project);
