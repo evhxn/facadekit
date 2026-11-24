@@ -47,6 +47,7 @@ def test_sample_project_is_complete_and_procedural(tmp_path: Path, theme: str) -
     # Only built-in effects and pictures drawn by FacadeKit: no video, no audio.
     assert {a.kind for a in project.assets} == {"image"}
     assert all((folder / a.filename).is_file() for a in project.assets)
+    assert all((folder / "media" / f"{a.id}.thumb.jpg").is_file() for a in project.assets)
     assert project.timeline.audio_asset_id is None
     effects = {c.generator.type for c in clips if c.generator is not None}
     assert len(effects) >= 4

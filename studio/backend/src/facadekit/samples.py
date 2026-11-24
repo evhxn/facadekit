@@ -25,6 +25,7 @@ from facadekit.calib.pipeline import run_calibration
 from facadekit.errors import INTERNAL, FkError
 from facadekit.geom.homography import estimate_aspect
 from facadekit.ids import new_id
+from facadekit.media.probe import make_thumbnail
 from facadekit.models.calibration import CalibSettings
 from facadekit.models.project import (
     CANVAS,
@@ -61,6 +62,8 @@ def _write_png(project_dir: Path, image: np.ndarray, original: str) -> Asset:
     rel = f"media/{asset_id}.png"
     if not cv2.imwrite(str(project_dir / rel), image):
         raise FkError(INTERNAL, f"Could not write the sample picture {original}")
+    # The media library shows a thumbnail, made the same way as for an uploaded picture.
+    make_thumbnail(project_dir / rel, "image", project_dir / "media" / f"{asset_id}.thumb.jpg")
     h, w = image.shape[:2]
     return Asset(
         id=asset_id, kind="image", filename=rel, original_name=original, width=w, height=h,
