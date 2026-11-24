@@ -365,3 +365,61 @@ def test_request_settings_reject_unknown_keys(sim_client: TestClient) -> None:
     ):
         body = {"mode": "scan", "camera_id": "sim", "settings": settings}
         assert sim_client.post(url, json=body).status_code == 422, settings
+
+
+def _hold_worker(client: TestClient) -> Any:
+    """Occupy the single job worker so later jobs stay queued. Returns the release callable."""
+    import threading
+
+    jobs = client.app.state.fk.jobs  # type: ignore[attr-defined]
+    started = threading.Event()
+    release = threading.Event()
+
+    def blocker(_progress: Any, _cancel: Any) -> dict[str, Any]:
+        started.set()
+        release.wait(30)
+        return {}
+
+    jobs.submit("render", blocker)
+    assert started.wait(10)
+    return release.set
+
+
+def test_second_start_while_first_is_active_is_refused(sim_client: TestClient) -> None:
+    release = _hold_worker(sim_client)
+    try:
+        a = _project(sim_client)
+        b = _project(sim_client)
+        url = f"{API}/projects/{a['id']}/calibrations"
+        first = sim_client.post(url, json={"mode": "manual"})
+        assert first.status_code == 202
+        first_id = first.json()["job_id"]
+        for body in ({"mode": "manual"}, {"mode": "scan", "camera_id": "sim"}):
+            second = sim_client.post(url, json=body)
+            assert second.status_code == 409, second.text
+            err = second.json()["error"]
+            assert err["code"] == "CALIBRATION_BUSY"
+            assert first_id in err["message"]
+        # Only one calibration job exists for the project.
+        jobs = sim_client.app.state.fk.jobs.recent()  # type: ignore[attr-defined]
+        assert [j.kind for j in jobs].count("calibration") == 1
+        # Another project is not blocked.
+        other = sim_client.post(f"{API}/projects/{b['id']}/calibrations", json={"mode": "manual"})
+        assert other.status_code == 202
+        # Cancelling the first frees the project at once.
+        assert sim_client.post(f"{API}/jobs/{first_id}/cancel").status_code == 200
+        again = sim_client.post(url, json={"mode": "manual"})
+        assert again.status_code == 202
+        assert again.json()["job_id"] != first_id
+    finally:
+        release()
+
+
+def test_start_is_allowed_again_after_the_job_finishes(sim_client: TestClient) -> None:
+    project = _project(sim_client)
+    url = f"{API}/projects/{project['id']}/calibrations"
+    first = sim_client.post(url, json={"mode": "manual"})
+    assert _wait(sim_client, first.json()["job_id"])["state"] == "succeeded"
+    second = sim_client.post(url, json={"mode": "manual"})
+    assert second.status_code == 202
+    assert _wait(sim_client, second.json()["job_id"])["state"] == "succeeded"

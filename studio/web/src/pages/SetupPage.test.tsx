@@ -5,6 +5,7 @@ import * as client from "../api/client";
 import * as events from "../api/events";
 import type { Calibration, CameraCheck, CameraRoi, Job, Project } from "../api/types";
 import { useProjectStore } from "../state/projectStore";
+import { resetScanGuard } from "../state/scanGuard";
 import SetupPage from "./SetupPage";
 import StepCamera from "./setup/StepCamera";
 import StepProjector from "./setup/StepProjector";
@@ -73,6 +74,7 @@ function calibration(warnings: string[] = []): Calibration {
 }
 
 beforeEach(() => {
+  resetScanGuard();
   useProjectStore.setState({ project, dirty: false });
   m.getProject.mockResolvedValue(project);
   m.health.mockResolvedValue({ status: "ok", version: "0", sim: false });
@@ -513,6 +515,61 @@ describe("Step 3 - scan", () => {
     renderScan();
     fireEvent.click(screen.getByRole("button", { name: "Start scan" }));
     expect(await screen.findByText(/could not see the red areas/)).toBeTruthy();
+  });
+
+  it("two rapid clicks on Start scan start one scan", async () => {
+    let finish: (j: Job) => void = () => {};
+    m.startCalibration.mockResolvedValue({ job_id: "j1" });
+    ev.waitForJob.mockReturnValue(new Promise<Job>((resolve) => (finish = resolve)));
+    renderScan();
+    const start = screen.getByRole("button", { name: "Start scan" });
+    fireEvent.click(start);
+    fireEvent.click(start); // the same button again, before React has re-rendered
+    await screen.findByText("Do not walk in front of the projector.");
+    expect(m.startCalibration).toHaveBeenCalledTimes(1);
+    await act(async () => finish(job({ state: "failed", error: null, result: null })));
+  });
+
+  it("keeps a second scan out while the first runs, also after the step is opened again", async () => {
+    let finish: (j: Job) => void = () => {};
+    m.startCalibration.mockResolvedValue({ job_id: "j1" });
+    ev.waitForJob.mockReturnValue(new Promise<Job>((resolve) => (finish = resolve)));
+    const first = renderScan();
+    fireEvent.click(screen.getByRole("button", { name: "Start scan" }));
+    await screen.findByText("Do not walk in front of the projector.");
+    first.unmount(); // user goes Back and returns while the scan still runs
+    renderScan();
+    const again = screen.getByRole("button", { name: "Start scan" }) as HTMLButtonElement;
+    expect(again.disabled).toBe(true);
+    expect(screen.getByRole("status").textContent).toMatch(/already running/);
+    fireEvent.click(again);
+    fireEvent.click(screen.getByRole("button", { name: "Skip scan (manual mode)" }));
+    expect(m.startCalibration).toHaveBeenCalledTimes(1);
+    await act(async () => finish(job({ state: "failed", error: null, result: null })));
+    // The scan ended: the slot is free again.
+    await waitFor(() =>
+      expect(
+        (screen.getByRole("button", { name: "Start scan" }) as HTMLButtonElement).disabled,
+      ).toBe(false),
+    );
+  });
+
+  it("shows the server's busy message when it refuses a second scan", async () => {
+    m.startCalibration.mockRejectedValue(
+      new client.ApiError(
+        "CALIBRATION_BUSY",
+        "A scan for this project is already running (job job_9).",
+        409,
+      ),
+    );
+    renderScan();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Start scan" }));
+    });
+    expect(await screen.findByText(/already running \(job job_9\)/)).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Retry" }) as HTMLButtonElement).disabled).toBe(
+      false,
+    );
   });
 
   it("starts a Pi-driven scan with the FPP host", async () => {

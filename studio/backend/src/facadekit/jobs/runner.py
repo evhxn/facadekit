@@ -68,6 +68,12 @@ class JobRunner:
             self._emit(snapshot)
         return result
 
+    def cancel_requested(self, job_id: str) -> bool:
+        """True once cancel() was called for this job (a running job may still be winding down)."""
+        with self._lock:
+            self._lookup(job_id)
+            return self._cancel[job_id].is_set()
+
     def shutdown(self) -> None:
         with self._lock:
             for event in self._cancel.values():

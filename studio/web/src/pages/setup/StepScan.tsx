@@ -20,6 +20,7 @@ import LearningPanel from "./LearningPanel";
 import ScanResultView from "./ScanResultView";
 import PhoneScanPanel from "./PhoneScanPanel";
 import { useProjectStore } from "../../state/projectStore";
+import { beginScan, endScan, useScanBusy } from "../../state/scanGuard";
 import styles from "../SetupPage.module.css";
 
 interface Props {
@@ -111,7 +112,19 @@ export default function StepScan({
     setError(message);
   };
 
+  // A second click (or another button, or this step opened again) while a scan is starting or
+  // running is ignored: it used to queue a second scan behind the first.
+  const scanBusy = useScanBusy(pid);
   const run = async (mode: "scan" | "manual") => {
+    if (!beginScan(pid)) return;
+    try {
+      await runScan(mode);
+    } finally {
+      endScan(pid);
+    }
+  };
+
+  const runScan = async (mode: "scan" | "manual") => {
     setError(null);
     setNoCamera(false);
     setPhase("running");
@@ -219,8 +232,8 @@ export default function StepScan({
         ) : null}
         {low && hasReasons ? (
           <p>
-            A large part was not measured. Surfaces in the coloured areas are placed by estimate
-            and may need manual alignment.
+            A large part was not measured. Surfaces in the coloured areas are placed by estimate and
+            may need manual alignment.
           </p>
         ) : null}
         {calibration.quality?.verdict === "marginal" ||
@@ -230,14 +243,16 @@ export default function StepScan({
         {warnings.includes("CROP_TOO_TIGHT") ? <p>{COPY.cropTight}</p> : null}
         {warnings.includes("NON_PLANAR") ? (
           <p>
-            This wall is not flat: something sticks out or steps back (a ledge, a box, a book).
-            That is OK. A four-corner surface is flat, so on such a part draw a separate surface
-            for each flat face, or bend one surface with the mesh editor on the Surfaces page.
+            This wall is not flat: something sticks out or steps back (a ledge, a box, a book). That
+            is OK. A four-corner surface is flat, so on such a part draw a separate surface for each
+            flat face, or bend one surface with the mesh editor on the Surfaces page.
           </p>
         ) : null}
         {warnings.includes("CAMERA_CONTROLS_UNAVAILABLE") ? (
           <p className={styles.note}>
-            This camera does not let FacadeKit lock its exposure (the built-in MacBook camera never does), so bright parts can come out washed out. A USB webcam such as a Logitech C920 can be locked, and FacadeKit then dims the projection until nothing is washed out.
+            This camera does not let FacadeKit lock its exposure (the built-in MacBook camera never
+            does), so bright parts can come out washed out. A USB webcam such as a Logitech C920 can
+            be locked, and FacadeKit then dims the projection until nothing is washed out.
           </p>
         ) : null}
         <div className={styles.row}>
@@ -251,11 +266,12 @@ export default function StepScan({
           >
             Continue to surfaces
           </button>
-          <button type="button" onClick={again}>
+          <button type="button" onClick={again} disabled={scanBusy}>
             Scan again
           </button>
           <button
             type="button"
+            disabled={scanBusy}
             onClick={() => {
               feedback("bad");
               again();
@@ -281,7 +297,9 @@ export default function StepScan({
               At a steep angle the far side of the picture is dimmer and its pixels are stretched.
               Moving the projector to face the wall more squarely gives a brighter, sharper show.
             </li>
-            <li>The whole projection has to be inside the camera picture, with a little room around.</li>
+            <li>
+              The whole projection has to be inside the camera picture, with a little room around.
+            </li>
           </ul>
         </details>
         <p className={styles.note}>
@@ -362,10 +380,15 @@ export default function StepScan({
               message={error}
               actions={
                 <>
-                  <button type="button" onClick={() => void run("scan")} className="primary">
+                  <button
+                    type="button"
+                    onClick={() => void run("scan")}
+                    className="primary"
+                    disabled={scanBusy}
+                  >
                     Retry
                   </button>
-                  <button type="button" onClick={() => void run("manual")}>
+                  <button type="button" onClick={() => void run("manual")} disabled={scanBusy}>
                     Use manual mode
                   </button>
                 </>
@@ -373,14 +396,24 @@ export default function StepScan({
             />
           ) : (
             <div className={styles.row}>
-              <button type="button" onClick={() => void run("scan")} className="primary">
+              <button
+                type="button"
+                onClick={() => void run("scan")}
+                className="primary"
+                disabled={scanBusy}
+              >
                 Start scan
               </button>
-              <button type="button" onClick={() => void run("manual")}>
+              <button type="button" onClick={() => void run("manual")} disabled={scanBusy}>
                 Skip scan (manual mode)
               </button>
             </div>
           )}
+          {scanBusy ? (
+            <p className={styles.note} role="status">
+              A scan is already running for this project. Wait for it to finish.
+            </p>
+          ) : null}
           {noCameraBanner}
           {piHost ? null : (
             <p>

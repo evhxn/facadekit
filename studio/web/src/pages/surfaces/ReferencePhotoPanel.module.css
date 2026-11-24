@@ -1,0 +1,22 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+.panel h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+.help {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.choose {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}

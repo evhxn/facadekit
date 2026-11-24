@@ -25,6 +25,7 @@ from facadekit.api import (
     routes_learning,
     routes_projector,
     routes_projects,
+    routes_reference,
     routes_render,
     routes_verify,
 )
@@ -156,6 +157,7 @@ def create_app(
 
     api.include_router(routes_projects.router)
     api.include_router(routes_assets.router)
+    api.include_router(routes_reference.router)
     api.include_router(routes_devices.router)
     api.include_router(routes_diagnostics.router)
     api.include_router(routes_calibration.router)

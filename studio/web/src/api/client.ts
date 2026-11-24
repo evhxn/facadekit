@@ -194,6 +194,35 @@ export const assetThumbUrl = (pid: string, aid: string) =>
 export const deleteAsset = (pid: string, aid: string) =>
   request<Project>("DELETE", `/projects/${enc(pid)}/assets/${enc(aid)}`);
 
+/** Reference photo of manual mode (a picture to place surfaces on by eye; never measured). */
+export interface ReferencePhotoInfo {
+  width: number;
+  height: number;
+  size_bytes: number;
+  updated_at: string;
+}
+/** null when the project has no photo. */
+export async function getReferencePhoto(pid: string): Promise<ReferencePhotoInfo | null> {
+  try {
+    return await request<ReferencePhotoInfo>("GET", `/projects/${enc(pid)}/reference-photo`);
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) return null;
+    throw e;
+  }
+}
+export const uploadReferencePhoto = (pid: string, file: File): Promise<ReferencePhotoInfo> =>
+  xhrUpload(
+    `/projects/${enc(pid)}/reference-photo`,
+    file,
+    undefined,
+    "The upload was stopped. Choose the photo again.",
+  );
+export const deleteReferencePhoto = (pid: string) =>
+  request<void>("DELETE", `/projects/${enc(pid)}/reference-photo`);
+/** The photo fitted into the projector frame; `version` (its updated_at) defeats the cache. */
+export const referencePhotoViewUrl = (pid: string, version: string) =>
+  `${BASE}/projects/${enc(pid)}/reference-photo/view.jpg?v=${enc(version)}`;
+
 export const getLearning = () => request<LearningSummary>("GET", "/learning/scans");
 export const forgetLearning = () => request<void>("DELETE", "/learning/scans");
 
