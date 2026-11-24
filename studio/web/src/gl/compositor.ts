@@ -57,6 +57,8 @@ export interface ClipUniforms {
   dst: Rect;
   featherUv: [number, number];
   blend: Clip["blend"];
+  /** Surface width / height (generators keep circles round with it). */
+  aspect: number;
 }
 
 const dist = (p: Pt, q: Pt) => Math.hypot(p[0] - q[0], p[1] - q[1]);
@@ -103,6 +105,7 @@ export function clipUniforms(
     dst,
     featherUv,
     blend: clip.blend,
+    aspect,
   };
 }
 
@@ -176,6 +179,8 @@ export class PreviewCompositor {
       "u_genColA",
       "u_genColB",
       "u_genP",
+      "u_genQ",
+      "u_genAspect",
       "u_genTc",
       "u_meshOn",
     ]) {
@@ -300,12 +305,14 @@ export class PreviewCompositor {
         u = clipUniforms(project, clip, asset, entry!.source.width, entry!.source.height);
       }
       if (!u) continue;
-      const gu = gen ? generatorUniforms(gen, (tMs - clip.start_ms) / 1000) : null;
+      const gu = gen ? generatorUniforms(gen, (tMs - clip.start_ms) / 1000, u.aspect) : null;
       gl.uniform1i(this.loc.u_genType!, gu ? gu.type : 0);
       if (gu) {
         gl.uniform3f(this.loc.u_genColA!, ...gu.colA);
         gl.uniform3f(this.loc.u_genColB!, ...gu.colB);
         gl.uniform4f(this.loc.u_genP!, ...gu.p);
+        gl.uniform4f(this.loc.u_genQ!, ...gu.q);
+        gl.uniform1f(this.loc.u_genAspect!, gu.aspect);
         gl.uniform1f(this.loc.u_genTc!, gu.tc);
       }
       const quad = this.surfaceQuad(project, clip);

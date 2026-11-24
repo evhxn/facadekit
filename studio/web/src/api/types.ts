@@ -35,7 +35,19 @@ export interface Asset {
   has_alpha: boolean;
 }
 export interface Generator {
-  type: "solid" | "wash" | "outline" | "strobe";
+  type:
+    | "solid"
+    | "wash"
+    | "outline"
+    | "strobe"
+    | "chase"
+    | "rings"
+    | "stars"
+    | "snow"
+    | "sweep"
+    | "cycle"
+    | "plasma"
+    | "flicker";
   params: Record<string, number | string>;
 }
 export interface Clip {

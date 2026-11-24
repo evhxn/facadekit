@@ -177,3 +177,15 @@ def test_stars_stay_round_on_a_wide_surface() -> None:
     heights = stats[1:, cv2.CC_STAT_HEIGHT]
     ratio = float(np.median(heights / widths))
     assert 1.7 < ratio < 2.3
+
+
+def test_web_fixture_matches_the_renderer() -> None:
+    # web/src/gl/generatorFixture.json holds small renders of every new effect; the web test
+    # checks evalGenerator against the same numbers. Regenerate it with the loop below.
+    fixture = json.loads((WEB_PARAMS.parent / "generatorFixture.json").read_text())
+    assert {case["type"] for case in fixture} == set(NEW_TYPES)
+    for case in fixture:
+        gen = _gen(case["type"], **case["params"])
+        n = case["size"]
+        img = render_generator(gen, case["tc"], size=(n, n), aspect=case["aspect"])
+        assert img[:, :, [2, 1, 0, 3]].reshape(-1).tolist() == case["rgba"], case["type"]

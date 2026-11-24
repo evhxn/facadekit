@@ -1,6 +1,19 @@
 import { describe, expect, it } from "vitest";
 import type { Generator } from "../api/types";
-import { defaultGenerator, evalGenerator, parseColor } from "./generators";
+import fixture from "./generatorFixture.json";
+import {
+  GENERATOR_LABELS,
+  GENERATOR_TYPES,
+  SAFE_FLASH_HZ,
+  cellHash,
+  defaultGenerator,
+  evalGenerator,
+  flashWarning,
+  flickerLevel,
+  param,
+  parseColor,
+  rnd,
+} from "./generators";
 
 const gen = (type: Generator["type"], params: Generator["params"] = {}): Generator => ({
   type,
@@ -55,5 +68,76 @@ describe("evalGenerator", () => {
       speed: 0.5,
       tail: 0.35,
     });
+  });
+});
+
+describe("effects added after T-109", () => {
+  it("hash agrees with the backend bit for bit", () => {
+    const h = cellHash(1, 2, 3);
+    expect(h).toBe(72785788);
+    expect(rnd(h, 0)).toBe(4807689 / 16777216);
+    const h2 = cellHash(-5, 7, 42);
+    expect(h2).toBe(2305073543);
+    expect(Math.abs(rnd(h2, 2) - 0.8092036843299866)).toBeLessThan(1e-12);
+  });
+
+  it("matches the backend renders in generatorFixture.json (within 1 level)", () => {
+    for (const c of fixture as {
+      type: Generator["type"];
+      params: Generator["params"];
+      tc: number;
+      aspect: number;
+      size: number;
+      rgba: number[];
+    }[]) {
+      let worst = 0;
+      for (let y = 0; y < c.size; y++) {
+        for (let x = 0; x < c.size; x++) {
+          const got = bytes(
+            evalGenerator(
+              gen(c.type, c.params),
+              (x + 0.5) / c.size,
+              (y + 0.5) / c.size,
+              c.tc,
+              c.aspect,
+            ),
+          );
+          const i = (y * c.size + x) * 4;
+          for (let k = 0; k < 4; k++) worst = Math.max(worst, Math.abs(got[k]! - c.rgba[i + k]!));
+        }
+      }
+      expect(worst, `${c.type} at ${c.tc}`).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("clamps numbers to the spec range", () => {
+    expect(param(gen("flicker", { rate_hz: 40 }), "rate_hz")).toBe(SAFE_FLASH_HZ);
+    expect(param(gen("stars", { density: "x" }), "density")).toBe(12);
+  });
+
+  it("flicker never changes direction more than 3 times a second", () => {
+    const g = gen("flicker", { rate_hz: 20, depth: 1, seed: 9 });
+    const levels = Array.from({ length: 300 }, (_, n) => flickerLevel(g, n / 30));
+    let turns = 0;
+    for (let i = 2; i < levels.length; i++) {
+      const a = levels[i - 1]! - levels[i - 2]!;
+      const b = levels[i]! - levels[i - 1]!;
+      if (a * b < 0) turns++;
+    }
+    expect(turns).toBeLessThanOrEqual(30);
+  });
+
+  it("warns about strobe above 3 Hz only", () => {
+    expect(flashWarning(gen("strobe", { rate_hz: 8 }))).toMatch(/seizures/);
+    expect(flashWarning(gen("strobe", { rate_hz: 2 }))).toBeNull();
+    expect(flashWarning(gen("flicker", { rate_hz: 3 }))).toBeNull();
+  });
+
+  it("every effect type has a label and defaults", () => {
+    for (const t of GENERATOR_TYPES) {
+      expect(GENERATOR_LABELS[t]).toBeTruthy();
+      expect(Object.keys(defaultGenerator(t).params).length).toBeGreaterThan(0);
+    }
+    expect(GENERATOR_TYPES).toHaveLength(12);
   });
 });
