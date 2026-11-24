@@ -75,7 +75,11 @@ export default function TrySample() {
         <div className={styles.row}>
           <label>
             Theme
-            <select value={theme} onChange={(e) => setTheme(e.target.value as SampleTheme)}>
+            <select
+              id="try-sample-theme"
+              value={theme}
+              onChange={(e) => setTheme(e.target.value as SampleTheme)}
+            >
               {THEMES.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.label}

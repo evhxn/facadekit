@@ -102,6 +102,11 @@ export default function ProjectsPage() {
             field?.scrollIntoView?.({ block: "center" });
             field?.focus();
           }}
+          onTrySample={() => {
+            const box = document.getElementById("try-sample");
+            box?.scrollIntoView?.({ block: "center" });
+            document.getElementById("try-sample-theme")?.focus();
+          }}
         />
       ) : null}
       <div className={styles.columns}>

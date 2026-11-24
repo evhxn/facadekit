@@ -263,6 +263,7 @@ test("sample project from Projects to a finished render, no hardware", async ({ 
   await expect(page.getByRole("heading", { name: "Try a sample project" })).toBeVisible();
   await page.getByLabel("Theme").selectOption("winter");
   await shot(page, who, "20-projects-sample");
+  await check(page);
   await page.getByRole("button", { name: "Try a sample project" }).click();
 
   // The simulated scan, surfaces and show are made in a job; the sample opens in Arrange.
@@ -270,14 +271,22 @@ test("sample project from Projects to a finished render, no hardware", async ({ 
   await page.waitForLoadState("networkidle");
   await expect(page.getByAltText("Exact rendered frame")).toBeVisible({ timeout: 30000 });
   await shot(page, who, "21-sample-arrange");
-  await expectNoSidewaysScroll(page);
+  await check(page);
+  // The effect controls of a sample clip: pick the starfield clip and see its settings.
+  await page
+    .getByRole("button", { name: /Effect: Starfield/ })
+    .first()
+    .click();
+  await expect(page.getByLabel("Seed")).toBeVisible();
+  await shot(page, who, "21b-sample-effect");
+  await check(page);
 
   await page.getByRole("link", { name: "Publish →" }).click();
   await expect(page).toHaveURL(/\/publish$/);
   await page.getByRole("button", { name: "Render show" }).click();
   await expect(page.getByRole("list", { name: "Renders" })).toBeVisible({ timeout: 180000 });
   await shot(page, who, "22-sample-publish");
-  await expectNoSidewaysScroll(page);
+  await check(page);
 
   await page.goto("/");
   await expect(page.getByText("Sample: Winter (simulated house)").first()).toBeVisible();
