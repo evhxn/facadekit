@@ -229,6 +229,9 @@ function fk_health(array $config): array
             'auto_scope' => $config['settings']['auto_scope'],
             'guard_enabled' => $config['settings']['guard_enabled'],
             'guard_stop_playback' => $config['settings']['guard_stop_playback'],
+            'recovery_enabled' => $config['settings']['recovery_enabled'],
+            'recovery_cooldown_s' => $config['settings']['recovery_cooldown_s'],
+            'recovery_healthy_reads' => $config['settings']['recovery_healthy_reads'],
         ),
         'checked_at' => fk_now_iso(),
     );

@@ -34,7 +34,7 @@ import time
 from dataclasses import dataclass, field
 
 QUIRKS = ("close-after-reply", "split-writes", "crlf", "nul-padding", "slow-greeting",
-          "no-lamp", "silent", "lowercase-random", "err4")  # fmt: skip
+          "no-lamp", "silent", "lowercase-random", "err4", "no-erst", "erst-err4")  # fmt: skip
 
 POWER_STANDBY, POWER_ON, POWER_COOLING, POWER_WARMUP = "0", "1", "2", "3"
 
@@ -124,6 +124,10 @@ class FakeProjector:
             if param != "?":
                 return "ERR2"
             if cmd == "ERST":
+                if "no-erst" in self.quirks:
+                    return "ERR1"
+                if "erst-err4" in self.quirks:
+                    return "ERR4"
                 return self.erst
             if cmd == "LAMP":
                 if "no-lamp" in self.quirks:

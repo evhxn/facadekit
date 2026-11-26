@@ -10,7 +10,7 @@
  *   cli.php input <code> [projectors]              FPP command "FacadeKit Select Input"
  *   cli.php status                                 FPP command "FacadeKit Status Snapshot"
  *   cli.php playlist-event <json>                  callbacks.sh --type playlist
- *   cli.php worker <on|off|input> <id> <seq> <ready_s> <input|-> <delay_s>
+ *   cli.php worker <on|off|input> <id> <seq> <ready_s> <input|-> <delay_s> [retry_token]
  *   cli.php query <id>                             one projector snapshot as JSON
  *   cli.php guard <playlist>                       fault guard loop
  */
@@ -128,7 +128,7 @@ function fk_cli_main(array $argv): int
 
 function fk_cli_worker(array $config, array $args): int
 {
-    list($action, $id, $seq, $ready, $input, $delay) = array_pad($args, 6, '');
+    list($action, $id, $seq, $ready, $input, $delay, $token) = array_pad($args, 7, '');
     $p = fk_find_projector($config, $id);
     if ($p === null || !in_array($action, array('on', 'off', 'input'), true)) {
         fk_cli_print(array('id' => $id, 'name' => $id, 'ok' => false, 'state' => 'error', 'message' => 'unknown projector or action'));
@@ -160,7 +160,16 @@ function fk_cli_worker(array $config, array $args): int
             }
         }
         if ($action === 'on') {
-            $result = fk_sequence_on($p, $settings, $seq, max(0, (int)$ready), $input);
+            $precheck = null;
+            if ($token !== '') { // the automatic thermal retry: valid only while nothing cancelled it
+                $precheck = function () use ($p, $seq, $token) {
+                    return ($seq <= 0 || fk_intent_current($p['id'], $seq)) && fk_recovery_retry_valid($p['id'], $token);
+                };
+            }
+            $result = fk_sequence_on($p, $settings, $seq, max(0, (int)$ready), $input, $precheck);
+            if ($token !== '') {
+                fk_recovery_retry_report($p['id'], $token, $result);
+            }
         } elseif ($action === 'off') {
             $result = fk_sequence_off($p, $settings, $seq);
         } else {

@@ -23,6 +23,7 @@ require_once __DIR__ . '/common.php';
 require_once __DIR__ . '/pjlink.php';
 require_once __DIR__ . '/fpp.php';
 require_once __DIR__ . '/shows.php';
+require_once __DIR__ . '/recovery.php';
 
 const FK_POLL_S = 2;
 
@@ -75,6 +76,10 @@ function fk_state_update(callable $change): array
 
 function fk_record_snapshot(array $snapshot): void
 {
+    if (!empty($snapshot['ok']) && is_array($snapshot['errors'] ?? null) && isset($snapshot['errors']['temperature'], $snapshot['id'])) {
+        fk_thermal_observe(array('id' => $snapshot['id'], 'name' => $snapshot['name'] ?? $snapshot['id']),
+            array('valid' => true, 'level' => $snapshot['errors']['temperature'], 'at' => fk_now_ts()));
+    }
     fk_state_update(function (array $state) use ($snapshot) {
         $old = isset($state['projectors'][$snapshot['id']]) ? $state['projectors'][$snapshot['id']] : array();
         $state['projectors'][$snapshot['id']] = array_merge($old, $snapshot);
@@ -187,7 +192,7 @@ function fk_result(array $p, bool $ok, string $state, string $message): array
  * Switch one projector on and select its input. Returns a result array.
  * $readyTimeout: how long to wait for "on" while the projector reports warm-up.
  */
-function fk_sequence_on(array $p, array $settings, int $seq, int $readyTimeout, string $input): array
+function fk_sequence_on(array $p, array $settings, int $seq, int $readyTimeout, string $input, ?callable $precheck = null): array
 {
     $client = fk_client($p, $settings);
     $start = microtime(true);
@@ -233,6 +238,10 @@ function fk_sequence_on(array $p, array $settings, int $seq, int $readyTimeout, 
             return fk_result($p, false, 'standby', 'switched on, but the projector still reports standby');
         }
         if (!$sent) {
+            // Last look before the request leaves: a cancel or a newer request wins.
+            if ($precheck !== null && !$precheck()) {
+                return fk_result($p, true, 'cancelled', 'cancelled before power-on was sent');
+            }
             try {
                 $client->powerOn();
                 $sent = true;
@@ -408,8 +417,20 @@ function fk_power(string $action, array $projectors, bool $wait, ?int $timeoutOv
 {
     $config = fk_load_config();
     $jobs = array();
+    $held = array();
     $longest = 0;
+    if ($action === 'off') {
+        // The operator (or the scheduler) switches projectors off: no queued retry may survive.
+        fk_recovery_cancel(array_map(function ($p) { return $p['id']; }, $projectors),
+            'the projector was switched off', false);
+    }
     foreach ($projectors as $p) {
+        if ($action === 'on' && fk_recovery_blocks_power_on($config['settings'], $p['id'])) {
+            fk_log('WARN', $p['name'] . ': power-on held while thermal recovery is in progress');
+            $held[] = array('id' => $p['id'], 'name' => $p['name'], 'ok' => false, 'state' => 'held',
+                'message' => 'not switched on: the projector reported a temperature error and recovery is in progress');
+            continue;
+        }
         $seq = fk_new_intent($p['id'], $action);
         $ready = ($timeoutOverride !== null && $timeoutOverride >= 0) ? $timeoutOverride : (int)$p['ready_timeout_s'];
         $longest = max($longest, $ready + ($action === 'on' ? (int)$p['cooldown_timeout_s'] : 0));
@@ -418,7 +439,7 @@ function fk_power(string $action, array $projectors, bool $wait, ?int $timeoutOv
         $jobs[] = array('id' => $p['id'], 'name' => $p['name'], 'args' => $args);
     }
     if (!$jobs) {
-        return array();
+        return $held;
     }
     fk_log('INFO', 'power ' . $action . ' requested for ' . count($jobs) . ' projector(s)' . ($wait ? ', waiting' : ''));
     if (!$wait) {
@@ -428,10 +449,10 @@ function fk_power(string $action, array $projectors, bool $wait, ?int $timeoutOv
             $out[] = array('id' => $job['id'], 'name' => $job['name'], 'ok' => $started,
                 'state' => $started ? 'requested' : 'error', 'message' => $started ? 'requested' : 'could not start');
         }
-        return $out;
+        return array_merge($held, $out);
     }
     $io = (int)$config['settings']['connect_timeout_s'] + (int)$config['settings']['io_timeout_s'];
-    return fk_run_parallel($jobs, $longest + 4 * $io + 5);
+    return array_merge($held, fk_run_parallel($jobs, $longest + 4 * $io + 5));
 }
 
 /** Live snapshots of the given projectors, in parallel; also stored in state.json. */
@@ -451,7 +472,7 @@ function fk_status_live(array $projectors): array
             fk_record_snapshot($results[$i]);
         }
     }
-    return $results;
+    return fk_attach_thermal($results, $config['settings']);
 }
 
 /** Stored snapshots, in the order of the projector table, for projectors still configured. */
@@ -466,7 +487,7 @@ function fk_status_cached(array $config): array
         $snap['host'] = $p['host'];
         $out[] = $snap;
     }
-    return $out;
+    return fk_attach_thermal($out, $config['settings']);
 }
 
 // -- automatic power and the guard -------------------------------------------------------
@@ -542,12 +563,16 @@ function fk_playlist_event(array $data): void
         if (!$inScope) {
             return;
         }
+        $before = fk_active_show_get();
+        if ($before !== null && $before !== $name) {
+            fk_recovery_cancel(null, 'the show was replaced', true);
+        }
         fk_active_show_set($name);
         if ($settings['auto_on']) {
             fk_log('INFO', 'playlist "' . $name . '" started: switching projectors on');
             fk_power('on', $config['projectors'], false, null);
         }
-        if ($settings['guard_enabled']) {
+        if ($settings['guard_enabled'] || $settings['recovery_enabled']) {
             fk_set_health(true, null, null);
             fk_spawn_detached(array('guard', $name));
         }
@@ -570,6 +595,7 @@ function fk_playlist_event(array $data): void
         return;
     }
     fk_active_show_clear();
+    fk_recovery_cancel(null, 'the show ended', false);
     if (!$inScope) {
         fk_log('INFO', 'playlist stopped with no name (FPP sends an empty one): ending "' . $show . '"');
     }
@@ -607,6 +633,12 @@ function fk_wait_before_off(array $p, array $settings, int $seq, int $delay): ?a
  * projector that is off once the show has had time to start) marks the plugin unhealthy and,
  * when guard_stop_playback is on, stops FPP's playlist. A projector that does not answer
  * three times in a row only marks it unhealthy.
+ *
+ * Without recovery the guard ends after the first fault, as it always did. With recovery on
+ * (and playback not stopped) it keeps watching until the show ends: a fault is reported once
+ * and the thermal recovery of each projector advances on every check.
+ * Temperature warnings and their clearance are logged in both modes; a warning alone never
+ * stops anything.
  */
 function fk_guard(string $playlist): void
 {
@@ -617,11 +649,18 @@ function fk_guard(string $playlist): void
     try {
         $startedAt = microtime(true);
         $misses = array();
+        $reported = array();
         fk_log('INFO', 'fault guard watching "' . $playlist . '"');
+        // What an earlier process left half-done is unknown now and can never lead to a retry.
+        fk_recovery_reset_unknown();
         while (true) {
             $config = fk_load_config();
             $settings = $config['settings'];
-            if (!$settings['guard_enabled'] || !is_dir(fk_plugin_dir())) {
+            $recovery = (bool)$settings['recovery_enabled'];
+            if (!$recovery) {
+                fk_recovery_cancel(null, 'recovery was turned off', false);
+            }
+            if ((!$settings['guard_enabled'] && !$recovery) || !is_dir(fk_plugin_dir())) {
                 return;
             }
             fk_sleep_s((int)$settings['guard_interval_s']);
@@ -629,6 +668,7 @@ function fk_guard(string $playlist): void
             $recorded = fk_active_show_get();
             if ($recorded === null) {
                 fk_log('INFO', 'fault guard stopped: the show ended');
+                fk_recovery_cancel(null, 'the show ended', false);
                 return;
             }
             if ($recorded !== $playlist) {
@@ -639,49 +679,94 @@ function fk_guard(string $playlist): void
             if ($status === null || $status['status_name'] === 'idle' || $status['current_playlist'] === null
                 || !fk_in_scope($settings, $status['current_playlist'])) {
                 fk_log('INFO', 'fault guard stopped: no show in scope is playing');
+                fk_recovery_cancel(null, 'the show ended', false);
                 return;
             }
+            $showKey = fk_recovery_active_show_key();
             foreach ($config['projectors'] as $p) {
+                $reading = fk_thermal_read(fk_client($p, $settings));
+                fk_thermal_observe($p, $reading);
+                $id = $p['id'];
+                $inRecovery = $recovery && fk_recovery_in_progress(fk_thermal_get($id)['recovery']);
                 $fault = null;
-                try {
-                    $client = fk_client($p, $settings);
-                    $power = $client->power();
-                    $misses[$p['id']] = 0;
+                if ($reading['power'] !== 'unknown') {
+                    $misses[$id] = 0;
                     $grace = (int)$p['ready_timeout_s'] + (int)$settings['guard_interval_s'] + 10;
-                    if (($power === 'standby' || $power === 'cooling') && microtime(true) - $startedAt > $grace) {
-                        $fault = 'is ' . $power . ' during the show';
+                    if (($reading['power'] === 'standby' || $reading['power'] === 'cooling')
+                        && microtime(true) - $startedAt > $grace && !$inRecovery) {
+                        $fault = 'is ' . $reading['power'] . ' during the show';
                     }
-                    if ($fault === null) {
-                        foreach ($client->errorStatus() as $field => $level) {
-                            if ($level === 'error') {
-                                $fault = 'reports a ' . $field . ' error';
-                                break;
-                            }
-                        }
-                    }
-                } catch (FkPjlinkException $e) {
-                    if ($e->kind === 'failure') {
-                        $fault = 'reports a failure (ERR4)';
-                    } elseif ($e->kind !== 'unavailable' && $e->kind !== 'undefined') {
-                        $misses[$p['id']] = ($misses[$p['id']] ?? 0) + 1;
-                        if ($misses[$p['id']] >= 3) {
-                            fk_set_health(false, $p['name'] . ' does not answer: ' . $e->getMessage(), $p['id']);
-                            fk_log('WARN', 'guard: ' . $p['name'] . ' does not answer (' . $e->kind . ')');
+                }
+                if ($fault === null && is_array($reading['errors'])) {
+                    foreach ($reading['errors'] as $field => $level) {
+                        if ($level === 'error') {
+                            $fault = 'reports a ' . $field . ' error';
+                            break;
                         }
                     }
                 }
-                if ($fault !== null) {
-                    fk_set_health(false, $p['name'] . ' ' . $fault, $p['id']);
-                    fk_log('ERROR', 'guard: ' . $p['name'] . ' ' . $fault);
+                if ($reading['kind'] === 'failure') {
+                    $fault = $fault ?? 'reports a failure (ERR4)';
+                } elseif ($reading['kind'] !== null && $reading['kind'] !== 'unavailable' && $reading['kind'] !== 'undefined') {
+                    $misses[$id] = ($misses[$id] ?? 0) + 1;
+                    if ($misses[$id] >= 3 && $settings['guard_enabled']) {
+                        fk_set_health(false, $p['name'] . ' does not answer (' . $reading['kind'] . ')', $id);
+                        fk_log('WARN', 'guard: ' . $p['name'] . ' does not answer (' . $reading['kind'] . ')');
+                    }
+                }
+                if ($fault !== null && $settings['guard_enabled']) {
+                    if (($reported[$id] ?? null) !== $fault) {
+                        $reported[$id] = $fault;
+                        fk_set_health(false, $p['name'] . ' ' . $fault, $id);
+                        fk_log('ERROR', 'guard: ' . $p['name'] . ' ' . $fault);
+                    }
                     if ($settings['guard_stop_playback']) {
                         $stopped = fk_fpp_stop_playback();
                         fk_log('ERROR', 'guard: ' . ($stopped ? 'stopped playback' : 'could not stop playback'));
+                        if ($recovery) {
+                            fk_recovery_cancel(null, 'playback was stopped after a fault', false);
+                        }
+                        return;
                     }
-                    return;
+                    if (!$recovery) {
+                        return;
+                    }
+                } elseif ($fault === null) {
+                    unset($reported[$id]);
+                }
+                if ($recovery && $showKey !== null) {
+                    fk_recovery_tick($p, $settings, $reading, $showKey);
                 }
             }
         }
     } finally {
         fk_unlock($lock);
+    }
+}
+
+/** Advance one projector's recovery with a fresh reading; start the single retry when due. */
+function fk_recovery_tick(array $p, array $settings, array $reading, string $showKey): void
+{
+    $ctx = array('enabled' => true, 'show_active' => true, 'show_key' => $showKey,
+        'cooldown_s' => (int)$settings['recovery_cooldown_s'], 'reads_needed' => (int)$settings['recovery_healthy_reads']);
+    $actions = array();
+    $before = null;
+    $t = fk_thermal_update($p['id'], function (array $t) use ($reading, $ctx, &$actions, &$before) {
+        $before = $t['recovery'];
+        list($r, $actions) = fk_recovery_step($t['recovery'], $reading, $ctx, fk_now_ts());
+        $t['recovery'] = $r;
+        return $t;
+    });
+    $r = $t['recovery'];
+    if ($before !== null && ($before['state'] !== $r['state'] || $before['last_outcome'] !== $r['last_outcome'])) {
+        $level = $r['state'] === 'attention' ? 'ERROR' : 'INFO';
+        fk_log($level, $p['name'] . ': recovery ' . fk_recovery_label($r) . ($r['reason'] !== null ? ' (' . $r['reason'] . ')' : '')
+            . ($r['last_outcome'] !== null && $before['last_outcome'] !== $r['last_outcome'] ? '; ' . $r['last_outcome'] : ''));
+    }
+    if (in_array('retry', $actions, true)) {
+        $seq = fk_new_intent($p['id'], 'on'); // takes over from any older request; serialised by the projector lock
+        fk_log('INFO', $p['name'] . ': automatic power-on retry (one per show)');
+        fk_spawn_detached(array('worker', 'on', $p['id'], (string)$seq, (string)(int)$p['ready_timeout_s'],
+            $p['input'] === '' ? '-' : $p['input'], '0', (string)$r['retry_token']));
     }
 }

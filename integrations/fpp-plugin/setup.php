@@ -24,8 +24,8 @@ $fkAjax = 'plugin.php?plugin=' . rawurlencode(FK_REPO) . '&page=ajax.php&nopage=
     <div id="fk-player" class="mb-2 text-body-secondary"></div>
     <div class="table-responsive">
       <table class="table table-sm align-middle">
-        <thead><tr><th>Projector</th><th>Power</th><th>Input</th><th>Hours</th><th>Model</th><th>Problems</th><th>Checked</th></tr></thead>
-        <tbody id="fk-status-rows"><tr><td colspan="7" class="text-body-secondary">Loading…</td></tr></tbody>
+        <thead><tr><th>Projector</th><th>Power</th><th>Input</th><th>Hours</th><th>Model</th><th>Problems</th><th>Temperature and recovery</th><th>Checked</th></tr></thead>
+        <tbody id="fk-status-rows"><tr><td colspan="8" class="text-body-secondary">Loading…</td></tr></tbody>
       </table>
     </div>
   </section>
@@ -57,6 +57,12 @@ $fkAjax = 'plugin.php?plugin=' . rawurlencode(FK_REPO) . '&page=ajax.php&nopage=
     </div>
     <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="fk-guard_enabled"><label class="form-check-label" for="fk-guard_enabled">Watch the projectors during a show and report faults</label></div>
     <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="fk-guard_stop_playback"><label class="form-check-label" for="fk-guard_stop_playback">Stop the playlist when a projector reports a fault</label></div>
+    <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="fk-recovery_enabled"><label class="form-check-label" for="fk-recovery_enabled">After a projector temperature error, retry once when it has cooled down and is healthy (the plugin then watches the projectors during a show)</label></div>
+    <div class="row g-2 my-1">
+      <div class="col-auto"><label class="form-label" for="fk-recovery_cooldown_s">Minimum cooldown (s)</label><input class="form-control" type="number" min="30" max="3600" id="fk-recovery_cooldown_s"></div>
+      <div class="col-auto"><label class="form-label" for="fk-recovery_healthy_reads">Healthy readings in a row</label><input class="form-control" type="number" min="2" max="10" id="fk-recovery_healthy_reads"></div>
+    </div>
+    <p class="small text-body-secondary">Recovery never power-cycles a projector that is still on. It sends no power-on while a projector reports a temperature error, keeps the other projector's show running (unless "Stop the playlist" above is on, which stops the show first and nothing is retried), tries at most once per show, and never restarts a playlist. Switching a projector off, stopping or replacing the show, or turning this off cancels a queued retry.</p>
     <div class="row g-2 my-1">
       <div class="col-auto"><label class="form-label" for="fk-guard_interval_s">Check every (s)</label><input class="form-control" type="number" min="5" max="600" id="fk-guard_interval_s"></div>
       <div class="col-auto"><label class="form-label" for="fk-connect_timeout_s">Connect timeout (s)</label><input class="form-control" type="number" min="1" max="30" id="fk-connect_timeout_s"></div>
@@ -108,7 +114,7 @@ $fkAjax = 'plugin.php?plugin=' . rawurlencode(FK_REPO) . '&page=ajax.php&nopage=
   var root = document.getElementById('fk-plugin');
   var AJAX = root.getAttribute('data-ajax');
   var SETTINGS = ['auto_on', 'auto_off', 'auto_scope', 'guard_enabled', 'guard_stop_playback',
-    'guard_interval_s', 'connect_timeout_s', 'io_timeout_s', 'facadekit_url'];
+    'guard_interval_s', 'recovery_enabled', 'recovery_cooldown_s', 'recovery_healthy_reads', 'connect_timeout_s', 'io_timeout_s', 'facadekit_url'];
   var state = { projectors: [], settings: {}, timing: {} };
 
   function el(tag, attrs, text) {
@@ -150,7 +156,7 @@ $fkAjax = 'plugin.php?plugin=' . rawurlencode(FK_REPO) . '&page=ajax.php&nopage=
     var rows = document.getElementById('fk-status-rows');
     rows.textContent = '';
     if (!data.projectors.length) {
-      var tr = el('tr'); tr.appendChild(el('td', { colspan: '7', class: 'text-body-secondary' }, 'No projectors yet. Add one below.'));
+      var tr = el('tr'); tr.appendChild(el('td', { colspan: '8', class: 'text-body-secondary' }, 'No projectors yet. Add one below.'));
       rows.appendChild(tr);
     }
     data.projectors.forEach(function (s) {
@@ -165,6 +171,19 @@ $fkAjax = 'plugin.php?plugin=' . rawurlencode(FK_REPO) . '&page=ajax.php&nopage=
       if (s.errors) { Object.keys(s.errors).forEach(function (k) { if (s.errors[k] !== 'ok') { problems.push(k + ': ' + s.errors[k]); } }); }
       if (s.error) { problems.push(s.error); }
       tr.appendChild(el('td', { class: problems.length ? 'text-danger' : '' }, problems.join('; ')));
+      var th = s.thermal || {};
+      var rec = th.recovery || {};
+      var tcell = el('td', { class: 'small' });
+      var levelTxt = { ok: 'Temperature OK', warning: 'Temperature WARNING', error: 'Temperature ERROR', unknown: 'Temperature not read yet' }[th.level || 'unknown'];
+      tcell.appendChild(el('div', { class: th.level === 'error' ? 'text-danger fw-bold' : (th.level === 'warning' ? 'text-warning-emphasis fw-bold' : '') }, levelTxt));
+      if (th.last_valid_check_at) { tcell.appendChild(el('div', { class: 'text-body-secondary' }, 'Last good reading ' + new Date(th.last_valid_check_at).toLocaleTimeString())); }
+      if (th.recovery_enabled && rec.state && rec.state !== 'idle') {
+        tcell.appendChild(el('div', { class: rec.state === 'attention' ? 'text-danger fw-bold' : '' }, 'Recovery: ' + rec.label + (rec.reason ? ' - ' + rec.reason : '')));
+        if (rec.cooldown_ends_at) { tcell.appendChild(el('div', {}, 'No retry before ' + new Date(rec.cooldown_ends_at).toLocaleTimeString())); }
+        if (rec.wants_on === false) { tcell.appendChild(el('div', {}, 'Switched off by the operator for this show')); }
+      }
+      if (rec.last_outcome) { tcell.appendChild(el('div', { class: 'text-body-secondary' }, 'Last outcome: ' + rec.last_outcome)); }
+      tr.appendChild(tcell);
       tr.appendChild(el('td', { class: 'small text-body-secondary' }, s.checked_at ? new Date(s.checked_at).toLocaleTimeString() : ''));
       rows.appendChild(tr);
     });
