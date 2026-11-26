@@ -19,7 +19,7 @@ DEFAULT_PORT = 8137
 
 COMMANDS = [
     "serve", "new", "calibrate", "render", "publish", "doctor", "sim", "phone-scan", "verify",
-    "spike", "calib3d",
+    "spike", "calib3d", "fpp",
 ]  # fmt: skip
 
 
@@ -103,6 +103,25 @@ def build_parser() -> argparse.ArgumentParser:
                 "--ask-password", action="store_true", help="prompt for FPP's UI password"
             )
             fpp.add_argument("--timeout", type=float, default=10.0)
+        elif name == "fpp":
+            fpp_sub = sp.add_subparsers(dest="fpp_command", required=True)
+            pstat = fpp_sub.add_parser(
+                "plugin-status",
+                help="check the FacadeKit FPP plugin on a player (projectors, player, shows)",
+            )
+            pstat.add_argument("host", help="FPP address, e.g. 192.168.1.50 or fpp.local")
+            pstat.add_argument(
+                "--ask-token",
+                action="store_true",
+                help="prompt for the pairing token instead of using the stored one",
+            )
+            pstat.add_argument("--json", action="store_true", help="print the answer as JSON")
+            fake = fpp_sub.add_parser(
+                "fake-pjlink",
+                help="run fake PJLink projectors (for testing the plugin without hardware)",
+                add_help=False,
+            )
+            fake.add_argument("fake_args", nargs=argparse.REMAINDER)
         elif name == "calib3d":
             c3_sub = sp.add_subparsers(dest="calib3d_command", required=True)
             solve = c3_sub.add_parser(
@@ -559,9 +578,64 @@ def _cmd_spike(args: argparse.Namespace) -> int:
     return 1 if any(step.verdict == FAIL for step in steps) else 0
 
 
+def _cmd_fpp(args: argparse.Namespace) -> int:
+    if args.fpp_command == "fake-pjlink":
+        from facadekit.fpp.pjlink_fake import main as fake_main
+
+        # parse_known_args leaves options such as --port to the extras.
+        return fake_main(list(args.extra_args) + list(args.fake_args))
+    import getpass
+    import json
+
+    from facadekit.fpp.plugin_client import plugin_summary
+
+    token = getpass.getpass("Plugin pairing token: ").strip() if args.ask_token else None
+    summary = plugin_summary(args.host, token=token or None)
+    if args.json:
+        print(json.dumps(summary, indent=2))
+        return 0 if summary["present"] else 1
+    print(format_plugin_summary(args.host, summary))
+    return 0 if summary["present"] and (summary["paired"] or not summary["token_stored"]) else 1
+
+
+def format_plugin_summary(host: str, summary: dict[str, object]) -> str:
+    """Plain-text report for ``facadekit fpp plugin-status``."""
+    lines = [f"FacadeKit plugin on {host}"]
+    if not summary["present"]:
+        lines.append(f"  not available: {summary['problem']}")
+        lines.append("  (FacadeKit still works through the plain FPP API.)")
+        return "\n".join(lines)
+    lines.append(f"  version {summary['version']} (API {summary['api']})")
+    if not summary["paired"]:
+        why = summary["problem"] or "no pairing token stored for this host"
+        lines.append(f"  not paired: {why}")
+        return "\n".join(lines)
+    health = summary["health"] if isinstance(summary["health"], dict) else {}
+    state = "healthy" if health.get("healthy") else "UNHEALTHY"
+    reason = (health.get("health") or {}).get("reason")
+    lines.append(f"  {state}" + (f": {reason}" if reason else ""))
+    player = health.get("player") or {}
+    if isinstance(player, dict):
+        playing = player.get("current_playlist")
+        lines.append(f"  player: {player.get('status_name')}" + (f", {playing}" if playing else ""))
+    for proj in health.get("projectors") or []:
+        if not isinstance(proj, dict):
+            continue
+        hours = ", ".join(f"{lamp.get('hours')} h" for lamp in proj.get("lamps") or [])
+        bits = [str(proj.get("power")), hours, str(proj.get("error") or "")]
+        lines.append(f"  projector {proj.get('name')}: " + "; ".join(b for b in bits if b))
+    shows = health.get("shows") or []
+    lines.append(f"  shows published by FacadeKit: {len(shows)}")
+    for show in shows[:10]:
+        if isinstance(show, dict):
+            lines.append(f"    {show.get('name')} ({show.get('playlist')})")
+    return "\n".join(lines)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
-    args, _ = parser.parse_known_args(argv)
+    args, extra = parser.parse_known_args(argv)
+    args.extra_args = extra
     if args.command is None:
         parser.print_usage(sys.stderr)
         return 2
@@ -579,5 +653,6 @@ def main(argv: list[str] | None = None) -> int:
         "verify": _cmd_verify,
         "spike": _cmd_spike,
         "calib3d": _cmd_calib3d,
+        "fpp": _cmd_fpp,
     }
     return _run(lambda: handlers[args.command](args))

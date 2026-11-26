@@ -13,6 +13,7 @@ const api = vi.hoisted(() => ({
   fppProbe: vi.fn(),
   fppStatus: vi.fn(),
   fppSequences: vi.fn(),
+  fppPlugin: vi.fn(),
   publish: vi.fn(),
   cancelJob: vi.fn(),
 }));
@@ -69,6 +70,17 @@ beforeEach(() => {
   vi.clearAllMocks();
   window.localStorage.clear();
   api.fppSequences.mockResolvedValue({ sequences: [] });
+  api.fppPlugin.mockResolvedValue({
+    present: false,
+    version: null,
+    api: null,
+    paired: false,
+    token_stored: false,
+    configured: false,
+    health: null,
+    problem: "not installed",
+    reason: "absent",
+  });
   api.listRenders.mockResolvedValue([r1]);
   api.fppStatus.mockResolvedValue({
     status_name: "idle",
@@ -167,6 +179,47 @@ describe("PublishPage", () => {
         render_id: "r1",
         start: true,
         playlist_name: "Mine",
+      }),
+    );
+  });
+
+  it("asks the paired plugin to switch the projectors on when sending", async () => {
+    api.fppPlugin.mockResolvedValue({
+      present: true,
+      version: "0.1.0",
+      api: 1,
+      paired: true,
+      token_stored: true,
+      configured: true,
+      health: {
+        healthy: true,
+        health: { healthy: true, reason: null },
+        projectors: [{ id: "p1", name: "Left", ok: true, power: "standby" }],
+        summary: { total: 1, on: 0, off: 1, transition: 0, error: 0 },
+        player: { status_name: "idle", current_playlist: null },
+        shows: [],
+      },
+      problem: null,
+      reason: null,
+    });
+    api.publish.mockResolvedValue({ job_id: "j2" });
+    waitForJob.mockResolvedValue(
+      job({ kind: "publish", result: { media_name: "m", playlist_name: "P", started: true } }),
+    );
+    renderPage();
+    await screen.findByText("old.mp4");
+    await connect();
+    await screen.findByText("Left: Off");
+    expect((screen.getByLabelText("Switch the projectors on") as HTMLInputElement).checked).toBe(
+      true,
+    );
+    fireEvent.click(screen.getByText("Send to FPP"));
+    await waitFor(() =>
+      expect(api.publish).toHaveBeenCalledWith("prj_1", {
+        host: "fpp.local",
+        render_id: "r1",
+        start: true,
+        power_on: true,
       }),
     );
   });

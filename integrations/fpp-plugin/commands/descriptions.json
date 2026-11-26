@@ -1,0 +1,96 @@
+[
+    {
+        "name": "FacadeKit Projectors On",
+        "description": "Switch the projectors on (all at once) and select each one's input. With Wait, the playlist waits until they report on, up to the timeout.",
+        "script": "on.sh",
+        "args": [
+            {
+                "name": "wait",
+                "description": "Wait until ready",
+                "type": "bool",
+                "optional": true,
+                "default": "false"
+            },
+            {
+                "name": "timeout",
+                "description": "Longest wait (s), 0 = each projector's own setting",
+                "type": "int",
+                "optional": true,
+                "min": 0,
+                "max": 900,
+                "default": "0"
+            },
+            {
+                "name": "projectors",
+                "description": "Projectors (all, or names separated by commas)",
+                "type": "datalist",
+                "optional": true,
+                "contentListUrl": "api/plugin/fpp-plugin-FacadeKit/projector-names",
+                "allowBlanks": false,
+                "default": "all"
+            }
+        ]
+    },
+    {
+        "name": "FacadeKit Projectors Off",
+        "description": "Switch the projectors off. A projector that reports warming up is switched off once it can be; one that reports cooling is left alone.",
+        "script": "off.sh",
+        "args": [
+            {
+                "name": "wait",
+                "description": "Wait until every projector answered",
+                "type": "bool",
+                "optional": true,
+                "default": "false"
+            },
+            {
+                "name": "projectors",
+                "description": "Projectors (all, or names separated by commas)",
+                "type": "datalist",
+                "optional": true,
+                "contentListUrl": "api/plugin/fpp-plugin-FacadeKit/projector-names",
+                "allowBlanks": false,
+                "default": "all"
+            }
+        ]
+    },
+    {
+        "name": "FacadeKit Select Input",
+        "description": "Select a PJLink input on the projectors (the code's first two digits are used).",
+        "script": "input.sh",
+        "args": [
+            {
+                "name": "input",
+                "description": "PJLink input",
+                "type": "datalist",
+                "optional": false,
+                "contents": [
+                    "31 Digital 1 (HDMI 1)",
+                    "32 Digital 2 (HDMI 2)",
+                    "33 Digital 3",
+                    "11 RGB 1",
+                    "12 RGB 2",
+                    "21 Video 1",
+                    "41 Storage 1",
+                    "51 Network 1"
+                ],
+                "default": "31 Digital 1 (HDMI 1)"
+            },
+            {
+                "name": "projectors",
+                "description": "Projectors (all, or names separated by commas)",
+                "type": "datalist",
+                "optional": true,
+                "contentListUrl": "api/plugin/fpp-plugin-FacadeKit/projector-names",
+                "allowBlanks": false,
+                "default": "all"
+            }
+        ]
+    },
+    {
+        "name": "FacadeKit Status Snapshot",
+        "description": "Read every projector's power, input, errors and hours and write them to the plugin log and status panel.",
+        "script": "status.sh",
+        "args": []
+    }
+]

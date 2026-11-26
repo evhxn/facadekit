@@ -138,7 +138,16 @@ def publish_render(
     sequence_name: str | None = None,
     progress: ProgressFn | None = None,
     cancel: Callable[[], bool] | None = None,
+    manifest: dict[str, Any] | None = None,
+    power_on: bool = False,
 ) -> dict[str, Any]:
+    """Upload, verify, save the playlist and optionally start it.
+
+    With ``manifest`` (or ``power_on``) the FacadeKit FPP plugin is used when it is installed
+    and paired: the show is registered in its list and, with ``power_on``, the projectors are
+    switched on before the playlist starts. The plugin is optional: when it is absent, not
+    paired or failing, the publish still succeeds and ``result["plugin"]`` says why.
+    """
     if not local_path.is_file():
         raise FkError("NOT_FOUND", f"Rendered file not found: {local_path}")
     if not playlist_name.strip():
@@ -176,10 +185,71 @@ def publish_render(
         client.put_playlist(playlist_name, [media_entry(media_name, sequence_name)])
         _report(progress, _P_PLAYLIST, 1.0, "Creating playlist")
 
+        plugin: dict[str, Any] | None = None
+        if manifest is not None or power_on:
+            full = dict(manifest or {})
+            full.update(playlist=playlist_name, video=media_name)
+            if sequence_name is not None:
+                full["sequence"] = sequence_name
+            plugin = _plugin_step(host, full, power_on=power_on, wait=start, progress=progress)
+
         if start:
             _report(progress, _P_START, 0.0, "Starting")
             client.start_playlist(playlist_name)
         _report(progress, _P_START, 1.0, "Starting" if start else "Done")
     finally:
         client.close()
-    return {"media_name": media_name, "playlist_name": playlist_name, "started": start}
+    result: dict[str, Any] = {
+        "media_name": media_name,
+        "playlist_name": playlist_name,
+        "started": start,
+    }
+    if plugin is not None:
+        result["plugin"] = plugin
+    return result
+
+
+def _plugin_step(
+    host: str,
+    manifest: dict[str, Any],
+    *,
+    power_on: bool,
+    wait: bool,
+    progress: ProgressFn | None,
+) -> dict[str, Any]:
+    """Register the show with the plugin and optionally power on. Never raises."""
+    from facadekit.fpp.plugin_client import FppPluginClient, PluginError
+
+    out: dict[str, Any] = {"status": "skipped", "registered": False, "power": None,
+                           "problems": []}  # fmt: skip
+    client = FppPluginClient(host, timeout=10.0)
+    try:
+        try:
+            client.info()
+        except PluginError as exc:
+            out["status"] = "absent" if exc.reason == "absent" else "error"
+            if exc.reason != "absent":
+                out["problems"].append(exc.message)
+            return out
+        if not client.token:
+            out["status"] = "not_paired"
+            return out
+        try:
+            client.register_show(manifest)
+            out["registered"] = True
+        except PluginError as exc:
+            out["problems"].append(f"The show was not added to the plugin's list: {exc.message}")
+        if power_on:
+            _report(progress, _P_PLAYLIST, 1.0, "Turning projectors on")
+            try:
+                answer = client.power("on", wait=wait)
+                out["power"] = answer.get("results", [])
+                for item in out["power"]:
+                    if isinstance(item, dict) and not item.get("ok"):
+                        out["problems"].append(f"{item.get('name')}: {item.get('message')}")
+            except PluginError as exc:
+                out["problems"].append(f"Projectors were not switched on: {exc.message}")
+        out["status"] = "ok" if not out["problems"] else "partial"
+        return out
+    finally:
+        client.close()

@@ -356,6 +356,59 @@ def _read_steps(rec: _Recorder) -> None:
         rec.steps[-1].detail += f"; {status.get('status_name')}, mode {status.get('mode_name')}"
 
     _api_help(rec)
+    _plugin(rec)
+
+
+def _plugin(rec: _Recorder) -> None:
+    """The optional FacadeKit FPP plugin: SKIP when absent; read-only GETs when present."""
+    from facadekit.fpp.plugin_client import (
+        PLUGIN_PREFIX,
+        SUPPORTED_API,
+        FppPluginClient,
+        PluginError,
+    )
+
+    try:
+        status, data, _ = rec.get(f"{PLUGIN_PREFIX}/version")
+    except FppError as exc:
+        rec.add(Step("plugin", WARN, f"[{exc.reason}] {exc.message}"))
+        return
+    if status == 404 or not isinstance(data, dict) or data.get("plugin") != "fpp-plugin-FacadeKit":
+        rec.add(Step("plugin", SKIP, "FacadeKit plugin not installed (optional)"))
+        return
+    saved = rec.save("plugin_version", data)
+    diffs = [
+        f"{key!r} missing" for key in ("version", "api", "paired", "configured") if key not in data
+    ]
+    api = data.get("api")
+    if isinstance(api, int) and api > SUPPORTED_API:
+        diffs.append(f"plugin API {api} is newer than {SUPPORTED_API}")
+    detail = f"plugin {data.get('version')} (API {api}), paired={data.get('paired')}"
+    rec.add(Step("plugin", WARN if diffs else PASS, detail, diffs, saved))
+    client = FppPluginClient(f"{rec.client.scheme}://{rec.client.host}", timeout=10.0)
+    try:
+        if not client.token:
+            rec.add(Step("plugin health", SKIP, "no pairing token stored for this host"))
+            return
+        try:
+            health = client.health()
+        except PluginError as exc:
+            rec.add(Step("plugin health", WARN, f"[{exc.reason}] {exc.message}"))
+            return
+        saved = rec.save("plugin_health", health)
+        missing = [k for k in ("healthy", "projectors", "player", "shows") if k not in health]
+        count = len(health.get("projectors") or [])
+        rec.add(
+            Step(
+                "plugin health",
+                WARN if missing or not health.get("healthy") else PASS,
+                f"{count} projector(s), healthy={health.get('healthy')}",
+                [f"{k!r} missing" for k in missing],
+                saved,
+            )
+        )
+    finally:
+        client.close()
 
 
 def _sample_playlist(rec: _Recorder, names: list[str]) -> None:
