@@ -15,7 +15,7 @@ if (defined('FK_PLUGIN_COMMON')) {
 define('FK_PLUGIN_COMMON', 1);
 
 const FK_REPO = 'fpp-plugin-FacadeKit';
-const FK_PLUGIN_VERSION = '0.1.0';
+const FK_PLUGIN_VERSION = '0.2.0';
 const FK_API_VERSION = 1;
 const FK_MAX_PROJECTORS = 16;
 const FK_MAX_SHOWS = 200;
