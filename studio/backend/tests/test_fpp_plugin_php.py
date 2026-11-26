@@ -252,3 +252,32 @@ def test_api_power_and_shows(env: dict[str, str], api: str, laser: FakePjlinkSer
     assert health["player"] is None  # FPP's API is not running in this test
     gone = httpx.delete(f"{api}/shows/FacadeKit%20-%20Show", headers=headers)
     assert gone.json()["ok"]
+
+
+@pytest.mark.parametrize(
+    ("remote", "server", "expected"),
+    [
+        # a Mac reaching fpp.local over its global IPv6 address, same /64 as the player
+        (
+            "2600:1700:ffc1:3350:1497:c70b:b4e1:fae0",
+            "2600:1700:ffc1:3350:dea6:32ff:fec8:d936",
+            True,
+        ),
+        ("192.168.1.214", "192.168.1.132", True),
+        ("::ffff:192.168.1.214", "192.168.1.132", True),
+        ("2600:1700:ffc1:9999::1", "2600:1700:ffc1:3350:dea6:32ff:fec8:d936", False),
+        ("203.0.113.7", "192.168.1.132", False),
+        ("203.0.113.7", "", False),
+        ("not-an-ip", "192.168.1.132", False),
+    ],
+)
+def test_same_link_accepts_only_the_players_own_subnet(
+    remote: str, server: str, expected: bool
+) -> None:
+    code = (
+        f"require {json.dumps(str(PLUGIN / 'lib' / 'common.php'))};"
+        f"echo json_encode(fk_same_link({json.dumps(remote)}, {json.dumps(server)}));"
+    )
+    out = subprocess.run([PHP or "php", "-r", code], capture_output=True, text=True, timeout=30)
+    assert out.returncode == 0, out.stderr
+    assert json.loads(out.stdout.strip().splitlines()[-1]) is expected
