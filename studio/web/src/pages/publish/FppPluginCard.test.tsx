@@ -60,6 +60,19 @@ beforeEach(() => vi.clearAllMocks());
 afterEach(cleanup);
 
 describe("FppPluginCard", () => {
+  it("asks the plugin again when refreshKey changes", async () => {
+    api.fppPlugin.mockResolvedValueOnce(paired());
+    const { rerender } = render(<FppPluginCard host="fpp.local" refreshKey={0} />);
+    expect(await screen.findByText(/1 of 2 projectors on/)).toBeTruthy();
+    expect(api.fppPlugin).toHaveBeenCalledTimes(1);
+    const after = paired();
+    after.health!.summary.on = 2;
+    api.fppPlugin.mockResolvedValueOnce(after);
+    rerender(<FppPluginCard host="fpp.local" refreshKey={1} />);
+    expect(await screen.findByText(/2 of 2 projectors on/)).toBeTruthy();
+    expect(api.fppPlugin).toHaveBeenCalledTimes(2);
+  });
+
   it("says the plugin is optional when it is absent", async () => {
     api.fppPlugin.mockResolvedValue(absent);
     const onPaired = vi.fn();

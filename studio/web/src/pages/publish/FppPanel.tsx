@@ -74,6 +74,7 @@ export default function FppPanel({
   const [seqRendering, setSeqRendering] = useState(false);
   const [startNow, setStartNow] = useState(true);
   const [pluginPaired, setPluginPaired] = useState(false);
+  const [pluginRefresh, setPluginRefresh] = useState(0);
   const [powerOn, setPowerOn] = useState(true);
   const [sendJob, setSendJob] = useState<Job | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
@@ -215,6 +216,7 @@ export default function FppPanel({
           typeof final.result?.playlist_name === "string" ? final.result.playlist_name : playlist;
         setSent(name);
         toast(`Sent. Playlist “${name}” is on your FPP.`);
+        setPluginRefresh((n) => n + 1);
         await reloadProject();
       } else if (final.state === "failed") {
         setSendError(
@@ -268,6 +270,7 @@ export default function FppPanel({
       setAlignJob(null);
       if (sentJob.state === "succeeded") {
         setAlignDone(true);
+        setPluginRefresh((n) => n + 1);
         await reloadProject();
       } else if (sentJob.state === "failed") {
         setAlignError(
@@ -468,7 +471,9 @@ export default function FppPanel({
         ) : null}
       </section>
 
-      {isConnected && host ? <FppPluginCard host={host} onPaired={setPluginPaired} /> : null}
+      {isConnected && host ? (
+        <FppPluginCard host={host} onPaired={setPluginPaired} refreshKey={pluginRefresh} />
+      ) : null}
 
       <section className={styles.panel}>
         <h2>Check alignment from the Pi</h2>
