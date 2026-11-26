@@ -41,9 +41,12 @@ function message(e: unknown, fallback: string): string {
 export default function FppPluginCard({
   host,
   onPaired,
+  refreshKey = 0,
 }: {
   host: string;
   onPaired?: (paired: boolean) => void;
+  /** Changing this value makes the card ask the plugin again (e.g. after a publish). */
+  refreshKey?: number;
 }) {
   const [summary, setSummary] = useState<FppPluginSummary | null>(null);
   const [loading, setLoading] = useState(false);
@@ -87,7 +90,7 @@ export default function FppPluginCard({
 
   useEffect(() => {
     void refresh();
-  }, [refresh]);
+  }, [refresh, refreshKey]);
 
   const pair = async () => {
     setBusy(true);

@@ -43,6 +43,9 @@ from facadekit.store.project_store import ProjectStore
 
 log = logging.getLogger(__name__)
 
+# index.html names the hashed bundle, so it must always be revalidated; hashed assets never change.
+REVALIDATE = "no-cache"
+ASSET_CACHE = "public, max-age=31536000, immutable"
 WEBDIST = Path(__file__).resolve().parent.parent / "webdist"
 NO_UI_MESSAGE = (
     "FacadeKit backend is running. The web UI has not been built (run `make build-web`)."
@@ -183,7 +186,9 @@ def create_app(
             root_dir = WEBDIST.resolve()
             candidate = (root_dir / full_path).resolve()
             if candidate.is_relative_to(root_dir) and candidate.is_file():
-                return FileResponse(candidate)
-        return FileResponse(index)
+                if candidate.is_relative_to(root_dir / "assets"):
+                    return FileResponse(candidate, headers={"Cache-Control": ASSET_CACHE})
+                return FileResponse(candidate, headers={"Cache-Control": REVALIDATE})
+        return FileResponse(index, headers={"Cache-Control": REVALIDATE})
 
     return app
