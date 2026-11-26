@@ -427,6 +427,28 @@ function fk_is_private_ip(string $ip): bool
     return false;
 }
 
+/**
+ * True when $remote is on the same subnet as the player's own address ($server): the same /24
+ * for IPv4, the same /64 for IPv6. This covers a Mac that reaches the player through
+ * fpp.local over a global (ISP-assigned) IPv6 address, which fk_is_private_ip() rejects.
+ */
+function fk_same_link(string $remote, string $server): bool
+{
+    $norm = function (string $ip): string {
+        if (strpos($ip, '::ffff:') === 0 && filter_var(substr($ip, 7), FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
+            return substr($ip, 7);
+        }
+        return $ip;
+    };
+    $r = @inet_pton($norm($remote));
+    $s = @inet_pton($norm($server));
+    if ($r === false || $s === false || strlen($r) !== strlen($s)) {
+        return false;
+    }
+    $bytes = strlen($r) === 4 ? 3 : 8;
+    return substr($r, 0, $bytes) === substr($s, 0, $bytes);
+}
+
 // -- logging ----------------------------------------------------------------------------
 
 /**

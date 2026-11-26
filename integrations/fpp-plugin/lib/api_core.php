@@ -90,7 +90,8 @@ function fk_api_handle(string $method, string $route, array $server, string $bod
 {
     $route = trim($route, '/');
     $remote = isset($server['REMOTE_ADDR']) && is_string($server['REMOTE_ADDR']) ? $server['REMOTE_ADDR'] : '';
-    if (!fk_is_private_ip($remote)) {
+    $serverAddr = isset($server['SERVER_ADDR']) && is_string($server['SERVER_ADDR']) ? $server['SERVER_ADDR'] : '';
+    if (!fk_is_private_ip($remote) && !fk_same_link($remote, $serverAddr)) {
         return fk_api_error(403, 'not_local', 'This API answers the local network only.');
     }
     if ($method === 'GET' && $route === 'version') {
