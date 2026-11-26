@@ -398,3 +398,17 @@ def test_log_uses_one_time_zone_in_every_process(env: dict[str, str]) -> None:
     stamp = datetime.strptime(log_text(env)[:19], "%Y-%m-%d %H:%M:%S")
     local = datetime.now(ZoneInfo(zone)).replace(tzinfo=None)
     assert abs((local - stamp).total_seconds()) < 120
+
+
+def test_log_follows_fpp_time_zone_setting(env: dict[str, str], tmp_path: Path) -> None:
+    media = tmp_path / "media"
+    media.mkdir()
+    (media / "settings").write_text('HostName = "FPP"\nTimeZone = "Pacific/Auckland"\n', "utf-8")
+    code = f"require {json.dumps(str(PLUGIN / 'lib' / 'common.php'))}; fk_log('INFO', 'tz');"
+    out = subprocess.run([PHP or "php", "-d", "date.timezone=UTC", "-r", code],
+                         env={**env, "MEDIADIR": str(media), "TZ": "Europe/Paris"},
+                         capture_output=True, text=True)  # fmt: skip
+    assert out.returncode == 0, out.stderr
+    stamp = datetime.strptime(log_text(env)[:19], "%Y-%m-%d %H:%M:%S")
+    local = datetime.now(ZoneInfo("Pacific/Auckland")).replace(tzinfo=None)
+    assert abs((local - stamp).total_seconds()) < 120

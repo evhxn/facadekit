@@ -198,6 +198,21 @@ dev loop below. FPP's Plugin Manager only fetches plugin info from GitHub, and i
 refuses a plugin with a privacy block unless the Plugins page showed it, which a script must
 not fake [V `FetchPluginInfoProxy`, `POST /plugin` docblock], so the dev loop installs over SSH.
 
+## 5b. The public repository
+
+FPP installs plugins with `git clone` of a repository whose root is the plugin, so the plugin
+is also published as its own small repository, `evhxn/fpp-plugin-FacadeKit` (GPL-3.0, one
+snapshot commit per release, no monorepo history). The monorepo stays the source of truth.
+To refresh the public copy after a change, build the tree and commit it there:
+
+```sh
+python3 integrations/fpp-plugin/dev/export_public_repo.py --out /tmp/fpp-plugin-FacadeKit
+```
+
+The script leaves out `dev/` and this design document, adds the LICENSE, a README and the user
+guide, and refuses to export if the tree contains an email address, a local path, a pairing
+token or a stored password.
+
 ## 6. Sandbox Pi dev loop
 
 ### 6.1 Serve and install

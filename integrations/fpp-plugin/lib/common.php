@@ -452,14 +452,27 @@ function fk_same_link(string $remote, string $server): bool
 // -- time zone --------------------------------------------------------------------------
 
 /**
- * The player's own time zone. php-fpm (web page, FPP callbacks) and php-cli (background
- * workers) read different php.ini files, and without date.timezone one falls back to UTC, so
- * the log mixed local and UTC times. Every process now sets the same zone explicitly: TZ,
- * then /etc/timezone, then the /etc/localtime link, else UTC.
+ * The player's own time zone, so the log reads in the same local time as FPP's own pages.
+ * php-fpm (web page, FPP callbacks) and php-cli (background workers) read different php.ini
+ * files, and without date.timezone one falls back to UTC, so the log once mixed local and UTC
+ * times. Every process now sets the same zone explicitly: FPP's own "TimeZone" setting first
+ * (the one shown in FPP's UI; the OS zone on a Pi can still be UTC), then TZ, /etc/timezone
+ * and the /etc/localtime link, else UTC.
  */
 function fk_system_timezone(): string
 {
     $candidates = array();
+    $fpp = isset($GLOBALS['settings']['TimeZone']) && is_string($GLOBALS['settings']['TimeZone'])
+        ? $GLOBALS['settings']['TimeZone'] : '';
+    if ($fpp === '') {
+        $settingsFile = @file_get_contents(fk_media_dir() . '/settings');
+        if (is_string($settingsFile) && preg_match('/^TimeZone\s*=\s*"?([^"\r\n]+?)"?\s*$/m', $settingsFile, $m) === 1) {
+            $fpp = trim($m[1]);
+        }
+    }
+    if ($fpp !== '') {
+        $candidates[] = $fpp;
+    }
     $tz = getenv('TZ');
     if (is_string($tz) && $tz !== '') {
         $candidates[] = ltrim($tz, ':');

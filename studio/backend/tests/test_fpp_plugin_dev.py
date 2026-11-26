@@ -78,3 +78,19 @@ def test_serves_over_dumb_http(tmp_path: Path) -> None:
         proc.terminate()
         out, _ = proc.communicate(timeout=10)
     assert "git clone" in out and "fpp_install.sh" in out and "fake-pjlink" in out
+
+
+def test_public_repo_export_is_clean(tmp_path: Path) -> None:
+    script = SCRIPT.with_name("export_public_repo.py")
+    out = tmp_path / "public"
+    run = subprocess.run([sys.executable, str(script), "--out", str(out)],
+                         capture_output=True, text=True, timeout=60)  # fmt: skip
+    assert run.returncode == 0, run.stderr
+    assert (out / "pluginInfo.json").is_file() and (out / "scripts" / "fpp_install.sh").is_file()
+    assert (out / "LICENSE").is_file() and (out / "docs" / "USER-GUIDE.md").is_file()
+    assert not (out / "dev").exists()  # the dev loop talks to the monorepo
+    readme = (out / "README.md").read_text("utf-8")
+    assert "git clone https://github.com/evhxn/fpp-plugin-FacadeKit.git" in readme
+    assert "../../docs" not in readme  # no links into the private monorepo
+    info = json.loads((out / "pluginInfo.json").read_text("utf-8"))
+    assert info["srcURL"].endswith("/fpp-plugin-FacadeKit.git")
