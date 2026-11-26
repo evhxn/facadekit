@@ -10,8 +10,8 @@ replies from start/stop (a missing playlist still answers 200 and nothing plays)
 auth when a UI password is set, and the cross-site gate that refuses a non-GET request whose
 ``Origin`` names another site.
 
-Uploads and playlists are stored under a state directory. This module imports nothing
-from ``facadekit`` so that it works standalone.
+Uploads and playlists are stored under a state directory. It imports only the
+fake plugin (``fpp/plugin_fake.py``) from ``facadekit``.
 """
 
 from __future__ import annotations
@@ -26,6 +26,8 @@ from typing import Any
 
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse, PlainTextResponse
+
+from facadekit.fpp.plugin_fake import FakePluginState, add_fake_plugin
 
 # Directory keys FPP accepts (GetDirSetting in www/config.php), mapped to folders on disk.
 DIR_KEYS: dict[str, str] = {
@@ -72,14 +74,20 @@ def _human(size: int) -> str:
 
 
 def create_fake_fpp(
-    state_dir: Path, *, version: str = "10.4", password: str | None = None
+    state_dir: Path,
+    *,
+    version: str = "10.4",
+    password: str | None = None,
+    plugin: FakePluginState | None = None,
 ) -> FastAPI:
     """Create a FastAPI app that imitates FPP, storing its state under ``state_dir``.
 
     ``app.state.playing`` holds the name of the playlist playing (or None),
     ``app.state.requests`` lists every handled request as ``"METHOD /path"`` and
     ``app.state.headers`` their headers. With ``password`` set, every request needs HTTP
-    Basic auth as user ``admin`` or ``fpp``.
+    Basic auth as user ``admin`` or ``fpp``. With ``plugin``, the FacadeKit FPP plugin's
+    routes are served too (``fpp/plugin_fake.py``); without it they answer 404 as on a player
+    that does not have the plugin.
     """
     state_dir.mkdir(parents=True, exist_ok=True)
     playlist_dir = state_dir / PLAYLIST_DIR
@@ -370,5 +378,8 @@ def create_fake_fpp(
                 "seconds_remaining": "0",
             }
         )
+
+    if plugin is not None:
+        add_fake_plugin(app, plugin)
 
     return app

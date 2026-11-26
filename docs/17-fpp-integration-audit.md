@@ -136,3 +136,7 @@ uv run facadekit spike fpp-contract 192.168.1.50 --out ~/fpp-s1-write --write-te
 Then review the files in `~/fpp-s1` (they are redacted, but look before sharing) and commit
 the useful ones under `studio/backend/tests/fixtures/fpp/` with a note in
 `spikes/S-1-fpp-contract.md`.
+
+## 8. FacadeKit FPP plugin
+
+The optional plugin that switches the projectors from the Pi, and the recorder steps that check it (`plugin`, `plugin health`), are described in [docs/20](20-fpp-plugin.md).

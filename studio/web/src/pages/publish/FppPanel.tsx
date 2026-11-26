@@ -16,6 +16,7 @@ import InfoTip from "../../components/InfoTip";
 import JobProgress from "../../components/JobProgress";
 import { toast } from "../../components/toast";
 import { useProjectStore } from "../../state/projectStore";
+import FppPluginCard from "./FppPluginCard";
 import styles from "./Panels.module.css";
 
 const POLL_MS = 3000;
@@ -72,6 +73,8 @@ export default function FppPanel({
   const [seqError, setSeqError] = useState<string | null>(null);
   const [seqRendering, setSeqRendering] = useState(false);
   const [startNow, setStartNow] = useState(true);
+  const [pluginPaired, setPluginPaired] = useState(false);
+  const [powerOn, setPowerOn] = useState(true);
   const [sendJob, setSendJob] = useState<Job | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
   const [sent, setSent] = useState<string | null>(null);
@@ -193,6 +196,7 @@ export default function FppPanel({
         playlist_name?: string;
         start: boolean;
         sequence_name?: string;
+        power_on?: boolean;
       } = {
         host,
         render_id: selectedRenderId,
@@ -201,6 +205,7 @@ export default function FppPanel({
       // The server's own default is the plain name, so send the name whenever it differs from it.
       if (playlist !== plainName) body.playlist_name = playlist;
       if (sequence) body.sequence_name = sequence;
+      if (pluginPaired && powerOn) body.power_on = true;
       const { job_id } = await publish(project.id, body);
       const final = await waitForJob(job_id, (j) => mounted.current && setSendJob(j));
       if (!mounted.current) return;
@@ -425,6 +430,16 @@ export default function FppPanel({
             />{" "}
             Start playing now
           </label>
+          {isConnected && pluginPaired ? (
+            <label>
+              <input
+                type="checkbox"
+                checked={powerOn}
+                onChange={(e) => setPowerOn(e.target.checked)}
+              />{" "}
+              Switch the projectors on
+            </label>
+          ) : null}
           <button
             type="button"
             className="primary"
@@ -452,6 +467,8 @@ export default function FppPanel({
           </>
         ) : null}
       </section>
+
+      {isConnected && host ? <FppPluginCard host={host} onPaired={setPluginPaired} /> : null}
 
       <section className={styles.panel}>
         <h2>Check alignment from the Pi</h2>

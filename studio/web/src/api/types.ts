@@ -164,12 +164,7 @@ export interface Calibration {
 }
 /** Verify surface (docs/13-surface-verification.md). Distances in projector px. */
 export type RigVerdict =
-  | "stable"
-  | "camera_moved"
-  | "projector_moved"
-  | "both_moved"
-  | "moved"
-  | "unknown";
+  "stable" | "camera_moved" | "projector_moved" | "both_moved" | "moved" | "unknown";
 export interface RigCheck {
   verdict: RigVerdict;
   camera: "stable" | "moved" | "unknown";
@@ -276,6 +271,52 @@ export interface FppProbe {
   major: number | null;
   ok: boolean;
   problems: string[];
+}
+export interface FppPluginProjector {
+  id: string;
+  name: string;
+  host?: string;
+  ok: boolean;
+  power: string;
+  input?: string | null;
+  errors?: Record<string, string> | null;
+  lamps?: { hours: number; on: boolean }[] | null;
+  manufacturer?: string | null;
+  model?: string | null;
+  error?: string | null;
+  checked_at?: string | null;
+}
+export interface FppPluginShow {
+  name: string;
+  playlist: string;
+  video: string;
+  project?: string | null;
+  published_at?: string;
+  calibration_age_days?: number | null;
+}
+export interface FppPluginHealth {
+  healthy: boolean;
+  health: { healthy: boolean; reason: string | null } | null;
+  projectors: FppPluginProjector[];
+  summary: { total: number; on: number; off: number; transition: number; error: number };
+  player: { status_name: string | null; current_playlist: string | null } | null;
+  shows: FppPluginShow[];
+}
+export interface FppPluginSummary {
+  present: boolean;
+  version: string | null;
+  api: number | null;
+  paired: boolean;
+  token_stored: boolean;
+  configured: boolean;
+  health: FppPluginHealth | null;
+  problem: string | null;
+  reason: string | null;
+}
+export interface FppPluginPowerResult {
+  ok: boolean;
+  action: string;
+  results: { id: string; name: string; ok: boolean; state: string; message: string }[];
 }
 export interface FppStatus {
   status_name: string | null;

@@ -1,0 +1,326 @@
+{
+    "paths": {
+        "/api/plugin/fpp-plugin-FacadeKit/version": {
+            "get": {
+                "summary": "Plugin version and whether it is paired and configured (no token)",
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            }
+        },
+        "/api/plugin/fpp-plugin-FacadeKit/projector-names": {
+            "get": {
+                "summary": "Projector names for the command editor (no token)",
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            }
+        },
+        "/api/plugin/fpp-plugin-FacadeKit/status": {
+            "get": {
+                "summary": "Live state of every projector (power, input, errors, hours); ?cached=1 for the stored state",
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "401": {
+                        "description": "Missing or wrong token"
+                    },
+                    "403": {
+                        "description": "Not paired yet, or caller outside private networks"
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "X-FacadeKit-Token",
+                        "in": "header",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Pairing token from the plugin page (or Authorization: Bearer)."
+                    },
+                    {
+                        "name": "cached",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "1"
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "/api/plugin/fpp-plugin-FacadeKit/health": {
+            "get": {
+                "summary": "Projectors (stored state), FPP player state and the shows FacadeKit published",
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "401": {
+                        "description": "Missing or wrong token"
+                    },
+                    "403": {
+                        "description": "Not paired yet, or caller outside private networks"
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "X-FacadeKit-Token",
+                        "in": "header",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Pairing token from the plugin page (or Authorization: Bearer)."
+                    }
+                ]
+            }
+        },
+        "/api/plugin/fpp-plugin-FacadeKit/projectors/on": {
+            "post": {
+                "summary": "Switch projectors on (in parallel); wait=true blocks until ready",
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "401": {
+                        "description": "Missing or wrong token"
+                    },
+                    "403": {
+                        "description": "Not paired yet, or caller outside private networks"
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "X-FacadeKit-Token",
+                        "in": "header",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Pairing token from the plugin page (or Authorization: Bearer)."
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "wait": {
+                                        "type": "boolean"
+                                    },
+                                    "timeout_s": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 900
+                                    },
+                                    "projectors": {
+                                        "type": "string",
+                                        "description": "all, or names/ids separated by commas"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/plugin/fpp-plugin-FacadeKit/projectors/off": {
+            "post": {
+                "summary": "Switch projectors off",
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "401": {
+                        "description": "Missing or wrong token"
+                    },
+                    "403": {
+                        "description": "Not paired yet, or caller outside private networks"
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "X-FacadeKit-Token",
+                        "in": "header",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Pairing token from the plugin page (or Authorization: Bearer)."
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "wait": {
+                                        "type": "boolean"
+                                    },
+                                    "timeout_s": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 900
+                                    },
+                                    "projectors": {
+                                        "type": "string",
+                                        "description": "all, or names/ids separated by commas"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/plugin/fpp-plugin-FacadeKit/shows": {
+            "get": {
+                "summary": "Shows FacadeKit published",
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "401": {
+                        "description": "Missing or wrong token"
+                    },
+                    "403": {
+                        "description": "Not paired yet, or caller outside private networks"
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "X-FacadeKit-Token",
+                        "in": "header",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Pairing token from the plugin page (or Authorization: Bearer)."
+                    }
+                ]
+            },
+            "post": {
+                "summary": "Register (or replace) a published show",
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "401": {
+                        "description": "Missing or wrong token"
+                    },
+                    "403": {
+                        "description": "Not paired yet, or caller outside private networks"
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "X-FacadeKit-Token",
+                        "in": "header",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Pairing token from the plugin page (or Authorization: Bearer)."
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "playlist",
+                                    "video"
+                                ],
+                                "properties": {
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "playlist": {
+                                        "type": "string"
+                                    },
+                                    "video": {
+                                        "type": "string"
+                                    },
+                                    "sequence": {
+                                        "type": "string"
+                                    },
+                                    "project": {
+                                        "type": "string"
+                                    },
+                                    "project_id": {
+                                        "type": "string"
+                                    },
+                                    "published_at": {
+                                        "type": "string"
+                                    },
+                                    "calibration_id": {
+                                        "type": "string"
+                                    },
+                                    "calibrated_at": {
+                                        "type": "string"
+                                    },
+                                    "facadekit_version": {
+                                        "type": "string"
+                                    },
+                                    "calibration_age_days": {
+                                        "type": [
+                                            "number",
+                                            "null"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/plugin/fpp-plugin-FacadeKit/shows/{playlist}": {
+            "delete": {
+                "summary": "Forget a published show (the FPP playlist and video stay)",
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "401": {
+                        "description": "Missing or wrong token"
+                    },
+                    "403": {
+                        "description": "Not paired yet, or caller outside private networks"
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "X-FacadeKit-Token",
+                        "in": "header",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Pairing token from the plugin page (or Authorization: Bearer)."
+                    },
+                    {
+                        "name": "playlist",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ]
+            }
+        }
+    }
+}

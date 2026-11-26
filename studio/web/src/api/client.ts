@@ -3,6 +3,8 @@ import type {
   CalibSettings,
   CameraRoi,
   CameraInfo,
+  FppPluginPowerResult,
+  FppPluginSummary,
   FppProbe,
   FppStatus,
   Health,
@@ -369,8 +371,19 @@ export const publish = (
     playlist_name?: string;
     start: boolean;
     sequence_name?: string;
+    power_on?: boolean;
   },
 ) => request<{ job_id: string }>("POST", `/projects/${enc(pid)}/publish`, body);
+
+/** The optional FacadeKit FPP plugin (docs/20-fpp-plugin.md). Never fails for "absent". */
+export const fppPlugin = (host: string) =>
+  request<FppPluginSummary>("GET", `/fpp/plugin?host=${enc(host)}`);
+export const fppPluginPair = (host: string, token: string) =>
+  request<FppPluginSummary>("POST", "/fpp/plugin/pair", { host, token });
+export const fppPluginUnpair = (host: string) =>
+  request<FppPluginSummary>("DELETE", `/fpp/plugin/pair?host=${enc(host)}`);
+export const fppPluginPower = (host: string, action: "on" | "off", wait = false) =>
+  request<FppPluginPowerResult>("POST", "/fpp/plugin/projectors", { host, action, wait });
 
 /** Verify surface: rig check, and with surface_id that surface too (docs/13). Job result
  * {verification: VerificationRecord}. */

@@ -1,0 +1,48 @@
+{
+	"repoName": "fpp-plugin-FacadeKit",
+	"name": "FacadeKit Projectors",
+	"author": "FacadeKit (evhxn)",
+	"description": "Turns PJLink class 1 projectors on and off (several at once, warm-up and cool-down aware) from FPP Commands, playlists and the scheduler, shows their status, and lists the projection shows FacadeKit published to this player. It talks only to the projector addresses you enter (normally a private wired network) and answers the FacadeKit app on your home network when you pair it with a token.",
+	"homeURL": "https://github.com/evhxn/fpp-plugin-FacadeKit",
+	"srcURL": "https://github.com/evhxn/fpp-plugin-FacadeKit.git",
+	"bugURL": "https://github.com/evhxn/fpp-plugin-FacadeKit/issues",
+	"allowUpdates": 1,
+	"releaseNotesStyle": "none",
+	"versions": [
+		{
+			"minFPPVersion": "10.4",
+			"maxFPPVersion": "0",
+			"branch": "main",
+			"sha": ""
+		}
+	],
+	"dependencies": {
+		"packages": [],
+		"python": [],
+		"scripts": [],
+		"plugins": []
+	},
+	"privacy": {
+		"summary": "Sends power, input and status commands to the projector addresses you enter. Answers the FacadeKit app on your network only when it presents the pairing token you created. Everything else stays on this player.",
+		"sends": [
+			{
+				"to": "the projector addresses you enter",
+				"what": "PJLink power, input and status commands, with the projector password you enter (as PJLink's MD5 digest, never in clear)",
+				"why": "to switch the projectors on and off and read their state",
+				"alwaysOn": false
+			},
+			{
+				"to": "the FacadeKit server address you enter",
+				"what": "one status request, only when you press Check on the settings page",
+				"why": "to show whether FacadeKit is reachable",
+				"alwaysOn": false
+			}
+		],
+		"collects": [],
+		"sensors": [],
+		"remoteAccess": "none",
+		"systemChanges": [],
+		"closedCode": false,
+		"other": "Projector passwords and the hash of the pairing token are kept in plugindata/fpp-plugin-FacadeKit (mode 0600), never in config/, the log or a command line; the token itself is shown once, when you create it. The REST routes under /api/plugin/fpp-plugin-FacadeKit switch projectors on and off and record the shows FacadeKit published: every route except version and projector-names needs the pairing token and refuses callers outside private networks. If you turn on the fault guard's stop option, the plugin stops FPP's playlist when a projector reports a fault. Nothing runs until you add a projector; automatic power and the fault guard are off by default. Uninstall removes the plugin's data and log unless FPP is reinstalling it."
+	}
+}

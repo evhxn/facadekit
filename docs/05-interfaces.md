@@ -659,7 +659,11 @@ Prefix `/api/v1`. JSON everywhere unless stated. Errors: HTTP status + body `{"e
 | `GET /projects/{pid}/renders/{rid}/file` | Range | `video/mp4` |
 | `POST /fpp/probe` | `{"host": str}` | `{"reachable": bool, "version": str\|null, "major": int\|null, "ok": bool, "problems": str[]}` (never an HTTP error for an unreachable host) |
 | `GET /fpp/status?host=` | – | `{"status_name": str\|null, "current_playlist": str\|null, "seconds_played": number\|null}` |
-| `POST /projects/{pid}/publish` | `{"host": str, "render_id": str, "playlist_name"?: str, "start": bool, "sequence_name"?: str}` | 202 `{"job_id": str}` |
+| `POST /projects/{pid}/publish` | `{"host": str, "render_id": str, "playlist_name"?: str, "start": bool, "sequence_name"?: str, "power_on"?: bool = false}` | 202 `{"job_id": str}`; ⚑ additive (T-209): when the FacadeKit FPP plugin is installed and paired, the job also registers the show with it and, with `power_on`, switches the projectors on before starting; the job result then has `plugin: {"status": "ok"\|"partial"\|"absent"\|"not_paired"\|"error", "registered": bool, "power": [...]\|null, "problems": str[]}` |
+| `GET /fpp/plugin?host=` ⚑ T-209 | – | `{"present", "version", "api", "paired", "token_stored", "configured", "health": object\|null, "problem": str\|null, "reason": str\|null}`; never an HTTP error for a missing plugin (docs/20) |
+| `POST /fpp/plugin/pair` ⚑ T-209 | `{"host": str, "token": str}` | same shape; the token is stored (data dir `secrets/`, 0600) only when the plugin accepts it |
+| `DELETE /fpp/plugin/pair?host=` ⚑ T-209 | – | same shape, token forgotten |
+| `POST /fpp/plugin/projectors` ⚑ T-209 | `{"host": str, "action": "on"\|"off", "wait"?: bool}` | the plugin's answer `{"ok", "action", "waited", "results": [{"id","name","ok","state","message"}]}` |
 | `GET /jobs/{jid}` | – | `Job` |
 | `POST /jobs/{jid}/cancel` | – | `Job` |
 | `POST /projects/{pid}/assets/{aid}/analyze` (v1) | – | 202 `{"job_id"}`; job appends markers to the project |
@@ -741,6 +745,8 @@ facadekit sim e2e  [--workdir PATH]                                 # full simul
 facadekit spike fpp-contract HOST [--out DIR] [--bundle ZIP] [--write-test] [--ask-password] [--timeout S]   # ⚑ additive: S-1 recorder, docs/17
 facadekit calib3d solve CAPTURE_DIR [--json] [--report DIR] [--min-confidence 0|1|2] [--max-range M]   # ⚑ additive: S-11 Part A, docs/18 (offline, simulator-tested only)
 facadekit new      PROJECT_DIR --sample [halloween|winter] [--name NAME]   # ⚑ additive: sample project on the simulated house (§13 "Effects and samples")
+facadekit fpp plugin-status HOST [--ask-token] [--json]             # ⚑ additive (T-209): the FacadeKit FPP plugin, docs/20; exit 1 when absent
+facadekit fpp fake-pjlink [--host H] [--port 4352] [--count N] [--password P] [--warmup S] [--cooldown S] [--quirk Q]   # ⚑ additive (T-209): fake projectors for testing
 ```
 
 `--sim` on `serve` replaces the camera list with one `sim` camera and makes the projector display a `SimDisplay` that is always "connected" at the default scene's size, so the whole UI can be exercised without hardware.
