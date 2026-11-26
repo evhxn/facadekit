@@ -33,6 +33,9 @@ function fk_default_settings(): array
         'guard_enabled' => false,     // watch projectors while a playlist in scope plays
         'guard_stop_playback' => false,
         'guard_interval_s' => 30,
+        'recovery_enabled' => false,  // opt-in: retry a projector once after a thermal error (docs/20)
+        'recovery_cooldown_s' => 300, // minimum wait after a thermal error before any retry
+        'recovery_healthy_reads' => 3, // consecutive fresh healthy readings needed after the cooldown
         'connect_timeout_s' => 3,
         'io_timeout_s' => 5,
     );
@@ -67,6 +70,8 @@ function fk_int_setting_ranges(): array
 {
     return array(
         'guard_interval_s' => array(5, 600),
+        'recovery_cooldown_s' => array(30, 3600),
+        'recovery_healthy_reads' => array(2, 10),
         'connect_timeout_s' => array(1, 30),
         'io_timeout_s' => array(1, 60),
     );
@@ -280,6 +285,9 @@ function fk_save_config(array $config): void
     $out['projectors'] = $config['projectors'];
     $out['config_version'] = 1;
     fk_write_json('config.json', $out);
+    if (empty($config['settings']['recovery_enabled']) && function_exists('fk_recovery_cancel')) {
+        fk_recovery_cancel(null, 'recovery was turned off');
+    }
 }
 
 function fk_coerce_setting(string $key, $value, $default)
@@ -569,6 +577,17 @@ function fk_log_tail(int $maxLines = 300): array
 }
 
 // -- small helpers ----------------------------------------------------------------------
+
+/** Unix time. FK_CLOCK_SCALE (tests only) runs the clock faster, the same in every process. */
+function fk_now_ts(): int
+{
+    $k = getenv('FK_CLOCK_SCALE');
+    if (is_string($k) && is_numeric($k) && (float)$k > 0 && (float)$k !== 1.0) {
+        $epoch = 1700000000.0;
+        return (int)($epoch + (microtime(true) - $epoch) * (float)$k);
+    }
+    return time();
+}
 
 function fk_now_iso(): string
 {

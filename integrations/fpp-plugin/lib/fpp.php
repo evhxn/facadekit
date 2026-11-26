@@ -37,7 +37,7 @@ function fk_fpp_request(string $method, string $path, float $timeout = 3.0): ?ar
     }
     $status = 0;
     $headers = function_exists('http_get_last_response_headers') ? http_get_last_response_headers()
-        : (isset($http_response_header) ? $http_response_header : array());
+        : (get_defined_vars()['http_response_header'] ?? array());
     if (is_array($headers) && isset($headers[0]) && preg_match('/^HTTP\/\S+\s+(\d{3})/', $headers[0], $m)) {
         $status = (int)$m[1];
     }

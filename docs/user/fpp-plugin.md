@@ -41,6 +41,16 @@ see [docs/20 §6](../20-fpp-plugin.md#6-sandbox-pi-dev-loop). It takes four comm
 - **Fault guard**: watches the projectors while a show plays and shows a red *Fault* line if
   one reports an error or switches off. Tick *Stop the playlist* only if you would rather
   stop the show than play it with a projector missing.
+- **Temperature warnings** are written to the plugin log once per projector (first warning,
+  error, back to normal) and the status table shows each projector's temperature and the time
+  of its last good reading. A warning alone never stops anything.
+- **Thermal recovery (optional, off by default)**: after a projector reports a temperature
+  *error* the plugin stops sending it power-on requests and lets it cool. After the minimum
+  cooldown and a few good readings in a row it switches the projector on **once** per show
+  (or just confirms it if it is already on), while the other projector keeps playing. If that
+  fails, or the error returns, the status table says **Needs attention** and the log says why.
+  Switching a projector off, stopping the show or turning the option off cancels it. It never
+  restarts a playlist, and it does nothing if *Stop the playlist* is ticked.
 
 ## 4. Pair FacadeKit
 

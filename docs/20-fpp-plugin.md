@@ -127,6 +127,55 @@ name ends the recorded show (log by name, per-projector `off_delay_s`, guard end
 the record, and with no record it is ignored. Before acting, `/api/fppd/status` is checked so a
 stale record or another in-scope playlist that is playing never causes a power-off.
 
+### 3.4b Thermal history and opt-in recovery (`lib/recovery.php`)
+
+PT-RZ570 `ERST?` is six characters; the third is the temperature severity (`0` ok, `1`
+warning, `2` error). Numeric sensor readings (intake, optics, exhaust, light source) exist on
+Panasonic's web status interface only; they stay a diagnostics follow-up until an
+authenticated read-only method, its freshness and its availability while running, cooling and
+in Normal standby are verified on both real units. ECO standby disables network control, so a
+projector in ECO standby cannot be monitored or retried at all. Recovery uses PJLink only.
+
+*History (always, whenever the guard, a status read or a Test reads ERST).* Per projector in
+`thermal.json`: the last known level, the time of the last **valid** reading, and the events
+**warning** (first warning), **escalation** (to error) and **clearance** (a fresh valid `ok`
+after a warning or error), each logged once with the projector's name. A reading that did not
+arrive (timeout, wrong password, ERR1 unsupported, ERR3 busy, ERR4 sensor failure) changes
+nothing: the last level is kept and nothing is cleared. A warning alone never touches playback.
+
+*Recovery (off by default, `recovery_enabled`).* While a show in scope plays the guard keeps
+watching after a fault (it used to end at the first one) and moves each projector through:
+
+| state | meaning |
+|---|---|
+| Monitoring | normal; a fresh valid error reading starts the cooldown |
+| Cooling down, no power-on | no power-on is sent; waits `recovery_cooldown_s` (default 300, min 30) |
+| Checking health | after the cooldown, needs `recovery_healthy_reads` (default 3) **consecutive** readings that are fresh (< 20 s), valid, not cooling/warming, temperature ok and no ERST field in error; any other reading resets the count |
+| Retrying power-on | once, only if the projector is in standby, still wanted on, and the per-show budget (1) is unused; the existing power worker sends POWR 1 |
+| Needs attention | failed retry, error back after the retry, retry not on within 120 s, budget used, or no health within cooldown + 30 min; reason in the log and the status table |
+
+If the projector is still **on** when health returns it is only confirmed (no power cycle, no
+budget used). A timer, a missing answer, a wrong password, an unsupported query or a sensor
+failure never counts as clearance. Everything is a pure function (`fk_recovery_step`) of the
+reading and the clock, walked through in `tests/test_fpp_plugin_recovery.py`.
+
+*Cancel, and nothing queued survives it.* Manual projector Off (UI, API, the scheduled
+"Projectors Off" command), the stop event (Stop Now, scheduled end and natural end, including
+FPP's empty-name stop), a replacement show, and turning recovery off all cancel counting and
+queued retries (`fk_recovery_cancel`). The retry runs as a normal worker under the projector
+lock with a one-off token; right before POWR 1 the worker re-checks the token, the show, the
+operator's wish and its intent number, so a cancel racing the retry wins (`cancelled`). Power-on
+requests (auto-on, "Projectors On", the API) are **held** for a projector whose last known
+level is `error` or whose recovery is in progress. A fresh monitor process treats anything
+left in progress by an earlier process (daemon restart, plugin reload) as unknown: no retry
+until a new confirmed error under the current show.
+
+*Playback.* Continue-show mode: the healthy projector keeps playing and the show is never
+touched. With "Stop the playlist when a projector reports a fault" on, the existing behaviour
+stands (the show is stopped, recovery has nothing left to do). Restarting a stopped playlist
+automatically is deliberately **not** built; it needs rules for show windows, restart
+position and manual cancellation and is a separately approved follow-up.
+
 ### 3.5 REST API (`/api/plugin/fpp-plugin-FacadeKit/…`)
 
 | Route | Token | Answer |
@@ -277,10 +326,9 @@ Verified here (all against fakes, on macOS):
 - FacadeKit client, fake plugin, publish with/without plugin, API routes, CLI, S-1 steps,
   web card [T]. Dev loop: repository build, fast-forward, dumb-HTTP clone on 127.0.0.1 [T].
 
-**Not executed here (php was not installed):** `php -l`, the PJLink client, the power
-sequences and the REST API. `tests/test_fpp_plugin_php.py` covers them against the fake
-projectors and `php -S`, and runs when `php` is present (`brew install php`;
-`FK_REQUIRE_PHP=1` makes a missing php a failure). Run it before the Pi.
+`tests/test_fpp_plugin_php.py` and `tests/test_fpp_plugin_recovery.py` run the PHP for real
+against the fake projectors and `php -S` when `php` is present (`brew install php`;
+`FK_REQUIRE_PHP=1` makes a missing php a failure). They ran clean on PHP 8.6 on the Mac.
 
 Unverified, needs the Pi or the projectors [A]:
 
@@ -294,6 +342,12 @@ Unverified, needs the Pi or the projectors [A]:
 5. Two projectors switched in parallel on the real wired network; fault guard during a real
    show; stop-on-fault with xLights/DMX playlists running.
 6. macOS firewall prompts for the dev server and the fake projectors.
+7. Thermal recovery on the real PT-RZ570s: whether `ERST?` answers (and answers truthfully) in
+   Normal standby and while cooling, what the projector reports during its own thermal
+   protection, and how long it takes to clear. If `ERST?` does not answer in standby the
+   recovery can only end in **Needs attention** (never in a blind retry). Check with the
+   plugin's Test button and the status table's "Last good reading" under normal conditions;
+   do not overheat the units to find out.
 
 ## 9. Limits
 
