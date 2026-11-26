@@ -482,20 +482,67 @@ function fk_in_scope(array $settings, string $playlist): bool
     return isset(fk_shows_playlists()[$playlist]);
 }
 
+// -- the show that is running ---------------------------------------------------------------
+
+/**
+ * FPP 10.4 sends the real playlist name with the "start" event, but the "stop" event (Stop Now
+ * and the natural end alike) carries an empty placeholder playlist: name "", Section "New".
+ * So the plugin remembers which in-scope show it started, in active_show.json, and a stop
+ * with no usable name ends that show.
+ */
+function fk_active_show_get(): ?string
+{
+    $rec = fk_read_json('active_show.json', null);
+    return (is_array($rec) && isset($rec['name']) && is_string($rec['name']) && $rec['name'] !== '') ? $rec['name'] : null;
+}
+
+/** Remember $name as the running show (replaces any earlier record). */
+function fk_active_show_set(string $name): void
+{
+    fk_with_lock('active-show', function () use ($name) {
+        if (fk_active_show_get() !== $name) {
+            fk_write_json('active_show.json', array('name' => $name, 'started_at' => fk_now_iso()));
+        }
+    });
+}
+
+/** Forget the running show; returns its name, or null when none was recorded. */
+function fk_active_show_clear(): ?string
+{
+    return fk_with_lock('active-show', function () {
+        $name = fk_active_show_get();
+        if (is_file(fk_data_dir() . '/active_show.json')) {
+            @unlink(fk_data_dir() . '/active_show.json');
+        }
+        return $name;
+    });
+}
+
 /** Called from callbacks.sh for every playlist event; returns at once. */
 function fk_playlist_event(array $data): void
 {
     $action = isset($data['Action']) && is_string($data['Action']) ? $data['Action'] : '';
     $name = isset($data['name']) && is_string($data['name']) ? $data['name'] : '';
-    if ($action !== 'start' && $action !== 'stop') {
+    if ($action !== 'start' && $action !== 'stop' && $action !== 'playing') {
         return;
     }
     $config = fk_load_config();
     $settings = $config['settings'];
-    if (!$config['projectors'] || !fk_in_scope($settings, $name)) {
+    if (!$config['projectors']) {
+        return;
+    }
+    $inScope = fk_in_scope($settings, $name);
+    if ($action === 'playing') {
+        if ($inScope) {
+            fk_active_show_set($name); // keeps the record right after a restart of fppd
+        }
         return;
     }
     if ($action === 'start') {
+        if (!$inScope) {
+            return;
+        }
+        fk_active_show_set($name);
         if ($settings['auto_on']) {
             fk_log('INFO', 'playlist "' . $name . '" started: switching projectors on');
             fk_power('on', $config['projectors'], false, null);
@@ -506,8 +553,28 @@ function fk_playlist_event(array $data): void
         }
         return;
     }
+    // stop
+    $show = $name;
+    if (!$inScope) {
+        $show = fk_active_show_get() ?? '';
+        if ($show === '') {
+            return; // not a show of ours, and none is recorded
+        }
+    }
+    // Another in-scope playlist already playing means this stop is not the end of the show.
+    $status = fk_fpp_status();
+    $now = ($status !== null && $status['current_playlist'] !== null && fk_in_scope($settings, $status['current_playlist']))
+        ? $status['current_playlist'] : null;
+    if ($now !== null && ($now !== $show || ($name !== '' && !$inScope))) {
+        fk_log('INFO', 'playlist stop ignored: "' . $now . '" is playing');
+        return;
+    }
+    fk_active_show_clear();
+    if (!$inScope) {
+        fk_log('INFO', 'playlist stopped with no name (FPP sends an empty one): ending "' . $show . '"');
+    }
     if ($settings['auto_off']) {
-        fk_log('INFO', 'playlist "' . $name . '" stopped: switching projectors off (per-projector delay)');
+        fk_log('INFO', 'playlist "' . $show . '" stopped: switching projectors off (per-projector delay)');
         foreach ($config['projectors'] as $p) {
             $seq = fk_new_intent($p['id'], 'off');
             fk_spawn_detached(array('worker', 'off', $p['id'], (string)$seq, '0', '-', (string)(int)$p['off_delay_s']));
@@ -558,8 +625,19 @@ function fk_guard(string $playlist): void
                 return;
             }
             fk_sleep_s((int)$settings['guard_interval_s']);
+            // The stop event clears the record: that ends the guard. A newer show replaces it.
+            $recorded = fk_active_show_get();
+            if ($recorded === null) {
+                fk_log('INFO', 'fault guard stopped: the show ended');
+                return;
+            }
+            if ($recorded !== $playlist) {
+                $playlist = $recorded;
+                fk_log('INFO', 'fault guard now watching "' . $playlist . '"');
+            }
             $status = fk_fpp_status();
-            if ($status === null || $status['current_playlist'] === null || !fk_in_scope($settings, $status['current_playlist'])) {
+            if ($status === null || $status['status_name'] === 'idle' || $status['current_playlist'] === null
+                || !fk_in_scope($settings, $status['current_playlist'])) {
                 fk_log('INFO', 'fault guard stopped: no show in scope is playing');
                 return;
             }

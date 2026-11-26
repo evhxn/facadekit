@@ -1,0 +1,53 @@
+{
+  "start": {
+    "Action": "start",
+    "Item": 0,
+    "Section": "MainPlaylist",
+    "blankAtEnd": 1,
+    "currentEntry": {
+      "mediaFilename": "fk_pi-sandbox-halloween.mp4",
+      "type": "media"
+    },
+    "currentState": "playing",
+    "desc": "",
+    "loop": 0,
+    "loopCount": 0,
+    "name": "FacadeKit - Sample: Halloween (simulated house)",
+    "random": 0,
+    "repeat": 0,
+    "size": 1
+  },
+  "playing": {
+    "Action": "playing",
+    "Item": 0,
+    "Section": "MainPlaylist",
+    "blankAtEnd": 1,
+    "currentEntry": {
+      "mediaFilename": "fk_pi-sandbox-halloween.mp4",
+      "type": "media"
+    },
+    "currentState": "playing",
+    "desc": "",
+    "loop": 0,
+    "loopCount": 0,
+    "name": "FacadeKit - Sample: Halloween (simulated house)",
+    "random": 0,
+    "repeat": 0,
+    "size": 1
+  },
+  "stop": {
+    "Action": "stop",
+    "Item": 0,
+    "Section": "New",
+    "blankAtEnd": 0,
+    "currentEntry": null,
+    "currentState": "idle",
+    "desc": "",
+    "loop": 0,
+    "loopCount": 0,
+    "name": "",
+    "random": 0,
+    "repeat": 0,
+    "size": 0
+  }
+}

@@ -13,10 +13,14 @@ import os
 import shutil
 import socket
 import subprocess
+import threading
 import time
 from collections.abc import Iterator
+from datetime import datetime
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import httpx
 import pytest
@@ -281,3 +285,116 @@ def test_same_link_accepts_only_the_players_own_subnet(
     out = subprocess.run([PHP or "php", "-r", code], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr
     assert json.loads(out.stdout.strip().splitlines()[-1]) is expected
+
+
+# -- playlist events: FPP 10.4 sends the stop with an empty playlist name ---------------------
+
+EVENTS = json.loads(
+    (Path(__file__).parent / "fixtures" / "fpp_playlist_events.json").read_text("utf-8")
+)
+SHOW = EVENTS["start"]["name"]
+
+
+def event(env: dict[str, str], name: str) -> None:
+    out = subprocess.run([PHP or "php", str(CLI), "playlist-event", json.dumps(EVENTS[name])],
+                         env=env, capture_output=True, text=True, timeout=60)  # fmt: skip
+    assert out.returncode == 0, out.stderr
+
+
+def active_show(env: dict[str, str]) -> str | None:
+    path = Path(env["FK_PLUGIN_DATA_DIR"], "active_show.json")
+    return json.loads(path.read_text("utf-8"))["name"] if path.exists() else None
+
+
+def wait_power(server: FakePjlinkServer, wanted: str, timeout: float = 15) -> bool:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if server.projector.power() == wanted:
+            return True
+        time.sleep(0.1)
+    return False
+
+
+@pytest.fixture
+def fpp_status(env: dict[str, str]) -> Iterator[dict[str, Any]]:
+    """A fake fppd /api/fppd/status; set ``playlist`` to what the player is playing."""
+    state: dict[str, Any] = {"playlist": None}
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            name = state["playlist"]
+            body = json.dumps({"status_name": "playing" if name else "idle",
+                               "current_playlist": {"playlist": name or ""}}).encode()  # fmt: skip
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args: Any) -> None:
+            pass
+
+    httpd = HTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    env["FK_FPP_API"] = f"http://127.0.0.1:{httpd.server_port}"
+    yield state
+    httpd.shutdown()
+
+
+def test_empty_name_stop_switches_projectors_off(
+    env: dict[str, str], laser: FakePjlinkServer, fpp_status: dict[str, Any]
+) -> None:
+    write_config(env, [proj(laser)], auto_on=True, auto_off=True, auto_scope="all")
+    event(env, "start")
+    assert wait_power(laser, "1") and active_show(env) == SHOW
+    event(env, "stop")  # name "": the exact payload FPP 10.4 sends
+    assert wait_power(laser, "0")
+    assert active_show(env) is None
+    assert f'"{SHOW}"' in log_text(env) and "FPP sends an empty one" in log_text(env)
+
+
+def test_stop_without_a_recorded_show_is_ignored(
+    env: dict[str, str], laser: FakePjlinkServer, fpp_status: dict[str, Any]
+) -> None:
+    write_config(env, [proj(laser)], auto_off=True, auto_scope="all")
+    laser.projector.set_power("1", 0)
+    event(env, "stop")
+    time.sleep(1)
+    assert laser.projector.power() == "1" and "switching projectors off" not in log_text(env)
+
+
+def test_second_start_replaces_the_record(
+    env: dict[str, str], laser: FakePjlinkServer, fpp_status: dict[str, Any]
+) -> None:
+    write_config(env, [proj(laser)], auto_scope="all")
+    event(env, "start")
+    other = dict(EVENTS["start"], name="Another Show")
+    subprocess.run([PHP or "php", str(CLI), "playlist-event", json.dumps(other)], env=env,
+                   check=True, capture_output=True, timeout=60)  # fmt: skip
+    assert active_show(env) == "Another Show"
+
+
+def test_stop_while_another_show_plays_keeps_projectors_on(
+    env: dict[str, str], laser: FakePjlinkServer, fpp_status: dict[str, Any]
+) -> None:
+    write_config(env, [proj(laser)], auto_on=True, auto_off=True, auto_scope="all")
+    event(env, "start")
+    assert wait_power(laser, "1")
+    fpp_status["playlist"] = "Next Show"
+    event(env, "stop")
+    time.sleep(1)
+    assert laser.projector.power() == "1"
+    assert active_show(env) == SHOW  # still recorded; the real stop comes later
+    fpp_status["playlist"] = None
+    event(env, "stop")
+    assert wait_power(laser, "0") and active_show(env) is None
+
+
+def test_log_uses_one_time_zone_in_every_process(env: dict[str, str]) -> None:
+    code = f"require {json.dumps(str(PLUGIN / 'lib' / 'common.php'))}; fk_log('INFO', 'tz');"
+    zone = "Pacific/Auckland"
+    out = subprocess.run([PHP or "php", "-d", "date.timezone=UTC", "-r", code],
+                         env={**env, "TZ": zone}, capture_output=True, text=True)  # fmt: skip
+    assert out.returncode == 0, out.stderr
+    stamp = datetime.strptime(log_text(env)[:19], "%Y-%m-%d %H:%M:%S")
+    local = datetime.now(ZoneInfo(zone)).replace(tzinfo=None)
+    assert abs((local - stamp).total_seconds()) < 120

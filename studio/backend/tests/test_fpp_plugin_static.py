@@ -328,3 +328,15 @@ def test_detach_shell_keeps_arguments_literal(tmp_path: Path) -> None:
         time.sleep(0.05)
     assert target.exists()
     assert not (tmp_path / "pwned").exists()
+
+
+def test_stop_event_handling_exists_and_fixtures_parse() -> None:
+    code = _all_code()
+    for name in ("fk_active_show_get", "fk_active_show_set", "fk_active_show_clear",
+                 "fk_system_timezone"):  # fmt: skip
+        assert re.search(rf"\bfunction\s+{name}\s*\(", code), name
+    events = json.loads(
+        (Path(__file__).parent / "fixtures" / "fpp_playlist_events.json").read_text("utf-8")
+    )
+    assert events["start"]["Action"] == "start" and events["start"]["name"]
+    assert events["stop"]["Action"] == "stop" and events["stop"]["name"] == ""
