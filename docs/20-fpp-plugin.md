@@ -116,7 +116,16 @@ only spawns workers. Scope: **only playlists FacadeKit published** (the manifest
   grace period marks the plugin **unhealthy** (status panel, `/health`, FacadeKit card) and,
   if "stop the playlist" is on, calls FPP's `POST /api/playlists/stop` on the loopback. Three
   missed answers in a row only mark it unhealthy (no stop). One guard at a time; it ends when
-  nothing in scope is playing.
+  nothing in scope is playing, FPP reports idle, or the recorded show is cleared.
+
+*Stop events.* FPP 10.4 sends the real playlist name with `start` (and `playing`), but the `stop`
+event, for Stop Now and the natural end alike, carries an empty placeholder playlist (`"name":""`,
+`"Section":"New"`, `"currentEntry":null`) [verified on a Pi]. Matching the event name alone
+would therefore never switch the projectors off. The plugin records the in-scope show it saw
+start in `active_show.json` (a second start replaces it); a stop with an empty or out-of-scope
+name ends the recorded show (log by name, per-projector `off_delay_s`, guard ends) and clears
+the record, and with no record it is ignored. Before acting, `/api/fppd/status` is checked so a
+stale record or another in-scope playlist that is playing never causes a power-off.
 
 ### 3.5 REST API (`/api/plugin/fpp-plugin-FacadeKit/…`)
 

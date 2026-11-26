@@ -449,6 +449,39 @@ function fk_same_link(string $remote, string $server): bool
     return substr($r, 0, $bytes) === substr($s, 0, $bytes);
 }
 
+// -- time zone --------------------------------------------------------------------------
+
+/**
+ * The player's own time zone. php-fpm (web page, FPP callbacks) and php-cli (background
+ * workers) read different php.ini files, and without date.timezone one falls back to UTC, so
+ * the log mixed local and UTC times. Every process now sets the same zone explicitly: TZ,
+ * then /etc/timezone, then the /etc/localtime link, else UTC.
+ */
+function fk_system_timezone(): string
+{
+    $candidates = array();
+    $tz = getenv('TZ');
+    if (is_string($tz) && $tz !== '') {
+        $candidates[] = ltrim($tz, ':');
+    }
+    $file = @file_get_contents('/etc/timezone');
+    if (is_string($file) && trim($file) !== '') {
+        $candidates[] = trim($file);
+    }
+    $link = @readlink('/etc/localtime');
+    if (is_string($link) && preg_match('~zoneinfo/(.+)$~', $link, $m) === 1) {
+        $candidates[] = $m[1];
+    }
+    foreach ($candidates as $zone) {
+        if (in_array($zone, timezone_identifiers_list(), true)) {
+            return $zone;
+        }
+    }
+    return 'UTC';
+}
+
+date_default_timezone_set(fk_system_timezone());
+
 // -- logging ----------------------------------------------------------------------------
 
 /**
